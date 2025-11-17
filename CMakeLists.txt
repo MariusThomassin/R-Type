@@ -15,21 +15,23 @@ add_executable(client client/main.cpp)
 
 # Put runtime binaries in a clear, cross-platform location inside the build dir.
 # For multi-config generators (Visual Studio), create config subfolders.
-set(BIN_OUT ${CMAKE_BINARY_DIR}/bin)
-set_target_properties(server PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${BIN_OUT}
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BIN_OUT}/Debug
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_OUT}/Release
-    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${BIN_OUT}/RelWithDebInfo
-    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${BIN_OUT}/MinSizeRel
-)
-set_target_properties(client PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${BIN_OUT}
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BIN_OUT}/Debug
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_OUT}/Release
-    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${BIN_OUT}/RelWithDebInfo
-    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${BIN_OUT}/MinSizeRel
-)
+# For single-config generators (Ninja, Make), place directly in bin/
+if(CMAKE_CONFIGURATION_TYPES)
+    # Multi-config generator (Visual Studio, Xcode)
+    set(BIN_OUT ${CMAKE_BINARY_DIR}/bin)
+    set_target_properties(server client PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BIN_OUT}/Debug
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_OUT}/Release
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${BIN_OUT}/RelWithDebInfo
+        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${BIN_OUT}/MinSizeRel
+    )
+else()
+    # Single-config generator (Ninja, Unix Makefiles)
+    set(BIN_OUT ${CMAKE_BINARY_DIR}/bin)
+    set_target_properties(server client PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${BIN_OUT}
+    )
+endif()
 
 # Preserve original binary names used across the project
 # (keeps compatibility with existing scripts/expectations: r-type_server / r-type_client)
