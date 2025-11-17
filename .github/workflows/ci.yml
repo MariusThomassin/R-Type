@@ -10,24 +10,11 @@ on:
       pull_request:
         branches: [ main ]
 
+    # Three explicit jobs to avoid matrix expression issues in the runner validation
     jobs:
-      build:
-        name: "Build and smoke-test on ${{ matrix.os }} (generator: ${{ matrix.generator }})"
-        runs-on: ${{ matrix.os }}
-        strategy:
-          fail-fast: false
-          matrix:
-            include:
-              - os: ubuntu-latest
-                generator: Ninja
-                build_type: Release
-              - os: ubuntu-latest
-                generator: "Unix Makefiles"
-                build_type: Release
-              - os: windows-latest
-                generator: "Visual Studio 17 2022"
-                build_type: Release
-
+      build-linux-ninja:
+        name: Build (Linux, Ninja)
+        runs-on: ubuntu-latest
         steps:
           - name: Checkout repository
             uses: actions/checkout@v4
@@ -38,54 +25,92 @@ on:
               cmake --version || true
               ninja --version || true
 
-          - name: Configure with CMake
-            shell: bash
+          - name: Configure with CMake (Ninja)
             run: |
-              echo "Generator: ${{ matrix.generator }}"
-              if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-                # Use x64 for Visual Studio generator
-                cmake -S . -B build -G "${{ matrix.generator }}" -A x64
-              else
-                cmake -S . -B build -G "${{ matrix.generator }}" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-              fi
+              cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
           - name: Build
-            shell: bash
-            run: |
-              if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-                cmake --build build --config ${{ matrix.build_type }} -- /m
-              else
-                cmake --build build -- -j$(nproc)
-              fi
+            run: cmake --build build -- -j$(nproc)
 
-          - name: Run smoke tests (execute built binaries)
-            shell: bash
+          - name: Run smoke tests
             run: |
               echo "Checking built binaries"
-              if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-                server=build/bin/Release/r-type_server.exe
-                client=build/bin/Release/r-type_client.exe
-                echo "Server binary: $server"
-                ls -l "$(dirname "$server")" || true
-                "$server" || (echo "Server failed to run" && exit 1)
-                "$client" || (echo "Client failed to run" && exit 1)
-              else
-                server=build/bin/r-type_server
-                client=build/bin/r-type_client
-                echo "Server binary: $server"
-                ls -l "$(dirname "$server")" || true
-                chmod +x "$server" || true
-                "$server" || (echo "Server failed to run" && exit 1)
-                "$client" || (echo "Client failed to run" && exit 1)
-              fi
+              server=build/bin/r-type_server
+              client=build/bin/r-type_client
+              ls -l "$(dirname "$server")" || true
+              chmod +x "$server" || true
+              "$server" || (echo "Server failed to run" && exit 1)
+              "$client" || (echo "Client failed to run" && exit 1)
 
-          - name: Upload built binaries (optional)
+          - name: Upload built binaries
             if: always()
             uses: actions/upload-artifact@v4
             with:
-              name: built-binaries-${{ matrix.os }}-${{ matrix.generator }}
-              path: |
-                build/bin/**
+              name: built-binaries-linux-ninja
+              path: build/bin/**
+
+      build-linux-make:
+        name: Build (Linux, Make)
+        runs-on: ubuntu-latest
+        steps:
+          - name: Checkout repository
+            uses: actions/checkout@v4
+
+          - name: Configure with CMake (Unix Makefiles)
+            run: cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+
+          - name: Build
+            run: cmake --build build -- -j$(nproc)
+
+          - name: Run smoke tests
+            run: |
+              echo "Checking built binaries"
+              server=build/bin/r-type_server
+              client=build/bin/r-type_client
+              ls -l "$(dirname "$server")" || true
+              chmod +x "$server" || true
+              "$server" || (echo "Server failed to run" && exit 1)
+              "$client" || (echo "Client failed to run" && exit 1)
+
+          - name: Upload built binaries
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+              name: built-binaries-linux-make
+              path: build/bin/**
+
+      build-windows-vs:
+        name: Build (Windows, Visual Studio 2022)
+        runs-on: windows-latest
+        steps:
+          - name: Checkout repository
+            uses: actions/checkout@v4
+
+          - name: Configure with CMake (Visual Studio)
+            shell: powershell
+            run: |
+              cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+          - name: Build
+            shell: powershell
+            run: cmake --build build --config Release -- /m
+
+          - name: Run smoke tests
+            shell: powershell
+            run: |
+              Write-Host "Checking built binaries"
+              $server = "build\bin\Release\r-type_server.exe"
+              $client = "build\bin\Release\r-type_client.exe"
+              Get-ChildItem (Split-Path $server) -ErrorAction SilentlyContinue
+              & $server; if ($LASTEXITCODE -ne 0) { Write-Error "Server failed to run"; exit 1 }
+              & $client; if ($LASTEXITCODE -ne 0) { Write-Error "Client failed to run"; exit 1 }
+
+          - name: Upload built binaries
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+              name: built-binaries-windows-vs
+              path: build/bin/**
 
                 - name: Show runner and tool versions
                   run: |
