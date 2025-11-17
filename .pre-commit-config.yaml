@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: validate-github-workflows
+        name: Validate GitHub workflow YAML
+        entry: bash scripts/check-workflows.sh
+        language: script
+        files: '^\.github/workflows/.*\\.ya?ml$'
+        pass_filenames: false
