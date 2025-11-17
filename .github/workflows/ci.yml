@@ -2,90 +2,90 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    name: C/C++ CI
 
-jobs:
-  build:
-    name: Build and smoke-test on ${{ matrix.os }} (generator: ${{ matrix.generator }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            generator: Ninja
-            build_type: Release
-          - os: ubuntu-latest
-            generator: "Unix Makefiles"
-            build_type: Release
-          - os: windows-latest
-            generator: "Visual Studio 17 2022"
-            build_type: Release
+    on:
+      push:
+        branches: [ main ]
+      pull_request:
+        branches: [ main ]
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    jobs:
+      build:
+        name: "Build and smoke-test on ${{ matrix.os }} (generator: ${{ matrix.generator }})"
+        runs-on: ${{ matrix.os }}
+        strategy:
+          fail-fast: false
+          matrix:
+            include:
+              - os: ubuntu-latest
+                generator: Ninja
+                build_type: Release
+              - os: ubuntu-latest
+                generator: "Unix Makefiles"
+                build_type: Release
+              - os: windows-latest
+                generator: "Visual Studio 17 2022"
+                build_type: Release
 
-      - name: Show runner and tool versions
-        run: |
-          uname -a || true
-          cmake --version || true
-          ninja --version || true
+        steps:
+          - name: Checkout repository
+            uses: actions/checkout@v4
 
-      - name: Configure with CMake
-        shell: bash
-        run: |
-          echo "Generator: ${{ matrix.generator }}"
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            # Use x64 for Visual Studio generator
-            cmake -S . -B build -G "${{ matrix.generator }}" -A x64
-          else
-            cmake -S . -B build -G "${{ matrix.generator }}" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          fi
+          - name: Show runner and tool versions
+            run: |
+              uname -a || true
+              cmake --version || true
+              ninja --version || true
 
-      - name: Build
-        shell: bash
-        run: |
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            cmake --build build --config ${{ matrix.build_type }} -- /m
-          else
-            cmake --build build -- -j$(nproc)
-          fi
+          - name: Configure with CMake
+            shell: bash
+            run: |
+              echo "Generator: ${{ matrix.generator }}"
+              if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+                # Use x64 for Visual Studio generator
+                cmake -S . -B build -G "${{ matrix.generator }}" -A x64
+              else
+                cmake -S . -B build -G "${{ matrix.generator }}" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+              fi
 
-      - name: Run smoke tests (execute built binaries)
-        shell: bash
-        run: |
-          name: C/C++ CI
+          - name: Build
+            shell: bash
+            run: |
+              if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+                cmake --build build --config ${{ matrix.build_type }} -- /m
+              else
+                cmake --build build -- -j$(nproc)
+              fi
 
-          on:
-            push:
-              branches: [ main ]
-            pull_request:
-              branches: [ main ]
+          - name: Run smoke tests (execute built binaries)
+            shell: bash
+            run: |
+              echo "Checking built binaries"
+              if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+                server=build/bin/Release/r-type_server.exe
+                client=build/bin/Release/r-type_client.exe
+                echo "Server binary: $server"
+                ls -l "$(dirname "$server")" || true
+                "$server" || (echo "Server failed to run" && exit 1)
+                "$client" || (echo "Client failed to run" && exit 1)
+              else
+                server=build/bin/r-type_server
+                client=build/bin/r-type_client
+                echo "Server binary: $server"
+                ls -l "$(dirname "$server")" || true
+                chmod +x "$server" || true
+                "$server" || (echo "Server failed to run" && exit 1)
+                "$client" || (echo "Client failed to run" && exit 1)
+              fi
 
-          jobs:
-            build:
-              name: Build and smoke-test on ${{ matrix.os }} (generator: ${{ matrix.generator }})
-              runs-on: ${{ matrix.os }}
-              strategy:
-                fail-fast: false
-                matrix:
-                  include:
-                    - os: ubuntu-latest
-                      generator: Ninja
-                      build_type: Release
-                    - os: ubuntu-latest
-                      generator: "Unix Makefiles"
-                      build_type: Release
-                    - os: windows-latest
-                      generator: "Visual Studio 17 2022"
-                      build_type: Release
-
-              steps:
-                - name: Checkout repository
-                  uses: actions/checkout@v4
+          - name: Upload built binaries (optional)
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+              name: built-binaries-${{ matrix.os }}-${{ matrix.generator }}
+              path: |
+                build/bin/**
 
                 - name: Show runner and tool versions
                   run: |
