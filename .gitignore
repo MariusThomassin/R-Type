@@ -1,6 +1,7 @@
 # Ignore build artifacts and CMake temporary files
 /# Build directory
 build/
+build-windows/
 
 # CMake files
 CMakeFiles/
