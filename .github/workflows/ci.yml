@@ -2,16 +2,12 @@ name: C/C++ CI
 
 on:
   push:
-    name: C/C++ CI
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-    on:
-      push:
-        branches: [ main ]
-      pull_request:
-        branches: [ main ]
-
-    # Three explicit jobs to avoid matrix expression issues in the runner validation
-    jobs:
+# Three explicit jobs to avoid matrix expression issues in the runner validation
+jobs:
       build-linux-ninja:
         name: Build (Linux, Ninja)
         runs-on: ubuntu-latest
