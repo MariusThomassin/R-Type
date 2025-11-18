@@ -41,6 +41,12 @@ jobs:
         env:
           EPITECH_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-CPP-500-MPL-5-2-rtype-1.git
         run: |
+          # Set the SSH key SSH_PRIVATE_KEY
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git remote add epitech $EPITECH_REPO || git remote set-url epitech $EPITECH_REPO
