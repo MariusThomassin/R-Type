@@ -1,0 +1,22 @@
+name: Mirror from Organization Repo
+
+on:
+  schedule:
+    # Sync every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror repository
+        env:
+          SOURCE_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-CPP-500-MPL-5-2-rtype-1.git
+          DEST_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/MariusThomassin/R-Type.git
+        run: |
+          git clone --bare $SOURCE_REPO temp-repo
+          cd temp-repo
+          git push --mirror $DEST_REPO
+          cd ..
+          rm -rf temp-repo
