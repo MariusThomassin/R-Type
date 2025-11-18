@@ -12,6 +12,7 @@ on:
 jobs:
   build-test-and-mirror:
     runs-on: ubuntu-latest
+    if: github.repository == 'MariusThomassin/R-Type'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
