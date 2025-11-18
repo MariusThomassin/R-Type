@@ -39,18 +39,16 @@ jobs:
       - name: Mirror to Epitech repo
         if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
-          EPITECH_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-CPP-500-MPL-5-2-rtype-1.git
-        run: |
-          # Set the SSH key SSH_PRIVATE_KEY
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git remote add epitech $EPITECH_REPO || git remote set-url epitech $EPITECH_REPO
-          git push epitech main --force
+          EPITECH_REPO: git@github.com:EpitechPGE3-2025/G-CPP-500-MPL-5-2-rtype-1.git
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+            with:
+              fetch-depth: 0
+          - uses: pixta-dev/repository-mirroring-action@v1
+            with:
+              target_repo_url: ${{{{ vars.MIRROR_URL }}}}
+              ssh_private_key: ${{{{ secrets.SSH_PRIVATE_KEY }}}}
       
       - name: Success message
         if: success()
