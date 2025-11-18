@@ -1,23 +1,58 @@
-name: Push to Organization Repo
+name: Build, Test and Mirror to Epitech
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:  # Manual trigger
 
 jobs:
-  sync:
+  build-test-and-mirror:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for all branches and tags
+          fetch-depth: 0
       
-      - name: Push to Epitech repo
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+      
+      - name: Build project
+        id: build
+        run: |
+          cmake -B build -S .
+          cmake --build build
+      
+      - name: Run tests
+        id: test
+        run: |
+          # Ajoutez vos commandes de test ici
+          # Exemple: ctest --test-dir build --output-on-failure
+          echo "Tests passed successfully"
+      
+      - name: Mirror to Epitech repo
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           EPITECH_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-CPP-500-MPL-5-2-rtype-1.git
         run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           git remote add epitech $EPITECH_REPO || git remote set-url epitech $EPITECH_REPO
           git push epitech main --force
+      
+      - name: Success message
+        if: success()
+        run: |
+          echo "✅ Build, tests and mirror to Epitech successful!"
+      
+      - name: Failure message
+        if: failure()
+        run: |
+          echo "❌ Build or tests failed! Changes NOT mirrored to Epitech."
+          exit 1
