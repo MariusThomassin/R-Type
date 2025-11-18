@@ -2,6 +2,6 @@
 
 int main()
 {
-    std::cout << "Client: running (placeholder main)" << std::endl;
+    std::cout << "Coucou je suis le Client" << std::endl;
     return 0;
 }

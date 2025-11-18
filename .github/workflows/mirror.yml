@@ -1,22 +1,23 @@
-name: Mirror from Organization Repo
+name: Push to Organization Repo
 
 on:
-  schedule:
-    # Sync every 6 hours
-    - cron: '0 */6 * * *'
+  push:
+    branches:
+      - main
   workflow_dispatch:  # Manual trigger
 
 jobs:
-  mirror:
+  sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Mirror repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches and tags
+      
+      - name: Push to Epitech repo
         env:
-          SOURCE_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-CPP-500-MPL-5-2-rtype-1.git
-          DEST_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/MariusThomassin/R-Type.git
+          EPITECH_REPO: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-CPP-500-MPL-5-2-rtype-1.git
         run: |
-          git clone --bare $SOURCE_REPO temp-repo
-          cd temp-repo
-          git push --mirror $DEST_REPO
-          cd ..
-          rm -rf temp-repo
+          git remote add epitech $EPITECH_REPO || git remote set-url epitech $EPITECH_REPO
+          git push epitech main --force
