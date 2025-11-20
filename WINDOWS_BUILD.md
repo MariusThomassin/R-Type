@@ -1,4 +1,4 @@
-# Install MindGw-w64
+# Install MindGw-w64 for Windows
 
 ### 1. Download Packages
 Download MSYS2 from https://www.msys2.org/

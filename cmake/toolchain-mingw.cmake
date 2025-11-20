@@ -1,5 +1,6 @@
 # Cross-compile for Windows from Linux (WSL)
 set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_SYSTEM_PROCESSOR x86_64)
 
 # Target triple (64-bit Windows)
 set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)

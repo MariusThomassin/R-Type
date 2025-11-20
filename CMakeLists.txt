@@ -87,6 +87,29 @@ install(TARGETS server client
 )
 
 #--------------------------------------------------------------
+# Custom Rules
+#--------------------------------------------------------------
+# clean target to remove only binaries
+add_custom_target(clean_bin
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${BIN_OUT}
+    COMMENT "Clean : removing binaries in ${BIN_OUT}"
+)
+
+# fclean target to remove build directory
+add_custom_target(fclean
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}
+    COMMENT "Full clean: removing build directory and binaries"
+)
+
+# re : fclean + all target to rebuild all
+add_custom_target(re
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target clean
+    COMMAND ${CMAKE_COMMAND} -S ${CMAKE_SOURCE_DIR} -B ${CMAKE_BINARY_DIR}
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
+    COMMENT "Rebuilding project..."
+)
+
+#--------------------------------------------------------------
 # Summary
 #--------------------------------------------------------------
 message(STATUS "Project configured for C++${CMAKE_CXX_STANDARD}, binaries will be in: ${BIN_OUT}")
