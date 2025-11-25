@@ -1,8 +1,19 @@
 #!/bin/bash
-mkdir -p build-linux
+set -e
 
-# Simple CMake build without toolchain file
-cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Release
-make -C build-linux -j$(nproc)
+BUILD_DIR="build"
 
-echo -e "\n\nBuild completed. Binaries are located in the build-linux directory."
+echo "🔨 Building R-Type for Linux..."
+
+# Create and enter build directory
+mkdir -p "$BUILD_DIR"
+
+# Configure
+cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
+
+# Build
+cmake --build "$BUILD_DIR" -j$(nproc)
+
+echo "✅ Build completed!"
+echo "📦 Binaries are in: $BUILD_DIR/"
+ls -lh "$BUILD_DIR"/r-type_*

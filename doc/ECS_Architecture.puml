@@ -1,0 +1,108 @@
+@startuml ECS_Architecture
+!define ENTITY_COLOR #E8E8E8
+!define COMPONENT_COLOR #FFE6E6
+!define SYSTEM_COLOR #FFF9E6
+!define MANAGER_COLOR #E6F3FF
+
+skinparam backgroundColor white
+skinparam classBackgroundColor white
+skinparam classBorderColor black
+
+' Core ECS
+interface IComponent <<interface>> #FFE6E6 {
+  +getTypeName(): string
+}
+
+interface ISystem <<interface>> #FFF9E6 {
+  +update(): void
+  +getPhase(): SystemPhase
+  +isEnabled(): bool
+}
+
+class Entity <<entity>> #E8E8E8 {
+  +type: size_t
+}
+
+class Registry <<manager>> #E6F3FF {
+  -entities: map<Entity>
+  -componentArrays: map<>
+  +createEntity(): Entity
+  +destroyEntity(Entity)
+  +addComponent<T>(Entity, T&)
+  +getComponent<T>(Entity): T&
+  +getEntities(): vector<Entity>*
+}
+
+class SystemManager <<manager>> #E6F3FF {
+  -systems: vector<ISystem*>
+  +addSystem<T>(): T*
+  +getSystem<T>(): T*
+  +updateAllWorlds(float)
+}
+
+class EventBus <<manager>> #E6F3FF {
+  -subscribers: map<>
+  +emit<T>(event)
+  +subscribe<T>(callback)
+}
+
+' Components concrets
+class TransformComponent #FFE6E6
+class VelocityComponent #FFE6E6
+class SpriteComponent #FFE6E6
+class ColliderComponent #FFE6E6
+class HealthComponent #FFE6E6
+class WeaponComponent #FFE6E6
+class AIComponent #FFE6E6
+class NetworkComponent #FFE6E6
+
+note right of TransformComponent
+  <b>Components = Pure Data</b>
+  No logic
+end note
+
+' Systems concrets
+class MovementSystem #FFF9E6 {
+  Physics, Collision,
+  Weapon, Boss, PowerUp
+}
+
+class RenderSystem #FFF9E6 {
+  Rendering, Animation,
+  Parallax, UI, Sparkles
+}
+
+class InputSystem #FFF9E6 {
+  Input handling,
+  Player controls
+}
+
+note right of MovementSystem
+  <b>Systems = Logic</b>
+  Process entities
+  with components
+end note
+
+' Relations principales
+Registry "1" *-- "many" Entity : stores
+Registry -- IComponent : reads/writes
+IComponent <|.. TransformComponent
+IComponent <|.. VelocityComponent
+IComponent <|.. SpriteComponent
+IComponent <|.. ColliderComponent
+IComponent <|.. HealthComponent
+IComponent <|.. WeaponComponent
+IComponent <|.. AIComponent
+IComponent <|.. NetworkComponent
+
+ISystem <|.. MovementSystem
+ISystem <|.. RenderSystem
+ISystem <|.. InputSystem
+
+SystemManager -- ISystem : use
+MovementSystem --> Registry
+RenderSystem --> Registry
+InputSystem --> Registry
+EventBus -- ISystem
+
+@enduml

@@ -1,15 +1,26 @@
 #!/bin/bash
-
+set -e
 
 #---------------------------------------------------------------------------------------
 # WARNING: This script assumes you have MinGW-w64 installed and available in your PATH.
-# It also assumes you have CMake installed on windows and available in your PATH.
+# It also assumes you have CMake installed and available in your PATH.
 #---------------------------------------------------------------------------------------
-# Note: You may need to adjust the generator name ("MinGW Makefiles") based on your MinGW-w64 installation.
 
-mkdir -p build-windows
+BUILD_DIR="build"
 
-cmake -S . -B build-windows -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw.cmake -DCMAKE_BUILD_TYPE=Release
-cmake --build build-windows -j$(nproc)
+echo "🔨 Building R-Type for Windows (MinGW)..."
 
-echo -e "\n\nBuild completed. Binaries are located in the build-windows directory."
+# Create and enter build directory
+mkdir -p "$BUILD_DIR"
+
+# Configure with MinGW toolchain
+cmake -S . -B "$BUILD_DIR" \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw.cmake \
+    -DCMAKE_BUILD_TYPE=Release
+
+# Build
+cmake --build "$BUILD_DIR" -j$(nproc)
+
+echo "✅ Build completed!"
+echo "📦 Binaries are in: $BUILD_DIR/"
+ls -lh "$BUILD_DIR"/r-type_*.exe

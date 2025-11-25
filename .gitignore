@@ -1,37 +1,48 @@
-# Ignore build artifacts and CMake temporary files
-/# Build directory
+# Build directories
 build/
-build-windows/
-build-linux/
-build-mac/
+build-*/
+!doc/build/
 
 # CMake files
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 Makefile
-CMakeLists.txt.user
+*.cmake
+!CMakeLists.txt
+!cmake/
 
-# Object files and generated sources
+# Binaries
+*.exe
+*.out
+r-type_server
+r-type_client
+
+# Object files
 *.o
 *.obj
 *.lo
 *.la
 *.slo
-*.orig
 *.so
 *.a
+*.dll
+*.dylib
 
-# Visual Studio / IDE
+# IDE
 .vscode/
 .idea/
+*.code-workspace
 
-# Editor backup files
+# Editor backups
 *~
-# Tags / cscope
+*.swp
+*.swo
+
+# Tags
 tags
 cscope.*
 
-# executables (if created in repo root)
-./build/server
-./build/client
+# OS
+.DS_Store
+Thumbs.db

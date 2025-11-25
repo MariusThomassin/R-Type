@@ -19,36 +19,30 @@ endif()
 #--------------------------------------------------------------
 # Output directories
 #--------------------------------------------------------------
-# Put runtime binaries in a clear, cross-platform location inside the build dir.
-# For multi-config generators (Visual Studio), create config subfolders.
+# All binaries go to build/ at the project root
 
-set(BIN_OUT ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-function(configure_output TARGET_NAME)
-    set_target_properties(${TARGET_NAME} PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${BIN_OUT}
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BIN_OUT}/Debug
-        RUNTIME_OUTPUT_DIRECTORY ${BIN_OUT}
-        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${BIN_OUT}/RelWithDebInfo
-        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${BIN_OUT}/MinSizeRel
-    )
-endfunction()
+# For multi-config generators
+foreach(CONFIG ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${CONFIG} CONFIG_UPPER)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CONFIG_UPPER} ${CMAKE_BINARY_DIR})
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${CONFIG_UPPER} ${CMAKE_BINARY_DIR})
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_UPPER} ${CMAKE_BINARY_DIR})
+endforeach()
 
 #--------------------------------------------------------------
 # Targets
 #--------------------------------------------------------------
-# Create two simple executables: server and client
 
-add_executable(server server/main.cpp)
-add_executable(client client/main.cpp)
+add_executable(server src/server/main.cpp)
+add_executable(client src/client/main.cpp)
 
-# Preserve original binary names used across the project
+# Preserve original binary names
 set_target_properties(server PROPERTIES OUTPUT_NAME "r-type_server")
 set_target_properties(client PROPERTIES OUTPUT_NAME "r-type_client")
-
-# Apply output directory config
-configure_output(server)
-configure_output(client)
 
 #--------------------------------------------------------------
 # Warnings and platform-specific libraries
@@ -89,22 +83,19 @@ install(TARGETS server client
 #--------------------------------------------------------------
 # Custom Rules
 #--------------------------------------------------------------
-# clean target to remove only binaries
+
 add_custom_target(clean_bin
-    COMMAND ${CMAKE_COMMAND} -E rm -rf ${BIN_OUT}
-    COMMENT "Clean : removing binaries in ${BIN_OUT}"
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_BINARY_DIR}/r-type_server* ${CMAKE_BINARY_DIR}/r-type_client*
+    COMMENT "Clean: removing binaries"
 )
 
-# fclean target to remove build directory
 add_custom_target(fclean
     COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}
-    COMMENT "Full clean: removing build directory and binaries"
+    COMMENT "Full clean: removing build directory"
 )
 
-# re : fclean + all target to rebuild all
 add_custom_target(re
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target clean
-    COMMAND ${CMAKE_COMMAND} -S ${CMAKE_SOURCE_DIR} -B ${CMAKE_BINARY_DIR}
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
     COMMENT "Rebuilding project..."
 )
@@ -112,4 +103,11 @@ add_custom_target(re
 #--------------------------------------------------------------
 # Summary
 #--------------------------------------------------------------
-message(STATUS "Project configured for C++${CMAKE_CXX_STANDARD}, binaries will be in: ${BIN_OUT}")
+
+message(STATUS "==================================================")
+message(STATUS "Project: ${PROJECT_NAME} v${PROJECT_VERSION}")
+message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Binary Output: ${CMAKE_BINARY_DIR}")
+message(STATUS "==================================================")
+
