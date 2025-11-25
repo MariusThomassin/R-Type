@@ -8,7 +8,7 @@ skinparam backgroundColor white
 skinparam classBackgroundColor white
 skinparam classBorderColor black
 
-' Core ECS
+' CORE ECS INTERFACES
 interface IComponent <<interface>> #FFE6E6 {
   +getTypeName(): string
 }
@@ -20,72 +20,168 @@ interface ISystem <<interface>> #FFF9E6 {
 }
 
 class Entity <<entity>> #E8E8E8 {
-  +type: size_t
+  +id: size_t
+  +signature: bitset<64>
 }
 
 class Registry <<manager>> #E6F3FF {
-  -entities: map<Entity>
-  -componentArrays: map<>
+  -entities: map<EntityId, Entity>
+  -componentArrays: map<ComponentTypeID, IComponentArray*>
+  -signatures: map<EntityId, bitset<64>>
   +createEntity(): Entity
-  +destroyEntity(Entity)
-  +addComponent<T>(Entity, T&)
-  +getComponent<T>(Entity): T&
-  +getEntities(): vector<Entity>*
+  +destroyEntity(EntityId)
+  +addComponent<T>(EntityId, T&)
+  +getComponent<T>(EntityId): T&
+  +getEntities(): vector<EntityId>*
+  +getEntitiesWith<T...>() : ComponentView<T...>
 }
 
 class SystemManager <<manager>> #E6F3FF {
-  -systems: vector<ISystem*>
+  -systems: map<SystemTypeID, ISystem*>
   +addSystem<T>(): T*
   +getSystem<T>(): T*
-  +updateAllWorlds(float)
+  +updateAllSystems(dt: float)
 }
 
 class EventBus <<manager>> #E6F3FF {
-  -subscribers: map<>
-  +emit<T>(event)
-  +subscribe<T>(callback)
+  -subscribers: map<EventType, vector<Callback>>
+  +emit<T>(event: T)
+  +subscribe<T>(callback: function<void(const T&)>) 
 }
 
-' Components concrets
-class TransformComponent #FFE6E6
-class VelocityComponent #FFE6E6
-class SpriteComponent #FFE6E6
-class ColliderComponent #FFE6E6
-class HealthComponent #FFE6E6
-class WeaponComponent #FFE6E6
-class AIComponent #FFE6E6
-class NetworkComponent #FFE6E6
+' --- COMPONENTS (DATA) ---
+class TransformComponent #FFE6E6 extends IComponent {
+  +position: Vector2
+  +rotation: float
+  +scale: Vector2
+}
 
-note right of TransformComponent
-  <b>Components = Pure Data</b>
-  No logic
-end note
+class VelocityComponent #FFE6E6 extends IComponent {
+  +velocity: Vector2
+  +maxSpeed: float
+  +acceleration: Vector2
+}
 
-' Systems concrets
-class MovementSystem #FFF9E6 {
+class SpriteComponent #FFE6E6 extends IComponent {
+  +textureID: string
+  +layer: int
+  +isVisible: bool
+}
+
+class ColliderComponent #FFE6E6 extends IComponent {
+  +hitbox: Rectangle
+  +isTrigger: bool
+  +collisionLayer: int
+}
+
+class HealthComponent #FFE6E6 extends IComponent {
+  +currentHealth: int
+  +maxHealth: int
+  +isInvincible: bool
+}
+
+class WeaponComponent #FFE6E6 extends IComponent {
+  +fireRate: float
+  +damage: int
+  +projectileType: string
+  +lastFiredTime: float
+}
+
+class AIComponent #FFE6E6 extends IComponent {
+  +state: AIState
+  +targetEntityId: EntityId
+}
+
+class NetworkComponent #FFE6E6 extends IComponent {
+  +networkId: int
+  +isOwned: bool
+  +lastSyncTime: float
+}
+
+class PlayerComponent #FFE6E6 extends IComponent {
+  +playerId: int
+  +score: int
+  +lives: int
+}
+
+class EnnemyComponent #FFE6E6 extends IComponent {
+  +ennemyId: int
+  +enemyType: string
+  +difficultyLevel: int
+}
+
+class lifeTimeComponent #FFE6E6 extends IComponent {
+  +timeRemaining: float
+  +elapsedTime: float
+}
+
+' --- SYSTEMS (LOGIC) ---
+class MovementSystem #FFF9E6 extends ISystem {
   Physics, Collision,
   Weapon, Boss, PowerUp
+  ' Requires: Transform, Velocity, (Optional: Collider)
+  +updatePositions(dt: float)
 }
 
-class RenderSystem #FFF9E6 {
+class CollisionSystem #FFF9E6 extends ISystem {
+  Collision detection, Collision response
+  ' Requires: Transform, Collider
+  +detectCollisions()
+  +resolveCollisions()
+}
+
+class RenderSystem #FFF9E6 extends ISystem {
   Rendering, Animation,
   Parallax, UI, Sparkles
+  ' Requires: Transform, Sprite
+  +renderAll()
+  +updateAnimations()
 }
 
-class InputSystem #FFF9E6 {
-  Input handling,
-  Player controls
+class InputSystem #FFF9E6 extends ISystem {
+  ' Requires: PlayerComponent
+  +handleKeyboardInput()
+  +handleMouseInput()
+  +createInputEvents()
 }
 
-note right of MovementSystem
-  <b>Systems = Logic</b>
-  Process entities
-  with components
-end note
+class EnnemyAISystem #FFF9E6 extends ISystem {
+  ' Requires: EnnemyComponent, Transform, AIComponent
+  +executePatternLogic()
+  +updateTargeting(dt: float)
+}
 
-' Relations principales
-Registry "1" *-- "many" Entity : stores
-Registry -- IComponent : reads/writes
+class BulletSystem #FFF9E6 extends ISystem {
+  ' Requires: WeaponComponent, Transform
+  +checkLifetime(dt: float)
+  +spawnProjectiles(entityId: EntityId)
+  +updateProjectiles(dt: float)
+}
+
+' --- EVENTS (Communication) ---
+class InputEvent #E6F3FF {
+  +mousePosition: Vector2
+  +keyCode: int
+  +action: Action
+}
+
+class CollisionEvent <<event>> #D9EAD3 {
+  +entityA: EntityId
+  +entityB: EntityId
+  +normal: Vector2
+}
+
+class DamageEvent <<event>> #D9EAD3 {
+  +targetId: EntityId
+  +sourceId: EntityId
+  +damage: int
+}
+
+' --- RELATIONS ---
+
+' Regestry & Entity/Componant Storage
+Registry "1" *-- "many" Entity : manages
+Registry -- IComponent : reads/writes componant data
 IComponent <|.. TransformComponent
 IComponent <|.. VelocityComponent
 IComponent <|.. SpriteComponent
@@ -94,15 +190,38 @@ IComponent <|.. HealthComponent
 IComponent <|.. WeaponComponent
 IComponent <|.. AIComponent
 IComponent <|.. NetworkComponent
+IComponent <|.. PlayerComponent
+IComponent <|.. EnemyComponent
+IComponent <|.. LifetimeComponent
 
+' System Manager & Systems
 ISystem <|.. MovementSystem
+ISystem <|.. CollisionSystem
 ISystem <|.. RenderSystem
 ISystem <|.. InputSystem
+ISystem <|.. EnemyAISystem
+ISystem <|.. BulletSystem
+SystemManager -- ISystem : runs
 
-SystemManager -- ISystem : use
-MovementSystem --> Registry
-RenderSystem --> Registry
-InputSystem --> Registry
-EventBus -- ISystem
+' Systems & Registry (Data Access)
+MovementSystem --> Registry : accesses Transform, Velocity
+CollisionSystem --> Registry : accesses Transform, Collider
+RenderSystem --> Registry : accesses Transform, Sprite
+InputSystem --> Registry : accesses PlayerComponent, Velocity
+EnemyAISystem --> Registry : accesses Enemy, AI, Transform
+
+' EventBus & Systems/Events (Communication)
+EventBus -- ISystem : subscribes/emits
+InputSystem .> InputEvent : emits
+CollisionSystem .> CollisionEvent : emits
+CollisionSystem .> DamageEvent : emits
+MovementSystem .> CollisionEvent : subscribes
+
+' System Dependencies (Component Signatures)
+MovementSystem .right.> VelocityComponent : processes entities with
+MovementSystem .right.> TransformComponent : processes entities with
+RenderSystem .right.> SpriteComponent : processes entities with
+RenderSystem .right.> TransformComponent : processes entities with
+InputSystem .right.> PlayerComponent : processes entities with
 
 @enduml
