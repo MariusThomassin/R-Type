@@ -9,6 +9,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #--------------------------------------------------------------
+# Dependencies (FetchContent)
+#--------------------------------------------------------------
+
+include(FetchContent)
+
+# Asio (standalone, header-only networking library)
+FetchContent_Declare(
+    asio
+    GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
+    GIT_TAG asio-1-29-0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(asio)
+
+# Create an interface library for Asio
+add_library(asio_lib INTERFACE)
+target_include_directories(asio_lib INTERFACE ${asio_SOURCE_DIR}/asio/include)
+target_compile_definitions(asio_lib INTERFACE ASIO_STANDALONE)
+
+#--------------------------------------------------------------
 # Default build type (if not using multi-config generator)
 #--------------------------------------------------------------
 
@@ -43,6 +63,9 @@ add_executable(client src/client/main.cpp)
 # Preserve original binary names
 set_target_properties(server PROPERTIES OUTPUT_NAME "r-type_server")
 set_target_properties(client PROPERTIES OUTPUT_NAME "r-type_client")
+
+# Link Asio to server
+target_link_libraries(server PRIVATE asio_lib)
 
 #--------------------------------------------------------------
 # Warnings and platform-specific libraries
