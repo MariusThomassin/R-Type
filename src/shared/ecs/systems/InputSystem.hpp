@@ -1,35 +1,52 @@
 /*
 ** R-Type ECS - InputSystem
-** Handles player input using Raylib
+** Handles player input via EventBus
+** Subscribes to input events from InputManager
 */
 
 #pragma once
 
 #include "../ISystem.hpp"
 #include "../Registry.hpp"
+#include "../EventBus.hpp"
+#include "../events/InputEvents.hpp"
 #include "../components/PlayerComponent.hpp"
 #include "../components/VelocityComponent.hpp"
 #include "../components/WeaponComponent.hpp"
 
-#include <raylib.h>
-#include <functional>
-
 namespace rtype::ecs {
 
     /**
-     * @brief System that handles keyboard input for player movement and shooting
+     * @brief System that handles player movement and actions via events
      *
-     * Updates velocity based on arrow keys or WASD.
-     * Fires weapons with Space key.
+     * Subscribes to KeyStateEvent for continuous input (movement)
+     * and KeyPressedEvent for one-shot actions (danmaku).
+     * Emits ShootEvent and DanmakuEvent for other systems to handle.
      */
     class InputSystem : public ISystem {
     public:
-        using ShootCallback = std::function<void(EntityId)>;
+        InputSystem(EventBus& eventBus, float moveSpeed = 300.0f)
+            : m_eventBus(eventBus), m_moveSpeed(moveSpeed) {
+            
+            m_keyStateSubId = m_eventBus.subscribe<events::KeyStateEvent>(
+                [this](const events::KeyStateEvent& e) {
+                    m_keyState = e.state;
+                }
+            );
 
-        InputSystem(float moveSpeed = 300.0f)
-            : m_moveSpeed(moveSpeed) {}
+            m_keyPressedSubId = m_eventBus.subscribe<events::KeyPressedEvent>(
+                [this](const events::KeyPressedEvent& e) {
+                    if (e.key == events::KeyCode::G) {
+                        m_danmakuPressed = true;
+                    }
+                }
+            );
+        }
 
-        ~InputSystem() override = default;
+        ~InputSystem() override {
+            m_eventBus.unsubscribe<events::KeyStateEvent>(m_keyStateSubId);
+            m_eventBus.unsubscribe<events::KeyPressedEvent>(m_keyPressedSubId);
+        }
 
         void update(float dt) override {
             (void)dt;
@@ -48,18 +65,10 @@ namespace rtype::ecs {
                 velocity.vx = 0.0f;
                 velocity.vy = 0.0f;
 
-                if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
-                    velocity.vx = m_moveSpeed;
-                }
-                if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
-                    velocity.vx = -m_moveSpeed;
-                }
-                if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
-                    velocity.vy = -m_moveSpeed;
-                }
-                if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
-                    velocity.vy = m_moveSpeed;
-                }
+                if (m_keyState.moveRight()) velocity.vx = m_moveSpeed;
+                if (m_keyState.moveLeft()) velocity.vx = -m_moveSpeed;
+                if (m_keyState.moveUp()) velocity.vy = -m_moveSpeed;
+                if (m_keyState.moveDown()) velocity.vy = m_moveSpeed;
 
                 if (velocity.vx != 0.0f && velocity.vy != 0.0f) {
                     float factor = 0.7071f;
@@ -67,9 +76,14 @@ namespace rtype::ecs {
                     velocity.vy *= factor;
                 }
 
-                if (IsKeyDown(KEY_SPACE) && m_shootCallback) {
-                    m_shootCallback(entity);
+                if (m_keyState.space) {
+                    m_eventBus.emit(events::ShootEvent{entity});
                 }
+            }
+
+            if (m_danmakuPressed) {
+                m_eventBus.emit(events::DanmakuEvent{0, 0});
+                m_danmakuPressed = false;
             }
         }
 
@@ -80,17 +94,15 @@ namespace rtype::ecs {
         void setMoveSpeed(float speed) { m_moveSpeed = speed; }
         float getMoveSpeed() const { return m_moveSpeed; }
 
-        /**
-         * @brief Set callback for when player fires
-         * @param callback Function to call with shooter's EntityId
-         */
-        void setShootCallback(ShootCallback callback) {
-            m_shootCallback = callback;
-        }
-
     private:
+        EventBus& m_eventBus;
         float m_moveSpeed;
-        ShootCallback m_shootCallback;
+        
+        events::KeyState m_keyState;
+        bool m_danmakuPressed = false;
+
+        EventBus::SubscriberId m_keyStateSubId;
+        EventBus::SubscriberId m_keyPressedSubId;
     };
 
 } // namespace rtype::ecs

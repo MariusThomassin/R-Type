@@ -9,3 +9,4 @@
 #include "RenderSystem.hpp"
 #include "InputSystem.hpp"
 #include "BulletSystem.hpp"
+#include "DebugSystem.hpp"

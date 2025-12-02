@@ -3,225 +3,457 @@
 !define COMPONENT_COLOR #FFE6E6
 !define SYSTEM_COLOR #FFF9E6
 !define MANAGER_COLOR #E6F3FF
+!define INTERFACE_COLOR #E6FFE6
+!define EVENT_COLOR #D9EAD3
+!define DEBUG_COLOR #FFE6FF
 
 skinparam backgroundColor white
 skinparam classBackgroundColor white
 skinparam classBorderColor black
+skinparam packageBorderColor #888888
+skinparam packageBackgroundColor #FAFAFA
 
-' CORE ECS INTERFACES
-interface IComponent <<interface>> #FFE6E6 {
-  +getTypeName(): string
+title R-Type ECS Engine Architecture
+
+' ==================== CORE INTERFACES ====================
+package "Core Interfaces" #EEEEEE {
+    interface IComponent <<interface>> COMPONENT_COLOR {
+        +getTypeName(): string
+    }
+
+    interface IRenderable <<interface>> INTERFACE_COLOR {
+        +render(transform, ctx): void
+        +isRenderable(): bool
+        +getRenderLayer(): int
+    }
+
+    interface ISystem <<interface>> SYSTEM_COLOR {
+        +update(registry, dt): void
+        +getPhase(): SystemPhase
+        +isEnabled(): bool
+    }
+
+    interface IDebugTab <<interface>> DEBUG_COLOR {
+        +getName(): string
+        +draw(registry): void
+        +handleMouse(mouse: MouseInput): void
+        +getBounds(): Rectangle
+    }
 }
 
-interface ISystem <<interface>> #FFF9E6 {
-  +update(): void
-  +getPhase(): SystemPhase
-  +isEnabled(): bool
+' ==================== CORE MANAGERS ====================
+package "Core Managers" #E6F3FF {
+    class Entity <<entity>> ENTITY_COLOR {
+        +id: size_t
+        +signature: bitset<64>
+    }
+
+    class Registry <<manager>> MANAGER_COLOR {
+        -entities: map<EntityId, Entity>
+        -componentArrays: map<TypeID, IComponentArray*>
+        -signatures: map<EntityId, Signature>
+        --
+        +createEntity(): EntityId
+        +destroyEntity(id): void
+        +addComponent<T>(id, component): void
+        +getComponent<T>(id): T&
+        +tryGetComponent<T>(id): T*
+        +hasComponent<T>(id): bool
+        +getEntitiesWith<T...>(): ComponentView<T...>
+    }
+
+    class SystemManager <<manager>> MANAGER_COLOR {
+        -systems: map<TypeID, unique_ptr<ISystem>>
+        -updateOrder: vector<ISystem*>
+        --
+        +addSystem<T>(args...): T*
+        +getSystem<T>(): T*
+        +updateAll(registry, dt): void
+    }
+
+    class EventBus <<manager>> MANAGER_COLOR {
+        -subscribers: map<EventType, vector<Subscriber>>
+        -nextSubscriberId: size_t
+        --
+        +subscribe<T>(callback): SubscriberId
+        +unsubscribe<T>(id): bool
+        +emit<T>(event): void
+        +clear(): void
+    }
+
+    class RenderContext <<data>> MANAGER_COLOR {
+        +textures: map<string, Texture2D>*
+        +screenWidth, screenHeight: int
+        +animTime, deltaTime: float
+        --
+        +getTexture(id): Texture2D*
+    }
 }
 
-class Entity <<entity>> #E8E8E8 {
-  +id: size_t
-  +signature: bitset<64>
+' ==================== INPUT SYSTEM ====================
+package "Input System" #E6FFE6 {
+    class InputManager <<manager>> MANAGER_COLOR {
+        -eventBus: EventBus&
+        -keyState: KeyState
+        -mouseState: MouseState
+        -keyToRaylib: map<KeyCode, int>
+        --
+        +pollInput(): void
+        +getKeyState(): KeyState
+        +getMouseState(): MouseState
+        +isKeyDown(key): bool
+        +wasKeyPressed(key): bool
+    }
+
+    struct KeyState <<data>> #E6FFE6 {
+        +up, down, left, right: bool
+        +w, a, s, d: bool
+        +space, enter, escape: bool
+        +shift, ctrl, alt: bool
+        --
+        +moveUp(): bool
+        +moveDown(): bool
+        +moveLeft(): bool
+        +moveRight(): bool
+    }
+
+    struct MouseState <<data>> #E6FFE6 {
+        +x, y: float
+        +deltaX, deltaY: float
+        +wheelDelta: float
+        +leftDown, rightDown: bool
+    }
+
+    struct MouseInput <<data>> #E6FFE6 {
+        +x, y: int
+        +clicked, rightClicked: bool
+        +wheelDelta: float
+        +isHeld: bool
+    }
 }
 
-class Registry <<manager>> #E6F3FF {
-  -entities: map<EntityId, Entity>
-  -componentArrays: map<ComponentTypeID, IComponentArray*>
-  -signatures: map<EntityId, bitset<64>>
-  +createEntity(): Entity
-  +destroyEntity(EntityId)
-  +addComponent<T>(EntityId, T&)
-  +getComponent<T>(EntityId): T&
-  +getEntities(): vector<EntityId>*
-  +getEntitiesWith<T...>() : ComponentView<T...>
+' ==================== EVENTS ====================
+package "Events" EVENT_COLOR {
+    struct KeyPressedEvent <<event>> EVENT_COLOR {
+        +key: KeyCode
+    }
+
+    struct KeyReleasedEvent <<event>> EVENT_COLOR {
+        +key: KeyCode
+    }
+
+    struct KeyStateEvent <<event>> EVENT_COLOR {
+        +state: KeyState
+    }
+
+    struct MouseMoveEvent <<event>> EVENT_COLOR {
+        +x, y: float
+        +deltaX, deltaY: float
+    }
+
+    struct MouseButtonPressedEvent <<event>> EVENT_COLOR {
+        +button: MouseButton
+        +x, y: float
+    }
+
+    struct MouseWheelEvent <<event>> EVENT_COLOR {
+        +delta: float
+    }
+
+    struct ShootEvent <<event>> EVENT_COLOR {
+        +shooterId: uint64
+    }
+
+    struct DanmakuEvent <<event>> EVENT_COLOR {
+        +x, y: float
+    }
+
+    struct DebugToggleEvent <<event>> EVENT_COLOR {
+    }
 }
 
-class SystemManager <<manager>> #E6F3FF {
-  -systems: map<SystemTypeID, ISystem*>
-  +addSystem<T>(): T*
-  +getSystem<T>(): T*
-  +updateAllSystems(dt: float)
+' ==================== COMPONENTS ====================
+package "Components" COMPONENT_COLOR {
+    class TransformComponent COMPONENT_COLOR {
+        +x, y: float
+        +rotation: float
+        +scaleX, scaleY: float
+    }
+
+    class VelocityComponent COMPONENT_COLOR {
+        +vx, vy: float
+        +maxSpeed: float
+    }
+
+    class SpriteComponent COMPONENT_COLOR {
+        +textureID: string
+        +layer: int
+        +isVisible: bool
+        +renderStyle: RenderStyle
+        --
+        <<IRenderable>>
+        +render(transform, ctx): void
+    }
+
+    class SpritesheetComponent COMPONENT_COLOR {
+        +textureId: string
+        +frameX, frameY: int
+        +frameWidth, frameHeight: int
+        +layer: int
+        +hasGlow: bool
+        --
+        <<IRenderable>>
+        +render(transform, ctx): void
+        +setBullet(type, color): void
+    }
+
+    class PlayerShipComponent COMPONENT_COLOR {
+        +mainR, mainG, mainB: uchar
+        +layer: int
+        +pixelScale: float
+        +shieldActive: bool
+        --
+        <<IRenderable>>
+        +render(transform, ctx): void
+        +updateEffects(dt): void
+    }
+
+    class BackgroundComponent COMPONENT_COLOR {
+        +stars: vector<Star>
+        +screenWidth, screenHeight: int
+        +layer: int
+        --
+        <<IRenderable>>
+        +render(transform, ctx): void
+        +update(dt): void
+        +initStars(count): void
+    }
+
+    class ColliderComponent COMPONENT_COLOR {
+        +width, height: float
+        +offsetX, offsetY: float
+        +isTrigger: bool
+    }
+
+    class HealthComponent COMPONENT_COLOR {
+        +current, max: int
+        +isInvincible: bool
+    }
+
+    class WeaponComponent COMPONENT_COLOR {
+        +fireRate: float
+        +damage: int
+        +projectileType: string
+    }
+
+    class PlayerComponent COMPONENT_COLOR {
+        +playerId: int
+        +score: int
+        +lives: int
+    }
+
+    class EnemyComponent COMPONENT_COLOR {
+        +enemyType: string
+        +difficultyLevel: int
+    }
+
+    class ProjectileComponent COMPONENT_COLOR {
+        +damage: int
+        +ownerId: EntityId
+        +bulletType: BulletType
+        +bulletColor: BulletColor
+    }
+
+    class LifetimeComponent COMPONENT_COLOR {
+        +timeRemaining: float
+        +elapsed: float
+    }
+
+    class AIComponent COMPONENT_COLOR {
+        +state: AIState
+        +targetId: EntityId
+    }
+
+    class NetworkComponent COMPONENT_COLOR {
+        +networkId: int
+        +isOwned: bool
+    }
 }
 
-class EventBus <<manager>> #E6F3FF {
-  -subscribers: map<EventType, vector<Callback>>
-  +emit<T>(event: T)
-  +subscribe<T>(callback: function<void(const T&)>) 
+' ==================== SYSTEMS ====================
+package "Systems" SYSTEM_COLOR {
+    class InputSystem SYSTEM_COLOR {
+        -inputManager: InputManager
+        --
+        +update(registry, dt): void
+        -handlePlayerMovement(): void
+        -handleShooting(): void
+    }
+
+    class MovementSystem SYSTEM_COLOR {
+        --
+        +update(registry, dt): void
+        -applyVelocity(entity, dt): void
+    }
+
+    class BulletSystem SYSTEM_COLOR {
+        --
+        +update(registry, dt): void
+        -checkLifetime(entity, dt): void
+        -updateProjectiles(registry): void
+    }
+
+    class RenderSystem SYSTEM_COLOR {
+        -textures: map<string, Texture2D>
+        -context: RenderContext
+        -animTime: float
+        --
+        +update(registry, dt): void
+        -collectRenderables(): vector
+        -sortByLayer(): void
+        -renderEntities(): void
+        -drawUI(): void
+    }
+
+    class DebugSystem SYSTEM_COLOR {
+        -tabs: vector<unique_ptr<IDebugTab>>
+        -activeTab: int
+        -isVisible: bool
+        -tabRects: vector<Rectangle>
+        --
+        +update(registry, dt): void
+        -handleMouseInput(): void
+        -drawTabBar(): void
+        -drawActiveTab(): void
+    }
 }
 
-' --- COMPONENTS (DATA) ---
-class TransformComponent #FFE6E6 extends IComponent {
-  +position: Vector2
-  +rotation: float
-  +scale: Vector2
+' ==================== DEBUG TABS ====================
+package "Debug Tabs" DEBUG_COLOR {
+    class StatsTab DEBUG_COLOR {
+        +getName(): string
+        +draw(registry): void
+    }
+
+    class TexturesTab DEBUG_COLOR {
+        -scrollY, zoom: float
+        --
+        +handleMouse(mouse): void
+        +draw(registry): void
+    }
+
+    class ArchitectureTab DEBUG_COLOR {
+        --
+        +draw(registry): void
+        -drawArchitectureDiagram(): void
+    }
+
+    class EntityInspectorTab DEBUG_COLOR {
+        -selectedEntity: EntityId
+        -scrollY: float
+        --
+        +handleMouse(mouse): void
+        +draw(registry): void
+        -drawEntityList(): void
+        -drawComponentDetails(): void
+    }
+
+    class EntitySpawnerTab DEBUG_COLOR {
+        -spawnedCount: int
+        --
+        +handleMouse(mouse): void
+        +draw(registry): void
+        -spawnEntity(): void
+    }
+
+    class BulletsTab DEBUG_COLOR {
+        -selectedType: BulletType
+        -selectedColor: BulletColor
+        --
+        +handleMouse(mouse): void
+        +draw(registry): void
+    }
+
+    class PerformanceTab DEBUG_COLOR {
+        -fpsHistory: vector<float>
+        --
+        +draw(registry): void
+    }
 }
 
-class VelocityComponent #FFE6E6 extends IComponent {
-  +velocity: Vector2
-  +maxSpeed: float
-  +acceleration: Vector2
-}
+' ==================== RELATIONSHIPS ====================
 
-class SpriteComponent #FFE6E6 extends IComponent {
-  +textureID: string
-  +layer: int
-  +isVisible: bool
-}
-
-class ColliderComponent #FFE6E6 extends IComponent {
-  +hitbox: Rectangle
-  +isTrigger: bool
-  +collisionLayer: int
-}
-
-class HealthComponent #FFE6E6 extends IComponent {
-  +currentHealth: int
-  +maxHealth: int
-  +isInvincible: bool
-}
-
-class WeaponComponent #FFE6E6 extends IComponent {
-  +fireRate: float
-  +damage: int
-  +projectileType: string
-  +lastFiredTime: float
-}
-
-class AIComponent #FFE6E6 extends IComponent {
-  +state: AIState
-  +targetEntityId: EntityId
-}
-
-class NetworkComponent #FFE6E6 extends IComponent {
-  +networkId: int
-  +isOwned: bool
-  +lastSyncTime: float
-}
-
-class PlayerComponent #FFE6E6 extends IComponent {
-  +playerId: int
-  +score: int
-  +lives: int
-}
-
-class EnnemyComponent #FFE6E6 extends IComponent {
-  +ennemyId: int
-  +enemyType: string
-  +difficultyLevel: int
-}
-
-class lifeTimeComponent #FFE6E6 extends IComponent {
-  +timeRemaining: float
-  +elapsedTime: float
-}
-
-' --- SYSTEMS (LOGIC) ---
-class MovementSystem #FFF9E6 extends ISystem {
-  Physics, Collision,
-  Weapon, Boss, PowerUp
-  ' Requires: Transform, Velocity, (Optional: Collider)
-  +updatePositions(dt: float)
-}
-
-class CollisionSystem #FFF9E6 extends ISystem {
-  Collision detection, Collision response
-  ' Requires: Transform, Collider
-  +detectCollisions()
-  +resolveCollisions()
-}
-
-class RenderSystem #FFF9E6 extends ISystem {
-  Rendering, Animation,
-  Parallax, UI, Sparkles
-  ' Requires: Transform, Sprite
-  +renderAll()
-  +updateAnimations()
-}
-
-class InputSystem #FFF9E6 extends ISystem {
-  ' Requires: PlayerComponent
-  +handleKeyboardInput()
-  +handleMouseInput()
-  +createInputEvents()
-}
-
-class EnnemyAISystem #FFF9E6 extends ISystem {
-  ' Requires: EnnemyComponent, Transform, AIComponent
-  +executePatternLogic()
-  +updateTargeting(dt: float)
-}
-
-class BulletSystem #FFF9E6 extends ISystem {
-  ' Requires: WeaponComponent, Transform
-  +checkLifetime(dt: float)
-  +spawnProjectiles(entityId: EntityId)
-  +updateProjectiles(dt: float)
-}
-
-' --- EVENTS (Communication) ---
-class InputEvent #E6F3FF {
-  +mousePosition: Vector2
-  +keyCode: int
-  +action: Action
-}
-
-class CollisionEvent <<event>> #D9EAD3 {
-  +entityA: EntityId
-  +entityB: EntityId
-  +normal: Vector2
-}
-
-class DamageEvent <<event>> #D9EAD3 {
-  +targetId: EntityId
-  +sourceId: EntityId
-  +damage: int
-}
-
-' --- RELATIONS ---
-
-' Regestry & Entity/Componant Storage
-Registry "1" *-- "many" Entity : manages
-Registry -- IComponent : reads/writes componant data
+' Core Inheritance
 IComponent <|.. TransformComponent
 IComponent <|.. VelocityComponent
-IComponent <|.. SpriteComponent
 IComponent <|.. ColliderComponent
 IComponent <|.. HealthComponent
 IComponent <|.. WeaponComponent
-IComponent <|.. AIComponent
-IComponent <|.. NetworkComponent
 IComponent <|.. PlayerComponent
 IComponent <|.. EnemyComponent
+IComponent <|.. ProjectileComponent
 IComponent <|.. LifetimeComponent
+IComponent <|.. AIComponent
+IComponent <|.. NetworkComponent
 
-' System Manager & Systems
-ISystem <|.. MovementSystem
-ISystem <|.. CollisionSystem
-ISystem <|.. RenderSystem
+' IRenderable Pattern (Self-Rendering Components)
+IComponent <|.. SpriteComponent
+IComponent <|.. SpritesheetComponent
+IComponent <|.. PlayerShipComponent
+IComponent <|.. BackgroundComponent
+IRenderable <|.. SpriteComponent
+IRenderable <|.. SpritesheetComponent
+IRenderable <|.. PlayerShipComponent
+IRenderable <|.. BackgroundComponent
+
+' System Interface
 ISystem <|.. InputSystem
-ISystem <|.. EnemyAISystem
+ISystem <|.. MovementSystem
 ISystem <|.. BulletSystem
-SystemManager -- ISystem : runs
+ISystem <|.. RenderSystem
+ISystem <|.. DebugSystem
 
-' Systems & Registry (Data Access)
-MovementSystem --> Registry : accesses Transform, Velocity
-CollisionSystem --> Registry : accesses Transform, Collider
-RenderSystem --> Registry : accesses Transform, Sprite
-InputSystem --> Registry : accesses PlayerComponent, Velocity
-EnemyAISystem --> Registry : accesses Enemy, AI, Transform
+' Debug Tab Interface
+IDebugTab <|.. StatsTab
+IDebugTab <|.. TexturesTab
+IDebugTab <|.. ArchitectureTab
+IDebugTab <|.. EntityInspectorTab
+IDebugTab <|.. EntitySpawnerTab
+IDebugTab <|.. BulletsTab
+IDebugTab <|.. PerformanceTab
 
-' EventBus & Systems/Events (Communication)
-EventBus -- ISystem : subscribes/emits
-InputSystem .> InputEvent : emits
-CollisionSystem .> CollisionEvent : emits
-CollisionSystem .> DamageEvent : emits
-MovementSystem .> CollisionEvent : subscribes
+' Manager Relationships
+Registry "1" *-- "many" Entity : manages
+SystemManager "1" *-- "many" ISystem : orchestrates
+DebugSystem "1" *-- "many" IDebugTab : contains
 
-' System Dependencies (Component Signatures)
-MovementSystem .right.> VelocityComponent : processes entities with
-MovementSystem .right.> TransformComponent : processes entities with
-RenderSystem .right.> SpriteComponent : processes entities with
-RenderSystem .right.> TransformComponent : processes entities with
-InputSystem .right.> PlayerComponent : processes entities with
+' EventBus Communication
+InputManager --> EventBus : emits input events
+InputSystem --> EventBus : subscribes & emits
+DebugSystem --> EventBus : subscribes to debug events
+EventBus ..> KeyPressedEvent : dispatches
+EventBus ..> MouseButtonPressedEvent : dispatches
+EventBus ..> ShootEvent : dispatches
+EventBus ..> DebugToggleEvent : dispatches
+
+' System Data Access
+RenderSystem --> Registry : queries IRenderable
+RenderSystem --> RenderContext : creates & passes
+MovementSystem --> Registry : queries Transform+Velocity
+BulletSystem --> Registry : queries Projectile+Lifetime
+InputSystem --> Registry : queries Player+Velocity
+DebugSystem --> Registry : queries all components
+
+' Rendering Flow
+RenderContext ..> IRenderable : passed to render()
+RenderSystem ..> SpriteComponent : delegates render
+RenderSystem ..> SpritesheetComponent : delegates render
+RenderSystem ..> PlayerShipComponent : delegates render
+RenderSystem ..> BackgroundComponent : delegates render
+
+' Input Flow
+InputManager --> KeyState : maintains
+InputManager --> MouseState : maintains
+MouseInput ..> IDebugTab : passed to handleMouse
 
 @enduml
