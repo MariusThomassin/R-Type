@@ -6,6 +6,8 @@
 */
 
 #include "Color.hpp"
+#include <raylib.h>
+#include <algorithm>
 
 namespace rtype::ui {
     Color::Color(uint32_t red, uint32_t green, uint32_t blue, uint32_t alpha)
@@ -74,6 +76,37 @@ namespace rtype::ui {
             this->_a = other._a;
         }
         return *this;
+    }
+
+    ::Color Color::toRaylib() const
+    {
+        return ::Color{
+            static_cast<unsigned char>(_r),
+            static_cast<unsigned char>(_g),
+            static_cast<unsigned char>(_b),
+            static_cast<unsigned char>(_a)
+        };
+    }
+
+    Color Color::fromRaylib(const ::Color& color)
+    {
+        return Color(color.r, color.g, color.b, color.a);
+    }
+
+    Color Color::withAlpha(uint32_t a) const
+    {
+        return Color(_r, _g, _b, a);
+    }
+
+    Color Color::lerp(const Color& a, const Color& b, float t)
+    {
+        t = std::clamp(t, 0.0f, 1.0f);
+        return Color(
+            static_cast<uint32_t>(a._r + (b._r - a._r) * t),
+            static_cast<uint32_t>(a._g + (b._g - a._g) * t),
+            static_cast<uint32_t>(a._b + (b._b - a._b) * t),
+            static_cast<uint32_t>(a._a + (b._a - a._a) * t)
+        );
     }
 
 } // namespace rtype::ui

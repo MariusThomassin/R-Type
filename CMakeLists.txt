@@ -86,6 +86,14 @@ set(GAME_UTILS_SOURCES
 # Game utility sources - client only (raylib dependent)
 set(GAME_CLIENT_SOURCES
     src/game/systems/common/ColorPalette.cpp
+    # UI Library (raylib dependent)
+    src/engine/ui/Color.cpp
+    src/engine/ui/Widget.cpp
+    src/engine/ui/UIManager.cpp
+    src/engine/ui/widgets/TextWidget.cpp
+    src/engine/ui/widgets/ButtonWidget.cpp
+    src/engine/ui/widgets/PanelWidget.cpp
+    src/engine/ui/widgets/ProgressBarWidget.cpp
 )
 
 # Create static library for the ECS engine
@@ -113,8 +121,8 @@ add_executable(server ${SERVER_SOURCES})
 add_executable(client src/client/main.cpp ${GAME_CLIENT_SOURCES})
 
 # Include paths
-target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR})
 
 # Link ECS engine library
 target_link_libraries(server PRIVATE ecs_engine)

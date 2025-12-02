@@ -19,6 +19,7 @@
 #include "debug/BulletsTab.hpp"
 #include "debug/PerformanceTab.hpp"
 #include "debug/ModesTab.hpp"
+#include "debug/UILibraryTab.hpp"
 
 #include <raylib.h>
 #include <vector>
@@ -47,6 +48,7 @@ namespace rtype::ecs {
             m_tabs.push_back(std::make_unique<debug::BulletsTab>());
             m_tabs.push_back(std::make_unique<debug::TexturesTab>());
             m_tabs.push_back(std::make_unique<debug::PerformanceTab>());
+            m_tabs.push_back(std::make_unique<debug::UILibraryTab>());
             
             // ModesTab needs EventBus reference
             m_modesTab = std::make_unique<debug::ModesTab>(eventBus);
