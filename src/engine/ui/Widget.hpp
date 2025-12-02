@@ -14,6 +14,7 @@
 #include <algorithm>
 #include "src/engine/graphics/IRenderable.hpp"
 #include "src/engine/ui/Color.hpp"
+#include "src/engine/ecs/events/InputEvents.hpp"
 
 #define DEFAULT_BACKGROUND_COLOR rtype::ui::Color(200, 200, 200, 255)
 #define DEFAULT_BORDER_COLOR rtype::ui::Color(0, 0, 0, 255)
@@ -69,10 +70,11 @@ namespace rtype::ui {
             const std::vector<std::shared_ptr<Widget>>& getChildren() const;
 
             //Events
-            virtual bool onMouseEnter() { return false; }
-            virtual bool onMouseLeave() { return false; }
-            virtual bool onMouseClick(float x, float y) { return false; }
-            virtual bool onMouseMove(float x, float y) { return false; }
+            virtual bool onMouseEnter();
+            virtual bool onMouseLeave();
+            virtual bool onMouseClick(float x, float y);
+            virtual bool onMouseMove(float x, float y);
+            virtual bool onKeyPress(rtype::ecs::events::KeyCode key);
 
             //State management
             void setVisible(bool visible);

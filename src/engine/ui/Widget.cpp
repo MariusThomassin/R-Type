@@ -101,16 +101,40 @@ namespace rtype::ui {
             }
         ), _m_children.end());
 
-        if (auto parent_shared = child->_m_parent.lock()) {
-            if (parent_shared.get() == this) {
-                child->_m_parent.reset();
-            }
+        std::shared_ptr<Widget> self = shared_from_this();
+        if (child->_m_parent.lock() == self) {
+            child->_m_parent.reset();
         }
     }
 
     const std::vector<std::shared_ptr<Widget>>& Widget::getChildren() const
     {
         return _m_children;
+    }
+
+    bool Widget::onMouseEnter()
+    {
+        return false;
+    }
+
+    bool Widget::onMouseLeave()
+    {
+        return false;
+    }
+
+    bool Widget::onMouseClick(float x, float y)
+    {
+        return false;
+    }
+
+    bool Widget::onMouseMove(float x, float y)
+    {
+        return false;
+    }
+
+    bool Widget::onKeyPress(rtype::ecs::events::KeyCode key)
+    {
+        return false;
     }
 
     void Widget::setVisible(bool visible)
@@ -138,6 +162,11 @@ namespace rtype::ui {
         UITransform absTransform = getAbsoluteTransform();
         return (x >= absTransform.x && x <= absTransform.x + absTransform.width &&
                 y >= absTransform.y && y <= absTransform.y + absTransform.height);
+    }
+
+    size_t Widget::getID() const
+    {
+        return _m_id;
     }
 
     void Widget::render()

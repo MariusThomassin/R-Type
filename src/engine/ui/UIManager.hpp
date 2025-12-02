@@ -11,25 +11,33 @@
 #include <memory>
 #include <vector>
 #include "Widget.hpp"
+#include "src/engine/ecs/core/EventBus.hpp"
+#include "src/engine/ecs/events/InputEvents.hpp"
 
 namespace rtype::ui
 {
     class UIManager {
     public:
-        UIManager();
+        UIManager(rtype::ecs::EventBus& eventBus);
         ~UIManager();
 
         void addWidget(std::shared_ptr<Widget> widget);
         void removeWidget(std::shared_ptr<Widget> widget);
 
+        void handleMouseClick(const rtype::ecs::events::MouseButtonPressedEvent& event);
+        void handleMouseMove(const rtype::ecs::events::MouseMoveEvent& event);
+        void handleKeyPress(const rtype::ecs::events::KeyCode& key);
+
         void update(float deltaTime);
         void render();
 
     private:
-        std::unordered_map<size_t, std::shared_ptr<Widget>> widgets;
+        std::vector<std::shared_ptr<Widget>> widgets;
 
         std::shared_ptr<Widget> m_hoveredWidget;
         std::shared_ptr<Widget> m_focusedWidget;
+
+        rtype::ecs::EventBus& m_eventBus;
     };
 } // namespace rtype::ui
 
