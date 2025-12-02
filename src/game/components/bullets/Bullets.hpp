@@ -9,17 +9,10 @@
 #include "TrajectoryTypes.hpp"
 #include "TrajectoryParams.hpp"
 
-// Legacy component (large, monolithic)
+// Trajectory component (main implementation)
 #include "TrajectoryComponent.hpp"
 
-// NEW: Refactored trajectory system
-// Individual trajectory types in separate files
-#include "trajectories/Trajectories.hpp"
-
-// NEW: Optimized component using variants
-#include "TrajectoryComponentNew.hpp"
-
-// Factory for legacy component
+// Factory for creating trajectory components
 #include "TrajectoryFactory.hpp"
 
 // Spin component for rotating bullets
