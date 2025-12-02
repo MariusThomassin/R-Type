@@ -54,15 +54,11 @@ namespace rtype::ecs {
         }
 
         /**
-         * @brief Destroy expired entities
+         * @brief Destroy expired entities (uses batch destruction for efficiency)
          */
         static void destroyExpired(Registry& registry,
                                    const std::vector<EntityId>& expiredEntities) {
-            for (EntityId entity : expiredEntities) {
-                if (registry.entityExists(entity)) {
-                    registry.destroyEntity(entity);
-                }
-            }
+            registry.destroyEntities(expiredEntities);
         }
 
         /**
@@ -83,11 +79,7 @@ namespace rtype::ecs {
                 }
             });
 
-            for (EntityId entity : toDestroy) {
-                if (registry.entityExists(entity)) {
-                    registry.destroyEntity(entity);
-                }
-            }
+            registry.destroyEntities(toDestroy);
         }
 
         /**

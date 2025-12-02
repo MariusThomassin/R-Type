@@ -277,36 +277,73 @@ namespace rtype::ecs {
             report << "  Overall FPS (avg): " << static_cast<int>(overallAvgFps) << "\n";
             report << "  Peak Entity Count: " << overallMaxEntities << "\n\n";
 
-            // Performance grade
+            // Performance grade - weighted scoring system
+            // Grades based on: maintaining playable FPS under stress + entity scalability
             report << "-----------------------------------------------\n";
             report << "              Performance Grade\n";
             report << "-----------------------------------------------\n\n";
             
+            // Calculate weighted score based on multiple factors
+            float score = 0.0f;
+            
+            // Factor 1: Average FPS (40 points max)
+            // 60+ FPS avg = full points, scales down
+            score += std::min(40.0f, (overallAvgFps / 60.0f) * 40.0f);
+            
+            // Factor 2: Minimum FPS playability (30 points max)
+            // 30+ FPS min = full points (playable threshold)
+            score += std::min(30.0f, (static_cast<float>(overallMinFps) / 30.0f) * 30.0f);
+            
+            // Factor 3: Entity scalability (30 points max)
+            // 3000+ entities while maintaining any FPS = full points
+            score += std::min(30.0f, (static_cast<float>(overallMaxEntities) / 3000.0f) * 30.0f);
+            
+            // Bonus: If min FPS stays above 30 at max intensity
+            bool stayedPlayable = (m_phaseResults.size() >= 5 && m_phaseResults[4].minFps >= 30);
+            if (stayedPlayable) score += 10.0f;
+            
             std::string grade;
             std::string comment;
             
-            if (overallMinFps >= 55) {
-                grade = "A+ (Excellent)";
-                comment = "Exceptional performance! ECS handles stress with ease.";
-            } else if (overallMinFps >= 45) {
-                grade = "A (Great)";
-                comment = "Great performance throughout all intensity levels.";
-            } else if (overallMinFps >= 35) {
+            if (score >= 95) {
+                grade = "A+ (Exceptional)";
+                comment = "Outstanding! ECS handles extreme stress with ease.";
+            } else if (score >= 85) {
+                grade = "A (Excellent)";
+                comment = "Excellent performance across all intensity levels.";
+            } else if (score >= 75) {
+                grade = "B+ (Very Good)";
+                comment = "Very good performance with minor slowdown at peak stress.";
+            } else if (score >= 65) {
                 grade = "B (Good)";
-                comment = "Solid performance with minor dips at high intensity.";
-            } else if (overallMinFps >= 25) {
-                grade = "C (Acceptable)";
-                comment = "Acceptable performance, may need optimization for high entity counts.";
-            } else if (overallMinFps >= 15) {
-                grade = "D (Poor)";
-                comment = "Performance issues detected. Consider optimization.";
+                comment = "Good performance. Handles high entity counts well.";
+            } else if (score >= 55) {
+                grade = "C+ (Above Average)";
+                comment = "Above average. Some optimization could improve peak performance.";
+            } else if (score >= 45) {
+                grade = "C (Average)";
+                comment = "Average performance for a bullet hell. Consider optimization.";
+            } else if (score >= 35) {
+                grade = "D (Below Average)";
+                comment = "Below average. Performance degrades significantly under stress.";
             } else {
-                grade = "F (Critical)";
-                comment = "Severe performance problems. Immediate optimization needed.";
+                grade = "F (Needs Work)";
+                comment = "Significant optimization needed for acceptable performance.";
             }
 
+            report << "  Score: " << static_cast<int>(score) << "/100\n";
             report << "  Grade: " << grade << "\n";
             report << "  " << comment << "\n\n";
+            
+            // Detailed breakdown
+            report << "  Scoring Breakdown:\n";
+            report << "    - Avg FPS Factor:    " << static_cast<int>(std::min(40.0f, (overallAvgFps / 60.0f) * 40.0f)) << "/40\n";
+            report << "    - Min FPS Factor:    " << static_cast<int>(std::min(30.0f, (static_cast<float>(overallMinFps) / 30.0f) * 30.0f)) << "/30\n";
+            report << "    - Scalability:       " << static_cast<int>(std::min(30.0f, (static_cast<float>(overallMaxEntities) / 3000.0f) * 30.0f)) << "/30\n";
+            if (stayedPlayable) {
+                report << "    - Playability Bonus: +10 (maintained 30+ FPS at max intensity)\n";
+            }
+            report << "\n";
 
             report << "===============================================\n";
             report << "                 End of Report\n";

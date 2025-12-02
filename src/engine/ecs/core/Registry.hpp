@@ -85,6 +85,29 @@ namespace rtype::ecs {
         }
 
         /**
+         * @brief Batch destroy multiple entities (more efficient than individual destroys)
+         * @param entities Vector of entity IDs to destroy
+         * 
+         * This is significantly faster than calling destroyEntity() in a loop
+         * when destroying many entities (e.g., offscreen bullets).
+         */
+        void destroyEntities(const std::vector<EntityId>& entities) {
+            if (entities.empty()) return;
+
+            for (EntityId entity : entities) {
+                if (!entityExists(entity)) continue;
+
+                for (auto& [typeId, componentArray] : m_componentArrays) {
+                    componentArray->entityDestroyed(entity);
+                }
+
+                m_entities.erase(entity);
+                m_signatures.erase(entity);
+                m_availableIds.push(entity);
+            }
+        }
+
+        /**
          * @brief Check if an entity exists
          * @param entity The entity ID to check
          * @return true if the entity exists
@@ -321,6 +344,27 @@ namespace rtype::ecs {
                     (sigIt->second & required) == required) {
                     func(entityId, getComponent<Components>(entityId)...);
                 }
+            }
+        }
+
+        /**
+         * @brief Ultra-fast iteration over single component type (no signature checks)
+         * @tparam T The component type
+         * @param func Function to call with (entity, Component&) for each entity
+         * 
+         * This is the fastest iteration method - directly iterates the packed component
+         * array without any signature checking. Use when you only need one component type.
+         */
+        template <typename T, typename Func>
+        void forEachDirect(Func&& func) {
+            auto* array = getComponentArray<T>();
+            if (!array) return;
+
+            const auto& entities = array->getEntities();
+            auto& components = array->components();
+            
+            for (std::size_t i = 0; i < entities.size(); ++i) {
+                func(entities[i], components[i]);
             }
         }
 

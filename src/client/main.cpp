@@ -209,6 +209,22 @@ int main() {
             accumulator -= FIXED_TIMESTEP;
         }
 
+        // Sync mode states to debug menu
+        debugSystem->updateShowoffState(
+            showoffSystem->isActive(),
+            showoffSystem->getCurrentPatternName(),
+            showoffSystem->getCurrentPhase(),
+            showoffSystem->getTotalPhases(),
+            showoffSystem->getPhaseProgress()
+        );
+        debugSystem->updateStressTestState(
+            stressTestSystem->isActive(),
+            stressTestSystem->isComplete(),
+            stressTestSystem->getIntensity(),
+            stressTestSystem->getPhaseProgress(),
+            stressTestSystem->getReportFilename()
+        );
+
         renderSystem->update(frameTime);
     }
 

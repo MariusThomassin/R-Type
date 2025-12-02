@@ -39,14 +39,7 @@ namespace rtype::ecs {
                     if (e.key == events::KeyCode::G && !m_showoffActive && !m_stressTestActive) {
                         m_danmakuPressed = true;
                     }
-                    if (e.key == events::KeyCode::P) {
-                        // Shift+P = stress test, P alone = showoff
-                        if (m_keyState.shift) {
-                            m_stressTestPressed = true;
-                        } else {
-                            m_showoffPressed = true;
-                        }
-                    }
+                    // Note: Showoff (P) and Stress Test (Shift+P) are now controlled via Debug Menu -> Modes tab
                 }
             );
 
@@ -113,22 +106,7 @@ namespace rtype::ecs {
                 m_eventBus.emit(events::DanmakuEvent{0, 0});
                 m_danmakuPressed = false;
             }
-
-            if (m_showoffPressed) {
-                if (!m_showoffActive && !m_stressTestActive) {
-                    m_eventBus.emit(events::ShowoffStartEvent{});
-                } else if (m_showoffActive) {
-                    m_eventBus.emit(events::ShowoffEndEvent{});
-                }
-                m_showoffPressed = false;
-            }
-
-            if (m_stressTestPressed) {
-                if (!m_showoffActive) {
-                    m_eventBus.emit(events::StressTestToggleEvent{});
-                }
-                m_stressTestPressed = false;
-            }
+            // Showoff and Stress Test are now controlled via Debug Menu -> Modes tab
         }
 
         SystemPhase getPhase() const override {
@@ -144,8 +122,6 @@ namespace rtype::ecs {
         
         events::KeyState m_keyState;
         bool m_danmakuPressed = false;
-        bool m_showoffPressed = false;
-        bool m_stressTestPressed = false;
         bool m_showoffActive = false;
         bool m_stressTestActive = false;
 

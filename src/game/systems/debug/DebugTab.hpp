@@ -47,9 +47,9 @@ namespace rtype::ecs::debug {
         }
 
         /**
-         * @brief Update mouse state from events (called by DebugSystem)
+         * @brief Set mouse state from DebugSystem (called each frame for active tab)
          */
-        void updateMouseState(const MouseInput& mouse) {
+        void setMouseState(const MouseInput& mouse) {
             m_mouse = mouse;
             handleMouse(mouse);
         }

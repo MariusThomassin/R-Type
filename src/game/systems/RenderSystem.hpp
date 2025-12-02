@@ -67,33 +67,53 @@ namespace rtype::ecs {
                 }
             );
 
-            std::vector<EntityId> entities;
-            entities.reserve(256);
+            // Optimization: Use struct to cache layer during collection (avoids repeated lookups during sort)
+            struct RenderItem {
+                EntityId entity;
+                int layer;
+            };
             
-            m_registry->forEach<TransformComponent, SpriteComponent>(
-                [&entities](EntityId e) { entities.push_back(e); }
-            );
+            std::vector<RenderItem> entities;
+            entities.reserve(m_lastEntityCount > 0 ? m_lastEntityCount + 64 : 256);
+            
+            // Collect SpritesheetComponent entities (most common - bullets)
             m_registry->forEach<TransformComponent, SpritesheetComponent>(
                 [this, &entities](EntityId e) {
-                    if (!m_registry->hasComponent<SpriteComponent>(e)) {
-                        entities.push_back(e);
+                    const auto& sheet = m_registry->getComponent<SpritesheetComponent>(e);
+                    entities.push_back({e, sheet.getRenderLayer()});
+                }
+            );
+            
+            // Collect SpriteComponent entities (fewer)
+            m_registry->forEach<TransformComponent, SpriteComponent>(
+                [this, &entities](EntityId e) {
+                    if (!m_registry->hasComponent<SpritesheetComponent>(e)) {
+                        const auto& sprite = m_registry->getComponent<SpriteComponent>(e);
+                        entities.push_back({e, sprite.getRenderLayer()});
                     }
                 }
             );
+            
+            // Collect PlayerShipComponent entities (rare)
             m_registry->forEach<TransformComponent, PlayerShipComponent>(
                 [this, &entities](EntityId e) {
                     if (!m_registry->hasComponent<SpriteComponent>(e) && 
                         !m_registry->hasComponent<SpritesheetComponent>(e)) {
-                        entities.push_back(e);
+                        const auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
+                        entities.push_back({e, ship.getRenderLayer()});
                     }
                 }
             );
 
-            std::sort(entities.begin(), entities.end(), [this](EntityId a, EntityId b) {
-                return getLayer(a) < getLayer(b);
+            m_lastEntityCount = entities.size();
+
+            // Sort using cached layer values (O(n log n) but with fast comparisons)
+            std::sort(entities.begin(), entities.end(), [](const RenderItem& a, const RenderItem& b) {
+                return a.layer < b.layer;
             });
 
-            for (EntityId e : entities) {
+            for (const RenderItem& item : entities) {
+                EntityId e = item.entity;
                 const auto& transform = m_registry->getComponent<TransformComponent>(e);
                 
                 if (m_registry->hasComponent<PlayerShipComponent>(e)) {
@@ -151,6 +171,7 @@ namespace rtype::ecs {
     private:
         int m_screenWidth, m_screenHeight;
         float m_animTime;
+        std::size_t m_lastEntityCount = 0;  // Cache for vector reserve optimization
         std::unordered_map<std::string, Texture2D> m_textures;
         std::function<void()> m_overlayCallback;
 
