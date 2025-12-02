@@ -76,6 +76,7 @@ namespace rtype::ecs::debug {
                 y += 24;
 
                 m_showoffButtonY = y;
+                m_stopShowoffHover = isMouseOverButton(35, y, 120, 28);
                 drawButton(35, y, 120, 28, "Stop Showoff", {180, 80, 80, 255}, m_stopShowoffHover);
                 if (m_stopShowoffHover && m_mouse.leftPressed) {
                     m_eventBus.emit(events::ShowoffEndEvent{});
@@ -88,6 +89,7 @@ namespace rtype::ecs::debug {
                 y += 44;
 
                 m_showoffButtonY = y;
+                m_startShowoffHover = isMouseOverButton(35, y, 120, 28);
                 Color btnColor = canStart ? Color{80, 150, 80, 255} : Color{80, 80, 80, 255};
                 drawButton(35, y, 120, 28, "Start Showoff", btnColor, m_startShowoffHover && canStart);
                 if (m_startShowoffHover && m_mouse.leftPressed && canStart) {
@@ -118,6 +120,7 @@ namespace rtype::ecs::debug {
                 y += 24;
 
                 m_stressTestButtonY = y;
+                m_startStressTestHover = isMouseOverButton(35, y, 140, 28);
                 drawButton(35, y, 140, 28, "Run Again", {80, 150, 80, 255}, m_startStressTestHover);
                 if (m_startStressTestHover && m_mouse.leftPressed) {
                     m_eventBus.emit(events::StressTestToggleEvent{});
@@ -143,6 +146,7 @@ namespace rtype::ecs::debug {
                 DrawText(buf, 245, y - 22, 12, {150, 150, 150, 255});
 
                 m_stressTestButtonY = y;
+                m_stopStressTestHover = isMouseOverButton(35, y, 120, 28);
                 drawButton(35, y, 120, 28, "Stop Test", {180, 80, 80, 255}, m_stopStressTestHover);
                 if (m_stopStressTestHover && m_mouse.leftPressed) {
                     m_eventBus.emit(events::StressTestToggleEvent{});
@@ -155,6 +159,7 @@ namespace rtype::ecs::debug {
                 y += 44;
 
                 m_stressTestButtonY = y;
+                m_startStressTestHover = isMouseOverButton(35, y, 140, 28);
                 Color btnColor = canStart ? Color{80, 150, 80, 255} : Color{80, 80, 80, 255};
                 drawButton(35, y, 140, 28, "Start Stress Test", btnColor, m_startStressTestHover && canStart);
                 if (m_startStressTestHover && m_mouse.leftPressed && canStart) {
@@ -172,12 +177,7 @@ namespace rtype::ecs::debug {
 
         void handleMouse(const MouseInput& mouse) override {
             m_mouse = mouse;
-
-            // Update button hover states based on stored Y positions
-            m_startShowoffHover = isMouseOverButton(35, m_showoffButtonY, 120, 28);
-            m_stopShowoffHover = isMouseOverButton(35, m_showoffButtonY, 120, 28);
-            m_startStressTestHover = isMouseOverButton(35, m_stressTestButtonY, 140, 28);
-            m_stopStressTestHover = isMouseOverButton(35, m_stressTestButtonY, 120, 28);
+            // Hover states are now computed during draw() when Y positions are known
         }
 
     private:

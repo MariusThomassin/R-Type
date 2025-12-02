@@ -88,6 +88,7 @@ void clampPlayerToScreen(Registry& registry) {
 int main() {
     // ==================== Raylib Initialization ====================
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "R-Type");
+    ClearWindowState(FLAG_WINDOW_RESIZABLE);  // Fixed window size to prevent FPS drops on resize
 
     // ==================== Event Bus ====================
     EventBus eventBus;

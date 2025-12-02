@@ -91,17 +91,16 @@ namespace rtype::ui {
 
     bool ButtonWidget::onMouseClick(float x, float y)
     {
+        (void)x;  // Coordinates no longer needed - caller verified bounds
+        (void)y;
         if (!_m_enabled) return false;
 
-        if (contains(x, y)) {
-            _state = ButtonState::Pressed;
-            if (_onClick) {
-                _onClick();
-            }
-            _state = ButtonState::Hovered; // Return to hover after click
-            return true;
+        _state = ButtonState::Pressed;
+        if (_onClick) {
+            _onClick();
         }
-        return false;
+        _state = ButtonState::Hovered; // Return to hover after click
+        return true;
     }
 
     void ButtonWidget::renderSelf()

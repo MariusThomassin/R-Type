@@ -137,11 +137,8 @@ namespace rtype::ecs::debug {
                 button->onMouseLeave();
             }
             
-            // Handle click event
             if (over && mouse.leftPressed) {
-                float localX = mouse.x - transform.x;
-                float localY = mouse.y - transform.y;
-                button->onMouseClick(localX, localY);
+                button->onMouseClick(mouse.x, mouse.y);
             }
             
             wasOver = over;
