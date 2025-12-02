@@ -18,5 +18,8 @@
 #include "src/engine/ui/widgets/ButtonWidget.hpp"
 #include "src/engine/ui/widgets/PanelWidget.hpp"
 #include "src/engine/ui/widgets/ProgressBarWidget.hpp"
+#include "src/engine/ui/widgets/ListWidget.hpp"
+#include "src/engine/ui/widgets/ToggleButtonWidget.hpp"
+#include "src/engine/ui/widgets/SliderWidget.hpp"
 
 #endif /* !WIDGETS_HPP_ */

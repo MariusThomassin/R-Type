@@ -94,6 +94,9 @@ set(GAME_CLIENT_SOURCES
     src/engine/ui/widgets/ButtonWidget.cpp
     src/engine/ui/widgets/PanelWidget.cpp
     src/engine/ui/widgets/ProgressBarWidget.cpp
+    src/engine/ui/widgets/ListWidget.cpp
+    src/engine/ui/widgets/ToggleButtonWidget.cpp
+    src/engine/ui/widgets/SliderWidget.cpp
 )
 
 # Create static library for the ECS engine
