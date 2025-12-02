@@ -36,11 +36,16 @@ namespace rtype::ecs {
 
             m_keyPressedSubId = m_eventBus.subscribe<events::KeyPressedEvent>(
                 [this](const events::KeyPressedEvent& e) {
-                    if (e.key == events::KeyCode::G && !m_showoffActive) {
+                    if (e.key == events::KeyCode::G && !m_showoffActive && !m_stressTestActive) {
                         m_danmakuPressed = true;
                     }
                     if (e.key == events::KeyCode::P) {
-                        m_showoffPressed = true;
+                        // Shift+P = stress test, P alone = showoff
+                        if (m_keyState.shift) {
+                            m_stressTestPressed = true;
+                        } else {
+                            m_showoffPressed = true;
+                        }
                     }
                 }
             );
@@ -55,6 +60,12 @@ namespace rtype::ecs {
                     m_showoffActive = false;
                 }
             );
+
+            m_stressTestSubId = m_eventBus.subscribe<events::StressTestToggleEvent>(
+                [this](const events::StressTestToggleEvent&) {
+                    m_stressTestActive = !m_stressTestActive;
+                }
+            );
         }
 
         ~InputSystem() override {
@@ -62,6 +73,7 @@ namespace rtype::ecs {
             m_eventBus.unsubscribe<events::KeyPressedEvent>(m_keyPressedSubId);
             m_eventBus.unsubscribe<events::ShowoffStartEvent>(m_showoffStartSubId);
             m_eventBus.unsubscribe<events::ShowoffEndEvent>(m_showoffEndSubId);
+            m_eventBus.unsubscribe<events::StressTestToggleEvent>(m_stressTestSubId);
         }
 
         void update(float dt) override {
@@ -103,12 +115,19 @@ namespace rtype::ecs {
             }
 
             if (m_showoffPressed) {
-                if (!m_showoffActive) {
+                if (!m_showoffActive && !m_stressTestActive) {
                     m_eventBus.emit(events::ShowoffStartEvent{});
-                } else {
+                } else if (m_showoffActive) {
                     m_eventBus.emit(events::ShowoffEndEvent{});
                 }
                 m_showoffPressed = false;
+            }
+
+            if (m_stressTestPressed) {
+                if (!m_showoffActive) {
+                    m_eventBus.emit(events::StressTestToggleEvent{});
+                }
+                m_stressTestPressed = false;
             }
         }
 
@@ -126,12 +145,15 @@ namespace rtype::ecs {
         events::KeyState m_keyState;
         bool m_danmakuPressed = false;
         bool m_showoffPressed = false;
+        bool m_stressTestPressed = false;
         bool m_showoffActive = false;
+        bool m_stressTestActive = false;
 
         EventBus::SubscriberId m_keyStateSubId;
         EventBus::SubscriberId m_keyPressedSubId;
         EventBus::SubscriberId m_showoffStartSubId;
         EventBus::SubscriberId m_showoffEndSubId;
+        EventBus::SubscriberId m_stressTestSubId;
     };
 
 } // namespace rtype::ecs

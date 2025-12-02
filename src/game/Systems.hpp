@@ -25,3 +25,6 @@
 
 // Showoff/Demo system
 #include "systems/ShowoffSystem.hpp"
+
+// Stress test system
+#include "systems/StressTestSystem.hpp"

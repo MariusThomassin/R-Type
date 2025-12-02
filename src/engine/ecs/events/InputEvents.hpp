@@ -168,4 +168,9 @@ namespace rtype::ecs::events {
      */
     struct ShowoffEndEvent {};
 
+    /**
+     * @brief Toggle stress test mode (Shift+P)
+     */
+    struct StressTestToggleEvent {};
+
 } // namespace rtype::ecs::events

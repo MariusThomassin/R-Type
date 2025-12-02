@@ -108,13 +108,14 @@ int main() {
     systems.addSystem<TrajectorySystem>();
     systems.addSystem<SpinSystem>();
     auto* showoffSystem = systems.addSystem<ShowoffSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
+    auto* stressTestSystem = systems.addSystem<StressTestSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* renderSystem = systems.addSystem<RenderSystem>(SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* debugSystem = systems.addSystem<DebugSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     
     debugSystem->setTextures(renderSystem->getTextures());
     debugSystem->init();
     
-    renderSystem->setOverlayCallback([debugSystem, showoffSystem]() {
+    renderSystem->setOverlayCallback([debugSystem, showoffSystem, stressTestSystem]() {
         debugSystem->draw();
         
         // Draw showoff mode indicator
@@ -134,6 +135,47 @@ int main() {
                      showoffSystem->getCurrentPhase() + 1, 
                      showoffSystem->getTotalPhases());
             DrawText(phaseText, 200, 35, 16, GRAY);
+        }
+        
+        // Draw stress test mode indicator
+        if (stressTestSystem->isActive()) {
+            DrawRectangle(0, 0, 450, 100, Fade(RED, 0.85f));
+            DrawText("STRESS TEST MODE", 10, 8, 20, WHITE);
+            
+            // Phase progress bar
+            char phaseLabel[64];
+            snprintf(phaseLabel, sizeof(phaseLabel), "Phase %d/%d (Intensity %d)", 
+                     stressTestSystem->getCurrentPhase(),
+                     stressTestSystem->getTotalPhases(),
+                     stressTestSystem->getIntensity());
+            DrawText(phaseLabel, 10, 32, 14, YELLOW);
+            
+            float progress = stressTestSystem->getPhaseProgress();
+            DrawRectangle(10, 50, 430, 12, DARKGRAY);
+            DrawRectangle(10, 50, static_cast<int>(430 * progress), 12, ORANGE);
+            
+            char statsText[128];
+            snprintf(statsText, sizeof(statsText), "Entities: %d | Waves: %d | FPS: %d | Time: %.0fs/100s",
+                     stressTestSystem->getBulletCount(),
+                     stressTestSystem->getWaveCount(),
+                     GetFPS(),
+                     stressTestSystem->getTotalTime());
+            DrawText(statsText, 10, 68, 14, LIGHTGRAY);
+            
+            // Phase time remaining
+            float timeLeft = 20.0f - stressTestSystem->getPhaseTime();
+            snprintf(statsText, sizeof(statsText), "Next phase in: %.1fs", timeLeft > 0 ? timeLeft : 0);
+            DrawText(statsText, 10, 84, 12, GRAY);
+        }
+        
+        // Draw completion message
+        if (stressTestSystem->isComplete() && !stressTestSystem->getReportFilename().empty()) {
+            DrawRectangle(0, 0, 500, 60, Fade(GREEN, 0.9f));
+            DrawText("STRESS TEST COMPLETE!", 10, 10, 20, WHITE);
+            char reportMsg[256];
+            snprintf(reportMsg, sizeof(reportMsg), "Report saved: %s", 
+                     stressTestSystem->getReportFilename().c_str());
+            DrawText(reportMsg, 10, 35, 14, YELLOW);
         }
     });
 
@@ -157,6 +199,7 @@ int main() {
             inputSystem->update(FIXED_TIMESTEP);
             debugSystem->update(FIXED_TIMESTEP);
             showoffSystem->update(FIXED_TIMESTEP);
+            stressTestSystem->update(FIXED_TIMESTEP);
             patternSystem->update(FIXED_TIMESTEP);
             systems.getSystem<TrajectorySystem>()->update(FIXED_TIMESTEP);
             systems.getSystem<SpinSystem>()->update(FIXED_TIMESTEP);
