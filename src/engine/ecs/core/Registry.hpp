@@ -9,6 +9,7 @@
 #include "Entity.hpp"
 #include "IComponent.hpp"
 #include "IComponentArray.hpp"
+#include "SparseSet.hpp"
 #include "Types.hpp"
 
 #include <memory>
@@ -16,6 +17,8 @@
 #include <set>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
+#include <functional>
 
 namespace rtype::ecs {
 
@@ -26,6 +29,7 @@ namespace rtype::ecs {
      * - Entity creation and destruction
      * - Component storage and retrieval
      * - Entity signature management
+     * - Efficient entity queries with caching
      */
     class Registry {
     public:
@@ -227,21 +231,97 @@ namespace rtype::ecs {
          * @brief Get all entities with the specified components
          * @tparam Components The required component types
          * @return Vector of matching entity IDs
+         * 
+         * @note This allocates a new vector each call. For hot paths,
+         * prefer using forEach() or view() which don't allocate.
          */
         template <typename... Components>
         std::vector<EntityId> getEntitiesWith() const {
             std::vector<EntityId> result;
 
+            // Use the smallest component array as the lead iterator
+            // to minimize iteration count
+            const auto* smallestArray = findSmallestArray<Components...>();
+            if (!smallestArray) {
+                return result;
+            }
+
             Signature required;
             (required.set(getComponentTypeId<Components>()), ...);
 
-            for (const auto& [entityId, signature] : m_signatures) {
-                if ((signature & required) == required) {
+            const auto& entities = smallestArray->getEntities();
+            result.reserve(entities.size());
+
+            for (EntityId entityId : entities) {
+                auto sigIt = m_signatures.find(entityId);
+                if (sigIt != m_signatures.end() && 
+                    (sigIt->second & required) == required) {
                     result.push_back(entityId);
                 }
             }
 
             return result;
+        }
+
+        /**
+         * @brief Iterate over all entities with specified components without allocation
+         * @tparam Components The required component types
+         * @param func Function to call for each matching entity
+         * 
+         * This is the most efficient way to iterate entities as it:
+         * - Uses the smallest component array as lead iterator
+         * - Doesn't allocate any memory
+         * - Supports early termination by returning false
+         */
+        template <typename... Components, typename Func>
+        void forEach(Func&& func) {
+            const auto* smallestArray = findSmallestArray<Components...>();
+            if (!smallestArray) {
+                return;
+            }
+
+            Signature required;
+            (required.set(getComponentTypeId<Components>()), ...);
+
+            const auto& entities = smallestArray->getEntities();
+            for (EntityId entityId : entities) {
+                auto sigIt = m_signatures.find(entityId);
+                if (sigIt != m_signatures.end() && 
+                    (sigIt->second & required) == required) {
+                    if constexpr (std::is_same_v<std::invoke_result_t<Func, EntityId>, bool>) {
+                        if (!func(entityId)) {
+                            break;
+                        }
+                    } else {
+                        func(entityId);
+                    }
+                }
+            }
+        }
+
+        /**
+         * @brief Iterate with components passed to callback (most ergonomic)
+         * @tparam Components The required component types
+         * @param func Function to call with (entity, Component&...) for each match
+         */
+        template <typename... Components, typename Func>
+        void forEachWith(Func&& func) {
+            const auto* smallestArray = findSmallestArray<Components...>();
+            if (!smallestArray) {
+                return;
+            }
+
+            Signature required;
+            (required.set(getComponentTypeId<Components>()), ...);
+
+            const auto& entities = smallestArray->getEntities();
+            for (EntityId entityId : entities) {
+                auto sigIt = m_signatures.find(entityId);
+                if (sigIt != m_signatures.end() && 
+                    (sigIt->second & required) == required) {
+                    func(entityId, getComponent<Components>(entityId)...);
+                }
+            }
         }
 
         /**
@@ -296,6 +376,43 @@ namespace rtype::ecs {
             assert(it != m_componentArrays.end() && "Component type not registered");
 
             return std::static_pointer_cast<const ComponentArray<T>>(it->second);
+        }
+
+        /**
+         * @brief Find the smallest component array among requested types
+         * Used to optimize iteration by starting with the smallest set
+         */
+        template <typename First, typename... Rest>
+        const ComponentArray<First>* findSmallestArray() const {
+            ComponentTypeId typeId = getComponentTypeId<First>();
+            auto it = m_componentArrays.find(typeId);
+            if (it == m_componentArrays.end()) {
+                return nullptr;
+            }
+
+            const IComponentArray* smallest = it->second.get();
+            std::size_t minSize = smallest->size();
+
+            if constexpr (sizeof...(Rest) > 0) {
+                findSmallestArrayHelper<Rest...>(minSize, smallest);
+            }
+
+            return static_cast<const ComponentArray<First>*>(smallest);
+        }
+
+        template <typename First, typename... Rest>
+        void findSmallestArrayHelper(std::size_t& minSize, 
+                                      const IComponentArray*& smallest) const {
+            ComponentTypeId typeId = getComponentTypeId<First>();
+            auto it = m_componentArrays.find(typeId);
+            if (it != m_componentArrays.end() && it->second->size() < minSize) {
+                minSize = it->second->size();
+                smallest = it->second.get();
+            }
+
+            if constexpr (sizeof...(Rest) > 0) {
+                findSmallestArrayHelper<Rest...>(minSize, smallest);
+            }
         }
 
     private:

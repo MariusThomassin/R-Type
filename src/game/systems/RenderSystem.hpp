@@ -58,29 +58,36 @@ namespace rtype::ecs {
             BeginDrawing();
             ClearBackground({8, 8, 20, 255});
             
-            // Render backgrounds first (layer 0)
-            for (EntityId e : m_registry->getEntitiesWith<TransformComponent, BackgroundComponent>()) {
-                auto& background = m_registry->getComponent<BackgroundComponent>(e);
-                const auto& transform = m_registry->getComponent<TransformComponent>(e);
-                background.updateAnimation(dt);
-                background.render(transform, ctx);
-            }
+            m_registry->forEach<TransformComponent, BackgroundComponent>(
+                [this, &ctx, dt](EntityId e) {
+                    auto& background = m_registry->getComponent<BackgroundComponent>(e);
+                    const auto& transform = m_registry->getComponent<TransformComponent>(e);
+                    background.updateAnimation(dt);
+                    background.render(transform, ctx);
+                }
+            );
 
-            // Collect and sort all renderable entities
             std::vector<EntityId> entities;
-            for (EntityId e : m_registry->getEntitiesWith<TransformComponent, SpriteComponent>()) {
-                entities.push_back(e);
-            }
-            for (EntityId e : m_registry->getEntitiesWith<TransformComponent, SpritesheetComponent>()) {
-                if (!m_registry->hasComponent<SpriteComponent>(e)) {
-                    entities.push_back(e);
+            entities.reserve(256);
+            
+            m_registry->forEach<TransformComponent, SpriteComponent>(
+                [&entities](EntityId e) { entities.push_back(e); }
+            );
+            m_registry->forEach<TransformComponent, SpritesheetComponent>(
+                [this, &entities](EntityId e) {
+                    if (!m_registry->hasComponent<SpriteComponent>(e)) {
+                        entities.push_back(e);
+                    }
                 }
-            }
-            for (EntityId e : m_registry->getEntitiesWith<TransformComponent, PlayerShipComponent>()) {
-                if (!m_registry->hasComponent<SpriteComponent>(e) && !m_registry->hasComponent<SpritesheetComponent>(e)) {
-                    entities.push_back(e);
+            );
+            m_registry->forEach<TransformComponent, PlayerShipComponent>(
+                [this, &entities](EntityId e) {
+                    if (!m_registry->hasComponent<SpriteComponent>(e) && 
+                        !m_registry->hasComponent<SpritesheetComponent>(e)) {
+                        entities.push_back(e);
+                    }
                 }
-            }
+            );
 
             std::sort(entities.begin(), entities.end(), [this](EntityId a, EntityId b) {
                 return getLayer(a) < getLayer(b);
@@ -111,7 +118,6 @@ namespace rtype::ecs {
 
             drawUI();
             
-            // Call overlay callback if set (for DebugSystem)
             if (m_overlayCallback) m_overlayCallback();
 
             EndDrawing();

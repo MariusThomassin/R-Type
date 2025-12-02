@@ -53,31 +53,30 @@ namespace rtype::ecs {
 
             if (!m_registry) return;
 
-            auto entities = m_registry->getEntitiesWith<PlayerComponent, VelocityComponent>();
+            m_registry->forEach<PlayerComponent, VelocityComponent>(
+                [this](EntityId entity) {
+                    const auto& player = m_registry->getComponent<PlayerComponent>(entity);
 
-            for (EntityId entity : entities) {
-                const auto& player = m_registry->getComponent<PlayerComponent>(entity);
+                    if (!player.isLocal) return;
 
-                if (!player.isLocal) continue;
+                    auto& velocity = m_registry->getComponent<VelocityComponent>(entity);
 
-                auto& velocity = m_registry->getComponent<VelocityComponent>(entity);
+                    velocity.vx = 0.0f;
+                    velocity.vy = 0.0f;
 
-                velocity.vx = 0.0f;
-                velocity.vy = 0.0f;
+                    if (m_keyState.moveRight()) velocity.vx = m_moveSpeed;
+                    if (m_keyState.moveLeft()) velocity.vx = -m_moveSpeed;
+                    if (m_keyState.moveUp()) velocity.vy = -m_moveSpeed;
+                    if (m_keyState.moveDown()) velocity.vy = m_moveSpeed;
 
-                if (m_keyState.moveRight()) velocity.vx = m_moveSpeed;
-                if (m_keyState.moveLeft()) velocity.vx = -m_moveSpeed;
-                if (m_keyState.moveUp()) velocity.vy = -m_moveSpeed;
-                if (m_keyState.moveDown()) velocity.vy = m_moveSpeed;
+                    if (velocity.vx != 0.0f && velocity.vy != 0.0f) {
+                        float factor = 0.7071f;
+                        velocity.vx *= factor;
+                        velocity.vy *= factor;
+                    }
 
-                if (velocity.vx != 0.0f && velocity.vy != 0.0f) {
-                    float factor = 0.7071f;
-                    velocity.vx *= factor;
-                    velocity.vy *= factor;
-                }
-
-                if (m_keyState.space) {
-                    m_eventBus.emit(events::ShootEvent{entity});
+                    if (m_keyState.space) {
+                        m_eventBus.emit(events::ShootEvent{entity});
                 }
             }
 

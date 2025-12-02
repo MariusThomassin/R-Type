@@ -158,4 +158,14 @@ namespace rtype::ecs::events {
         int tabIndex;
     };
 
+    /**
+     * @brief Start showoff/demonstration mode
+     */
+    struct ShowoffStartEvent {};
+
+    /**
+     * @brief End showoff/demonstration mode
+     */
+    struct ShowoffEndEvent {};
+
 } // namespace rtype::ecs::events

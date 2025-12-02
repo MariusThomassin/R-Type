@@ -71,18 +71,18 @@ Entity createBackground(Registry& registry, int screenWidth, int screenHeight) {
  * @brief Clamp player position to screen bounds
  */
 void clampPlayerToScreen(Registry& registry) {
-    auto players = registry.getEntitiesWith<PlayerComponent, TransformComponent>();
-
     constexpr float MARGIN = 30.0f;
 
-    for (EntityId entity : players) {
-        auto& transform = registry.getComponent<TransformComponent>(entity);
+    registry.forEach<PlayerComponent, TransformComponent>(
+        [&registry](EntityId entity) {
+            auto& transform = registry.getComponent<TransformComponent>(entity);
 
-        if (transform.x < MARGIN) transform.x = MARGIN;
-        if (transform.x > SCREEN_WIDTH - MARGIN) transform.x = SCREEN_WIDTH - MARGIN;
-        if (transform.y < MARGIN) transform.y = MARGIN;
-        if (transform.y > SCREEN_HEIGHT - MARGIN) transform.y = SCREEN_HEIGHT - MARGIN;
-    }
+            if (transform.x < MARGIN) transform.x = MARGIN;
+            if (transform.x > SCREEN_WIDTH - MARGIN) transform.x = SCREEN_WIDTH - MARGIN;
+            if (transform.y < MARGIN) transform.y = MARGIN;
+            if (transform.y > SCREEN_HEIGHT - MARGIN) transform.y = SCREEN_HEIGHT - MARGIN;
+        }
+    );
 }
 
 int main() {
@@ -103,14 +103,38 @@ int main() {
     systems.addSystem<MovementSystem>();
     auto* bulletSystem = systems.addSystem<BulletSystem>(eventBus);
     bulletSystem->setScreenSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+    auto* patternSystem = systems.addSystem<PatternSystem>();
+    patternSystem->setScreenSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+    systems.addSystem<TrajectorySystem>();
+    systems.addSystem<SpinSystem>();
+    auto* showoffSystem = systems.addSystem<ShowoffSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* renderSystem = systems.addSystem<RenderSystem>(SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* debugSystem = systems.addSystem<DebugSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     
     debugSystem->setTextures(renderSystem->getTextures());
     debugSystem->init();
     
-    renderSystem->setOverlayCallback([debugSystem]() {
+    renderSystem->setOverlayCallback([debugSystem, showoffSystem]() {
         debugSystem->draw();
+        
+        // Draw showoff mode indicator
+        if (showoffSystem->isActive()) {
+            DrawRectangle(0, 0, 400, 60, Fade(BLACK, 0.7f));
+            DrawText("SHOWOFF MODE", 10, 10, 20, YELLOW);
+            DrawText(showoffSystem->getCurrentPatternName().c_str(), 10, 35, 16, WHITE);
+            
+            // Progress bar
+            float progress = showoffSystem->getPhaseProgress();
+            DrawRectangle(200, 12, 180, 16, DARKGRAY);
+            DrawRectangle(200, 12, static_cast<int>(180 * progress), 16, YELLOW);
+            
+            // Phase counter
+            char phaseText[32];
+            snprintf(phaseText, sizeof(phaseText), "%d/%d", 
+                     showoffSystem->getCurrentPhase() + 1, 
+                     showoffSystem->getTotalPhases());
+            DrawText(phaseText, 200, 35, 16, GRAY);
+        }
     });
 
     // ==================== Create Game Entities ====================
@@ -132,6 +156,10 @@ int main() {
         while (accumulator >= FIXED_TIMESTEP) {
             inputSystem->update(FIXED_TIMESTEP);
             debugSystem->update(FIXED_TIMESTEP);
+            showoffSystem->update(FIXED_TIMESTEP);
+            patternSystem->update(FIXED_TIMESTEP);
+            systems.getSystem<TrajectorySystem>()->update(FIXED_TIMESTEP);
+            systems.getSystem<SpinSystem>()->update(FIXED_TIMESTEP);
             systems.getSystem<MovementSystem>()->update(FIXED_TIMESTEP);
             bulletSystem->update(FIXED_TIMESTEP);
             clampPlayerToScreen(registry);

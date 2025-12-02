@@ -52,6 +52,26 @@ foreach(CONFIG ${CMAKE_CONFIGURATION_TYPES})
 endforeach()
 
 #--------------------------------------------------------------
+# ECS Engine Library (compiled sources)
+#--------------------------------------------------------------
+
+# Collect all .cpp files from the engine
+set(ECS_ENGINE_SOURCES
+    src/engine/ecs/core/src/Registry.cpp
+)
+
+# Create static library for the ECS engine
+add_library(ecs_engine STATIC ${ECS_ENGINE_SOURCES})
+target_include_directories(ecs_engine PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+# Compile with same flags
+if(MSVC)
+    target_compile_options(ecs_engine PRIVATE /W4 /permissive-)
+elseif(MINGW OR UNIX)
+    target_compile_options(ecs_engine PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+#--------------------------------------------------------------
 # Targets
 #--------------------------------------------------------------
 
@@ -61,6 +81,10 @@ add_executable(client src/client/main.cpp)
 # Include paths
 target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Link ECS engine library
+target_link_libraries(server PRIVATE ecs_engine)
+target_link_libraries(client PRIVATE ecs_engine)
 
 # Link raylib to client
 target_link_libraries(client PRIVATE raylib)

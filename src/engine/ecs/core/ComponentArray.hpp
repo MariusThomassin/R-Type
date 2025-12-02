@@ -7,12 +7,10 @@
 
 #include "IComponent.hpp"
 #include "IComponentArray.hpp"
+#include "SparseSet.hpp"
 #include "Types.hpp"
 
-#include <array>
 #include <cassert>
-#include <optional>
-#include <unordered_map>
 #include <vector>
 
 namespace rtype::ecs {
@@ -21,8 +19,8 @@ namespace rtype::ecs {
      * @brief Packed array for storing components of a single type
      * @tparam T The component type to store
      * 
-     * Uses a sparse set pattern for O(1) access while keeping
-     * components packed in memory for cache-friendly iteration.
+     * Uses a sparse set pattern for O(1) access without hash table overhead
+     * while keeping components packed in memory for cache-friendly iteration.
      */
     template <typename T>
     class ComponentArray : public IComponentArray {
@@ -34,6 +32,15 @@ namespace rtype::ecs {
         ~ComponentArray() override = default;
 
         /**
+         * @brief Reserve space for expected number of entities
+         * @param maxEntityId Maximum entity ID expected
+         */
+        void reserve(std::size_t maxEntityId) {
+            m_sparseSet.reserve(maxEntityId);
+            m_components.reserve(maxEntityId);
+        }
+
+        /**
          * @brief Add a component to an entity
          * @param entity The entity ID
          * @param component The component data to store
@@ -41,9 +48,7 @@ namespace rtype::ecs {
         void insertComponent(EntityId entity, T component) {
             assert(!hasComponent(entity) && "Component already exists for entity");
 
-            std::size_t newIndex = m_components.size();
-            m_entityToIndex[entity] = newIndex;
-            m_indexToEntity[newIndex] = entity;
+            m_sparseSet.insert(entity);
             m_components.push_back(std::move(component));
         }
 
@@ -56,20 +61,15 @@ namespace rtype::ecs {
         void removeComponent(EntityId entity) {
             assert(hasComponent(entity) && "Component does not exist for entity");
 
-            std::size_t removedIndex = m_entityToIndex[entity];
+            std::size_t removedIndex = m_sparseSet.getIndex(entity);
             std::size_t lastIndex = m_components.size() - 1;
 
             if (removedIndex != lastIndex) {
                 m_components[removedIndex] = std::move(m_components[lastIndex]);
-
-                EntityId lastEntity = m_indexToEntity[lastIndex];
-                m_entityToIndex[lastEntity] = removedIndex;
-                m_indexToEntity[removedIndex] = lastEntity;
             }
 
             m_components.pop_back();
-            m_entityToIndex.erase(entity);
-            m_indexToEntity.erase(lastIndex);
+            m_sparseSet.remove(entity);
         }
 
         /**
@@ -79,7 +79,7 @@ namespace rtype::ecs {
          */
         T& getComponent(EntityId entity) {
             assert(hasComponent(entity) && "Component does not exist for entity");
-            return m_components[m_entityToIndex[entity]];
+            return m_components[m_sparseSet.getIndex(entity)];
         }
 
         /**
@@ -89,7 +89,7 @@ namespace rtype::ecs {
          */
         const T& getComponent(EntityId entity) const {
             assert(hasComponent(entity) && "Component does not exist for entity");
-            return m_components[m_entityToIndex.at(entity)];
+            return m_components[m_sparseSet.getIndex(entity)];
         }
 
         /**
@@ -98,19 +98,17 @@ namespace rtype::ecs {
          * @return Pointer to component or nullptr
          */
         T* tryGetComponent(EntityId entity) {
-            auto it = m_entityToIndex.find(entity);
-            if (it == m_entityToIndex.end()) {
+            if (!m_sparseSet.contains(entity)) {
                 return nullptr;
             }
-            return &m_components[it->second];
+            return &m_components[m_sparseSet.getIndex(entity)];
         }
 
         const T* tryGetComponent(EntityId entity) const {
-            auto it = m_entityToIndex.find(entity);
-            if (it == m_entityToIndex.end()) {
+            if (!m_sparseSet.contains(entity)) {
                 return nullptr;
             }
-            return &m_components[it->second];
+            return &m_components[m_sparseSet.getIndex(entity)];
         }
 
         void entityDestroyed(EntityId entity) override {
@@ -120,7 +118,7 @@ namespace rtype::ecs {
         }
 
         bool hasComponent(EntityId entity) const override {
-            return m_entityToIndex.find(entity) != m_entityToIndex.end();
+            return m_sparseSet.contains(entity);
         }
 
         std::size_t size() const override {
@@ -139,14 +137,33 @@ namespace rtype::ecs {
          */
         EntityId getEntityAtIndex(std::size_t index) const {
             assert(index < m_components.size() && "Index out of bounds");
-            return m_indexToEntity.at(index);
+            return m_sparseSet.getEntityAt(index);
         }
 
-    private:
-        std::vector<T> m_components;
+        /**
+         * @brief Get all entities with this component type
+         * @return Reference to vector of entity IDs
+         */
+        const std::vector<EntityId>& getEntities() const {
+            return m_sparseSet.dense();
+        }
 
-        std::unordered_map<EntityId, std::size_t> m_entityToIndex;
-        std::unordered_map<std::size_t, EntityId> m_indexToEntity;
+        /**
+         * @brief Check if storage contains entity
+         */
+        bool contains(EntityId entity) const {
+            return m_sparseSet.contains(entity);
+        }
+
+        /**
+         * @brief Access components directly (for cache-friendly iteration)
+         */
+        std::vector<T>& components() { return m_components; }
+        const std::vector<T>& components() const { return m_components; }
+
+    private:
+        SparseSet m_sparseSet;
+        std::vector<T> m_components;
     };
 
 } // namespace rtype::ecs

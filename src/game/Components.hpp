@@ -21,3 +21,9 @@
 #include "components/SpritesheetComponent.hpp"
 #include "components/BulletTypes.hpp"
 #include "components/BulletSprites.hpp"
+
+// Bullet/trajectory components (refactored)
+#include "components/bullets/Bullets.hpp"
+
+// Pattern system components (refactored)
+#include "components/patterns/Patterns.hpp"

@@ -124,9 +124,9 @@ namespace rtype::ecs::debug {
 
         void refreshEntityList() {
             m_entities.clear();
-            for (EntityId eid : m_registry->getEntitiesWith<TransformComponent>()) {
+            m_registry->forEach<TransformComponent>([this](EntityId eid) {
                 m_entities.push_back(eid);
-            }
+            });
             if (m_selectedIndex >= static_cast<int>(m_entities.size())) {
                 m_selectedIndex = static_cast<int>(m_entities.size()) - 1;
             }
