@@ -57,12 +57,21 @@ endforeach()
 # Targets
 #--------------------------------------------------------------
 
-add_executable(server src/server/main.cpp)
+# Server sources
+set(SERVER_SOURCES
+    src/server/main.cpp
+    src/server/Server.cpp
+)
+
+add_executable(server ${SERVER_SOURCES})
 add_executable(client src/client/main.cpp)
 
 # Preserve original binary names
 set_target_properties(server PROPERTIES OUTPUT_NAME "r-type_server")
 set_target_properties(client PROPERTIES OUTPUT_NAME "r-type_client")
+
+# Include directories
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src/server)
 
 # Link Asio to server
 target_link_libraries(server PRIVATE asio_lib)

@@ -1,26 +1,22 @@
-#include <asio.hpp>
-#include <iostream>
+#include "Server.hpp"
+#include <csignal>
+
+Server* g_server = nullptr;
+
+void onSignal(int)
+{
+    if (g_server)
+        g_server->stop();
+}
 
 int main()
 {
-    try {
-        asio::io_context io_context;
+    std::signal(SIGINT, onSignal);
 
-        // Create UDP socket on port 4242
-        asio::ip::udp::socket socket(io_context, asio::ip::udp::endpoint(asio::ip::udp::v4(), 4242));
+    Server server(4242);
+    g_server = &server;
 
-        std::cout << "R-Type Server started on port 4242" << std::endl;
-
-        // Simple test: wait for one message
-        char recv_buffer[1024];
-        asio::ip::udp::endpoint remote_endpoint;
-        
-        std::cout << "Waiting for connections..." << std::endl;
-
-    } catch (std::exception& e) {
-        std::cerr << "Server error: " << e.what() << std::endl;
-        return 1;
-    }
+    server.run();
 
     return 0;
 }
