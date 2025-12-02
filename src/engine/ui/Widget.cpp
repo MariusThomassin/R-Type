@@ -135,8 +135,9 @@ namespace rtype::ui {
 
     bool Widget::contains(float x, float y) const
     {
-        return x >= _m_transform.x && x <= _m_transform.x + _m_transform.width &&
-               y >= _m_transform.y && y <= _m_transform.y + _m_transform.height;
+        UITransform absTransform = getAbsoluteTransform();
+        return (x >= absTransform.x && x <= absTransform.x + absTransform.width &&
+                y >= absTransform.y && y <= absTransform.y + absTransform.height);
     }
 
     void Widget::render()

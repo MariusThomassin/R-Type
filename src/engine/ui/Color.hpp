@@ -14,7 +14,7 @@ namespace rtype::ui {
     class Color {
         public:
             Color(uint32_t r, uint32_t g, uint32_t b, uint32_t a);
-            Color(const Color &color) = default;
+            Color();
 
             ~Color() = default;
 
