@@ -46,3 +46,6 @@ cscope.*
 # OS
 .DS_Store
 Thumbs.db
+
+# Doxygen generated docs
+doc/doxygen/

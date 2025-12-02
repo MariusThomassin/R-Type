@@ -7,12 +7,12 @@
 
 #include <raylib.h>
 
-#include "shared/ecs/ECS.hpp"
-#include "shared/ecs/EventBus.hpp"
-#include "shared/ecs/events/Events.hpp"
-#include "shared/ecs/SystemManager.hpp"
-#include "shared/ecs/components/Components.hpp"
-#include "shared/ecs/systems/Systems.hpp"
+#include "engine/ecs/ECS.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/events/Events.hpp"
+#include "engine/ecs/core/SystemManager.hpp"
+#include "game/Components.hpp"
+#include "game/Systems.hpp"
 
 using namespace rtype::ecs;
 using namespace rtype::ecs::events;
