@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "../core/IComponent.hpp"
-#include "../../graphics/IRenderable.hpp"
+#include "engine/ecs/core/IComponent.hpp"
+#include "engine/graphics/IRenderable.hpp"
 #include "TransformComponent.hpp"
 #include <string>
 #include <cmath>

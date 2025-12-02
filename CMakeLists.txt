@@ -9,11 +9,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #--------------------------------------------------------------
-# Raylib (fetched from GitHub)
+# Dependencies (FetchContent)
 #--------------------------------------------------------------
 
 include(FetchContent)
 
+# Raylib (fetched from GitHub)
 FetchContent_Declare(
     raylib
     GIT_REPOSITORY https://github.com/raysan5/raylib.git
@@ -25,6 +26,20 @@ FetchContent_Declare(
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(raylib)
+
+# Asio (standalone, header-only networking library)
+FetchContent_Declare(
+    asio
+    GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
+    GIT_TAG asio-1-29-0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(asio)
+
+# Create an interface library for Asio
+add_library(asio_lib INTERFACE)
+target_include_directories(asio_lib INTERFACE ${asio_SOURCE_DIR}/asio/include)
+target_compile_definitions(asio_lib INTERFACE ASIO_STANDALONE)
 
 #--------------------------------------------------------------
 # Default build type (if not using multi-config generator)
@@ -52,15 +67,66 @@ foreach(CONFIG ${CMAKE_CONFIGURATION_TYPES})
 endforeach()
 
 #--------------------------------------------------------------
+# ECS Engine Library (compiled sources)
+#--------------------------------------------------------------
+
+# Collect all .cpp files from the engine (non-raylib dependent)
+set(ECS_ENGINE_SOURCES
+    src/engine/ecs/core/src/Registry.cpp
+)
+
+# Game utility sources - shared (no raylib dependency)
+set(GAME_UTILS_SOURCES
+    src/game/systems/common/EasingFunctions.cpp
+    src/game/systems/common/GameMath.cpp
+    src/game/components/patterns/PatternFactory.cpp
+    src/game/components/bullets/TrajectoryFactory.cpp
+)
+
+# Game utility sources - client only (raylib dependent)
+set(GAME_CLIENT_SOURCES
+    src/game/systems/common/ColorPalette.cpp
+    # UI Library (raylib dependent)
+    src/engine/ui/Color.cpp
+    src/engine/ui/Widget.cpp
+    src/engine/ui/UIManager.cpp
+    src/engine/ui/widgets/TextWidget.cpp
+    src/engine/ui/widgets/ButtonWidget.cpp
+    src/engine/ui/widgets/PanelWidget.cpp
+    src/engine/ui/widgets/ProgressBarWidget.cpp
+)
+
+# Create static library for the ECS engine
+add_library(ecs_engine STATIC ${ECS_ENGINE_SOURCES} ${GAME_UTILS_SOURCES})
+target_include_directories(ecs_engine PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+# Compile with same flags
+if(MSVC)
+    target_compile_options(ecs_engine PRIVATE /W4 /permissive-)
+elseif(MINGW OR UNIX)
+    target_compile_options(ecs_engine PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+#--------------------------------------------------------------
 # Targets
 #--------------------------------------------------------------
 
-add_executable(server src/server/main.cpp)
-add_executable(client src/client/main.cpp)
+# Server sources
+set(SERVER_SOURCES
+    src/server/main.cpp
+    src/server/Server.cpp
+)
+
+add_executable(server ${SERVER_SOURCES})
+add_executable(client src/client/main.cpp ${GAME_CLIENT_SOURCES})
 
 # Include paths
-target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR})
+
+# Link ECS engine library
+target_link_libraries(server PRIVATE ecs_engine)
+target_link_libraries(client PRIVATE ecs_engine)
 
 # Link raylib to client
 target_link_libraries(client PRIVATE raylib)
@@ -68,6 +134,12 @@ target_link_libraries(client PRIVATE raylib)
 # Preserve original binary names
 set_target_properties(server PROPERTIES OUTPUT_NAME "r-type_server")
 set_target_properties(client PROPERTIES OUTPUT_NAME "r-type_client")
+
+# Include directories
+target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src/server)
+
+# Link Asio to server
+target_link_libraries(server PRIVATE asio_lib)
 
 #--------------------------------------------------------------
 # Warnings and platform-specific libraries

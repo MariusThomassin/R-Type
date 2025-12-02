@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../core/IComponent.hpp"
+#include "engine/ecs/core/IComponent.hpp"
 
 namespace rtype::ecs {
 

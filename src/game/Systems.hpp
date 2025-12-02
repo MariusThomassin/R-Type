@@ -16,3 +16,15 @@
 #include "systems/RenderSystem.hpp"
 #include "systems/BulletSystem.hpp"
 #include "systems/DebugSystem.hpp"
+#include "systems/HealthSystem.hpp"
+
+// Pattern system
+#include "systems/PatternSystem.hpp"
+#include "systems/TrajectorySystem.hpp"
+#include "systems/SpinSystem.hpp"
+
+// Showoff/Demo system
+#include "systems/ShowoffSystem.hpp"
+
+// Stress test system
+#include "systems/StressTestSystem.hpp"

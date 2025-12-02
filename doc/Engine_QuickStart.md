@@ -57,8 +57,16 @@ R-Type/
 │   │   └── main.cpp     # Entry point
 │   ├── server/          # Server application (multiplayer)
 │   │   └── main.cpp
-│   └── shared/          # Shared code
-│       └── ecs/         # ECS engine (see ECS_Documentation.md)
+│   ├── engine/          # Core engine code
+│   │   ├── ecs/         # Entity-Component-System
+│   │   │   ├── core/    # Registry, ComponentArray, SparseSet
+│   │   │   ├── components/
+│   │   │   ├── systems/
+│   │   │   └── events/
+│   │   └── graphics/    # IRenderer abstraction
+│   └── game/            # Game-specific code
+│       ├── components/  # Game components (bullets, patterns)
+│       └── systems/     # Game systems (trajectory, pattern)
 ├── doc/                 # Documentation
 ├── build/               # Build output
 └── CMakeLists.txt       # Build configuration
@@ -71,8 +79,8 @@ R-Type/
 ### Creating a New Entity
 
 ```cpp
-#include "shared/ecs/Registry.hpp"
-#include "shared/ecs/components/Components.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/components/Components.hpp"
 
 // In your initialization code:
 EntityId enemy = registry.createEntity();
@@ -80,6 +88,47 @@ registry.addComponent<TransformComponent>(enemy, {400.0f, 300.0f});
 registry.addComponent<VelocityComponent>(enemy, {-50.0f, 0.0f});
 registry.addComponent<EnemyComponent>(enemy, {"basic", 1});
 registry.addComponent<HealthComponent>(enemy, {30, 30});
+```
+
+### Iterating Entities (Modern Pattern)
+
+```cpp
+// Zero-allocation iteration with forEach
+registry.forEach<TransformComponent, VelocityComponent>(
+    [dt](EntityId entity) {
+        auto& transform = registry.getComponent<TransformComponent>(entity);
+        auto& velocity = registry.getComponent<VelocityComponent>(entity);
+        transform.x += velocity.vx * dt;
+        transform.y += velocity.vy * dt;
+    }
+);
+
+// With direct component access
+registry.forEachWith<HealthComponent>(
+    [](EntityId id, HealthComponent& health) {
+        if (health.currentHealth <= 0) {
+            // Handle death
+        }
+    }
+);
+```
+
+### Creating Bullet Patterns
+
+```cpp
+#include "game/components/patterns/Patterns.hpp"
+
+// Create a pattern spawner
+Entity spawner = registry.createEntity();
+registry.addComponent(spawner, TransformComponent(400, 100));
+
+PatternSpawnerComponent patternSpawner;
+patternSpawner.addPattern(
+    PatternFactory::createSpiral(4, 20, 180.0f, 60.0f,
+                                 BulletType::Rice, BulletColor::Cyan)
+);
+patternSpawner.autoStart = true;
+registry.addComponent(spawner, patternSpawner);
 ```
 
 ### Creating a Self-Rendering Component
@@ -124,8 +173,8 @@ struct ExplosionComponent : public IComponent, public IRenderable {
 ### Subscribing to Events
 
 ```cpp
-#include "shared/ecs/EventBus.hpp"
-#include "shared/ecs/events/InputEvents.hpp"
+#include "engine/ecs/EventBus.hpp"
+#include "engine/ecs/events/InputEvents.hpp"
 
 // In your system's constructor or init:
 m_eventBus.subscribe<events::KeyPressedEvent>(
@@ -158,24 +207,25 @@ m_eventBus.emit(events::DanmakuEvent{x, y});
 ### Querying Components Safely
 
 ```cpp
-void processEntities(Registry& registry) {
-    for (auto& [id, entity] : registry.getEntities()) {
-        // Safe: returns nullptr if not found
-        auto* transform = registry.tryGetComponent<TransformComponent>(id);
-        auto* velocity = registry.tryGetComponent<VelocityComponent>(id);
-        auto* health = registry.tryGetComponent<HealthComponent>(id);
-        
-        if (transform && velocity) {
-            // Move entity
-            transform->x += velocity->vx * dt;
-            transform->y += velocity->vy * dt;
+void processEntities(Registry& registry, float dt) {
+    // Modern pattern - use forEach for zero-allocation iteration
+    registry.forEach<TransformComponent, VelocityComponent>(
+        [&registry, dt](EntityId id) {
+            auto& transform = registry.getComponent<TransformComponent>(id);
+            auto& velocity = registry.getComponent<VelocityComponent>(id);
+            
+            transform.x += velocity.vx * dt;
+            transform.y += velocity.vy * dt;
         }
-        
+    );
+    
+    // For optional components, use tryGetComponent
+    registry.forEach<TransformComponent>([&registry](EntityId id) {
+        auto* health = registry.tryGetComponent<HealthComponent>(id);
         if (health && health->current <= 0) {
-            // Mark for destruction
             registry.destroyEntity(id);
         }
-    }
+    });
 }
 ```
 

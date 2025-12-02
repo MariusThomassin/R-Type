@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../core/EventBus.hpp"
+#include "engine/ecs/core/EventBus.hpp"
 #include "InputEvents.hpp"
 
 #include <raylib.h>
@@ -89,6 +89,7 @@ namespace rtype::ecs::events {
             m_keyToRaylib[KeyCode::G] = KEY_G;
             m_keyToRaylib[KeyCode::O] = KEY_O;
             m_keyToRaylib[KeyCode::C] = KEY_C;
+            m_keyToRaylib[KeyCode::P] = KEY_P;
             m_keyToRaylib[KeyCode::LeftShift] = KEY_LEFT_SHIFT;
             m_keyToRaylib[KeyCode::RightShift] = KEY_RIGHT_SHIFT;
             m_keyToRaylib[KeyCode::LeftControl] = KEY_LEFT_CONTROL;
@@ -113,28 +114,23 @@ namespace rtype::ecs::events {
         }
 
         void pollKeyboard() {
-            // Clear pressed state (only valid for one frame)
             m_keyPressed.clear();
 
-            // Poll each mapped key
             for (const auto& [keyCode, raylibKey] : m_keyToRaylib) {
                 bool wasDown = m_keyDown[keyCode];
                 bool isDown = IsKeyDown(raylibKey);
                 
                 m_keyDown[keyCode] = isDown;
 
-                // Key just pressed
                 if (isDown && !wasDown) {
                     m_keyPressed[keyCode] = true;
                     m_eventBus.emit(KeyPressedEvent{keyCode});
                 }
-                // Key just released
                 else if (!isDown && wasDown) {
                     m_eventBus.emit(KeyReleasedEvent{keyCode});
                 }
             }
 
-            // Update key state struct for convenience
             m_keyState.up = m_keyDown[KeyCode::Up];
             m_keyState.down = m_keyDown[KeyCode::Down];
             m_keyState.left = m_keyDown[KeyCode::Left];
@@ -151,7 +147,6 @@ namespace rtype::ecs::events {
             m_keyState.ctrl = m_keyDown[KeyCode::LeftControl] || m_keyDown[KeyCode::RightControl];
             m_keyState.alt = m_keyDown[KeyCode::LeftAlt] || m_keyDown[KeyCode::RightAlt];
 
-            // Emit key state event
             m_eventBus.emit(KeyStateEvent{m_keyState});
         }
 
@@ -164,7 +159,6 @@ namespace rtype::ecs::events {
             m_mouseState.x = newX;
             m_mouseState.y = newY;
 
-            // Mouse movement
             if (m_mouseState.deltaX != 0 || m_mouseState.deltaY != 0) {
                 m_eventBus.emit(MouseMoveEvent{
                     m_mouseState.x, m_mouseState.y,
@@ -172,7 +166,6 @@ namespace rtype::ecs::events {
                 });
             }
 
-            // Mouse buttons
             bool leftWasDown = m_mouseState.leftDown;
             bool rightWasDown = m_mouseState.rightDown;
             bool middleWasDown = m_mouseState.middleDown;
@@ -199,7 +192,6 @@ namespace rtype::ecs::events {
                 m_eventBus.emit(MouseButtonReleasedEvent{MouseButton::Middle, m_mouseState.x, m_mouseState.y});
             }
 
-            // Mouse wheel
             float wheel = GetMouseWheelMove();
             if (wheel != 0) {
                 m_mouseState.wheelDelta = wheel;

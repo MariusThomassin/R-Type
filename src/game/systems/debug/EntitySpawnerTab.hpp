@@ -6,11 +6,11 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "../../../engine/ecs/components/TransformComponent.hpp"
-#include "../../../engine/ecs/components/VelocityComponent.hpp"
-#include "../../components/SpritesheetComponent.hpp"
-#include "../../../engine/ecs/components/LifetimeComponent.hpp"
-#include "../../components/BulletSprites.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "engine/ecs/components/LifetimeComponent.hpp"
+#include "game/components/BulletSprites.hpp"
 #include <vector>
 #include <cmath>
 #include <cstdlib>

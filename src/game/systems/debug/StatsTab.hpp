@@ -6,10 +6,10 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "../../../engine/ecs/components/TransformComponent.hpp"
-#include "../../../engine/ecs/components/SpriteComponent.hpp"
-#include "../../components/SpritesheetComponent.hpp"
-#include "../../components/ProjectileComponent.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/SpriteComponent.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "game/components/ProjectileComponent.hpp"
 
 namespace rtype::ecs::debug {
 
@@ -25,11 +25,12 @@ namespace rtype::ecs::debug {
         void draw(int y) override {
             DrawText("Engine Statistics", 30, y, 20, WHITE); y += 35;
 
-            int entities = 0, bullets = 0, sprites = 0, sheets = 0;
-            for ([[maybe_unused]] auto _ : m_registry->getEntitiesWith<TransformComponent>()) entities++;
-            for ([[maybe_unused]] auto _ : m_registry->getEntitiesWith<ProjectileComponent>()) bullets++;
-            for ([[maybe_unused]] auto _ : m_registry->getEntitiesWith<SpriteComponent>()) sprites++;
-            for ([[maybe_unused]] auto _ : m_registry->getEntitiesWith<SpritesheetComponent>()) sheets++;
+            int entities = static_cast<int>(m_registry->getEntityCount());
+            
+            int bullets = 0, sprites = 0, sheets = 0;
+            m_registry->forEach<ProjectileComponent>([&bullets](EntityId) { bullets++; });
+            m_registry->forEach<SpriteComponent>([&sprites](EntityId) { sprites++; });
+            m_registry->forEach<SpritesheetComponent>([&sheets](EntityId) { sheets++; });
 
             char buf[128];
             snprintf(buf, sizeof(buf), "Total Entities: %d", entities);

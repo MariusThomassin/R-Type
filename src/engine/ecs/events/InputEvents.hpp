@@ -158,4 +158,19 @@ namespace rtype::ecs::events {
         int tabIndex;
     };
 
+    /**
+     * @brief Start showoff/demonstration mode
+     */
+    struct ShowoffStartEvent {};
+
+    /**
+     * @brief End showoff/demonstration mode
+     */
+    struct ShowoffEndEvent {};
+
+    /**
+     * @brief Toggle stress test mode (Shift+P)
+     */
+    struct StressTestToggleEvent {};
+
 } // namespace rtype::ecs::events
