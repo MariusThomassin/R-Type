@@ -70,13 +70,26 @@ endforeach()
 # ECS Engine Library (compiled sources)
 #--------------------------------------------------------------
 
-# Collect all .cpp files from the engine
+# Collect all .cpp files from the engine (non-raylib dependent)
 set(ECS_ENGINE_SOURCES
     src/engine/ecs/core/src/Registry.cpp
 )
 
+# Game utility sources - shared (no raylib dependency)
+set(GAME_UTILS_SOURCES
+    src/game/systems/common/EasingFunctions.cpp
+    src/game/systems/common/GameMath.cpp
+    src/game/components/patterns/PatternFactory.cpp
+    src/game/components/bullets/TrajectoryFactory.cpp
+)
+
+# Game utility sources - client only (raylib dependent)
+set(GAME_CLIENT_SOURCES
+    src/game/systems/common/ColorPalette.cpp
+)
+
 # Create static library for the ECS engine
-add_library(ecs_engine STATIC ${ECS_ENGINE_SOURCES})
+add_library(ecs_engine STATIC ${ECS_ENGINE_SOURCES} ${GAME_UTILS_SOURCES})
 target_include_directories(ecs_engine PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 # Compile with same flags
@@ -97,7 +110,7 @@ set(SERVER_SOURCES
 )
 
 add_executable(server ${SERVER_SOURCES})
-add_executable(client src/client/main.cpp)
+add_executable(client src/client/main.cpp ${GAME_CLIENT_SOURCES})
 
 # Include paths
 target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src)
