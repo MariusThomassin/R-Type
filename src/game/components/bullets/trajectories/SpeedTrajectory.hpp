@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../TrajectoryTypes.hpp"
+#include "game/components/bullets/TrajectoryTypes.hpp"
 
 namespace rtype::ecs {
 

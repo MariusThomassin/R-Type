@@ -6,13 +6,13 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/core/EventBus.hpp"
-#include "../../engine/ecs/events/InputEvents.hpp"
-#include "../../engine/ecs/components/TransformComponent.hpp"
-#include "../components/patterns/PatternSpawnerComponent.hpp"
-#include "../components/patterns/PatternFactory.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/events/InputEvents.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "game/components/patterns/PatternSpawnerComponent.hpp"
+#include "game/components/patterns/PatternFactory.hpp"
 
 #include <vector>
 #include <string>

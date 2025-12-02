@@ -7,7 +7,7 @@
 #pragma once
 
 #include "IRenderer.hpp"
-#include "../ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
 #include <cmath>
 
 namespace rtype::ecs {

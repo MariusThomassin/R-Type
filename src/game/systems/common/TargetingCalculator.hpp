@@ -8,7 +8,7 @@
 
 #include "GameMath.hpp"
 #include "TargetTracker.hpp"
-#include "../../components/patterns/PatternTypes.hpp"
+#include "game/components/patterns/PatternTypes.hpp"
 #include <cmath>
 #include <cstdlib>
 

@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "../core/ISystem.hpp"
-#include "../core/Registry.hpp"
-#include "../components/LifetimeComponent.hpp"
-#include "../components/TransformComponent.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/components/LifetimeComponent.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
 
 #include <vector>
 #include <functional>

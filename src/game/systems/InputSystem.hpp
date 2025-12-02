@@ -6,13 +6,13 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/core/EventBus.hpp"
-#include "../../engine/ecs/events/InputEvents.hpp"
-#include "../components/PlayerComponent.hpp"
-#include "../../engine/ecs/components/VelocityComponent.hpp"
-#include "../components/WeaponComponent.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/events/InputEvents.hpp"
+#include "game/components/PlayerComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/WeaponComponent.hpp"
 
 namespace rtype::ecs {
 

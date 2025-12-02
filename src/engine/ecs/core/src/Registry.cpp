@@ -3,7 +3,7 @@
 ** Compiled implementation of Registry functions
 */
 
-#include "../RegistryNew.hpp"
+#include "engine/ecs/core/RegistryNew.hpp"
 
 namespace rtype::ecs {
 

@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "../../components/patterns/PatternSpawnerComponent.hpp"
-#include "../../components/patterns/BulletPatternComponent.hpp"
+#include "game/components/patterns/PatternSpawnerComponent.hpp"
+#include "game/components/patterns/BulletPatternComponent.hpp"
 
 namespace rtype::ecs {
 

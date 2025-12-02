@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "../../../engine/ecs/core/IComponent.hpp"
-#include "../../../engine/ecs/core/Types.hpp"
+#include "engine/ecs/core/IComponent.hpp"
+#include "engine/ecs/core/Types.hpp"
 #include "TrajectoryTypes.hpp"
 
 namespace rtype::ecs {

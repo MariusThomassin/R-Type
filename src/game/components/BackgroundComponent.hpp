@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/IComponent.hpp"
-#include "../../engine/graphics/IRenderable.hpp"
-#include "../../engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/core/IComponent.hpp"
+#include "engine/graphics/IRenderable.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
 
 #include <raylib.h>
 #include <vector>

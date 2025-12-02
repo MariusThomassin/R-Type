@@ -6,7 +6,7 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "../../components/BulletSprites.hpp"
+#include "game/components/BulletSprites.hpp"
 
 namespace rtype::ecs::debug {
 

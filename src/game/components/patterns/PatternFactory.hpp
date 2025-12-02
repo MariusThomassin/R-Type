@@ -7,8 +7,8 @@
 
 #include "BulletPatternComponent.hpp"
 #include "PatternWave.hpp"
-#include "../BulletTypes.hpp"
-#include "../bullets/TrajectoryTypes.hpp"
+#include "game/components/BulletTypes.hpp"
+#include "game/components/bullets/TrajectoryTypes.hpp"
 
 namespace rtype::ecs {
 

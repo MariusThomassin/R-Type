@@ -6,12 +6,12 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/IComponent.hpp"
-#include "../../engine/graphics/IRenderable.hpp"
-#include "../../engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/core/IComponent.hpp"
+#include "engine/graphics/IRenderable.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
 #include "BulletTypes.hpp"
 #include "BulletSprites.hpp"
-#include "../../engine/graphics/RenderUtils.hpp"
+#include "engine/graphics/RenderUtils.hpp"
 #include <string>
 
 namespace rtype::ecs {

@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/core/EventBus.hpp"
-#include "../../engine/ecs/events/InputEvents.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/events/InputEvents.hpp"
 #include "debug/DebugTab.hpp"
 #include "debug/StatsTab.hpp"
 #include "debug/TexturesTab.hpp"

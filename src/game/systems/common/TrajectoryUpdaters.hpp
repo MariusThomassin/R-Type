@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "../../../engine/ecs/components/TransformComponent.hpp"
-#include "../../../engine/ecs/components/VelocityComponent.hpp"
-#include "../../components/bullets/TrajectoryComponent.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/bullets/TrajectoryComponent.hpp"
 #include "GameMath.hpp"
 #include <cmath>
 #include <cstdlib>

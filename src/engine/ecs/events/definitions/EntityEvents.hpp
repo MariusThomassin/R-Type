@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../../core/Types.hpp"
+#include "engine/ecs/core/Types.hpp"
 #include <string>
 
 namespace rtype::ecs::events {

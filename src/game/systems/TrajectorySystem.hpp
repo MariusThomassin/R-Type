@@ -5,14 +5,14 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/components/TransformComponent.hpp"
-#include "../../engine/ecs/components/VelocityComponent.hpp"
-#include "../components/bullets/TrajectoryComponent.hpp"
-#include "../components/PlayerComponent.hpp"
-#include "../components/SpritesheetComponent.hpp"
-#include "../components/BulletTypes.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/bullets/TrajectoryComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "game/components/BulletTypes.hpp"
 #include "common/GameMath.hpp"
 #include "common/TargetTracker.hpp"
 #include "common/TrajectoryUpdaters.hpp"

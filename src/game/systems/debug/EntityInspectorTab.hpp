@@ -6,16 +6,16 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "../../../engine/ecs/components/TransformComponent.hpp"
-#include "../../../engine/ecs/components/VelocityComponent.hpp"
-#include "../../components/SpritesheetComponent.hpp"
-#include "../../components/PlayerShipComponent.hpp"
-#include "../../components/BackgroundComponent.hpp"
-#include "../../../engine/ecs/components/LifetimeComponent.hpp"
-#include "../../components/PlayerComponent.hpp"
-#include "../../components/WeaponComponent.hpp"
-#include "../../components/ProjectileComponent.hpp"
-#include "../../../engine/ecs/components/SpriteComponent.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "game/components/PlayerShipComponent.hpp"
+#include "game/components/BackgroundComponent.hpp"
+#include "engine/ecs/components/LifetimeComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
+#include "game/components/WeaponComponent.hpp"
+#include "game/components/ProjectileComponent.hpp"
+#include "engine/ecs/components/SpriteComponent.hpp"
 #include <vector>
 #include <cstdio>
 

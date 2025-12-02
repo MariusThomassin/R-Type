@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include "../../../engine/ecs/core/Registry.hpp"
-#include "../../../engine/ecs/core/Types.hpp"
-#include "../../../engine/ecs/components/TransformComponent.hpp"
-#include "../../../engine/ecs/components/VelocityComponent.hpp"
-#include "../../components/PlayerComponent.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/Types.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
 #include <cmath>
 
 namespace rtype::ecs {

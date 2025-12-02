@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../core/EventBus.hpp"
+#include "engine/ecs/core/EventBus.hpp"
 #include "InputEvents.hpp"
 
 #include <raylib.h>

@@ -6,8 +6,8 @@
 #pragma once
 
 #include "PatternTypes.hpp"
-#include "../bullets/TrajectoryTypes.hpp"
-#include "../BulletTypes.hpp"
+#include "game/components/bullets/TrajectoryTypes.hpp"
+#include "game/components/BulletTypes.hpp"
 
 namespace rtype::ecs {
 

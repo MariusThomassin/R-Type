@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/core/EventBus.hpp"
-#include "../../engine/ecs/components/HealthComponent.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/components/HealthComponent.hpp"
 
 namespace rtype::ecs {
 

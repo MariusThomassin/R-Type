@@ -5,15 +5,15 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/graphics/IRenderable.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/components/TransformComponent.hpp"
-#include "../../engine/ecs/components/SpriteComponent.hpp"
-#include "../components/SpritesheetComponent.hpp"
-#include "../components/PlayerShipComponent.hpp"
-#include "../components/BackgroundComponent.hpp"
-#include "../components/ProjectileComponent.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/graphics/IRenderable.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/SpriteComponent.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "game/components/PlayerShipComponent.hpp"
+#include "game/components/BackgroundComponent.hpp"
+#include "game/components/ProjectileComponent.hpp"
 
 #include <raylib.h>
 #include <algorithm>

@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "../../components/SpritesheetComponent.hpp"
-#include "../../components/BulletTypes.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "game/components/BulletTypes.hpp"
 
 namespace rtype::ecs {
 

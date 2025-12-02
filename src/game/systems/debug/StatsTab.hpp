@@ -6,10 +6,10 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "../../../engine/ecs/components/TransformComponent.hpp"
-#include "../../../engine/ecs/components/SpriteComponent.hpp"
-#include "../../components/SpritesheetComponent.hpp"
-#include "../../components/ProjectileComponent.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/SpriteComponent.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "game/components/ProjectileComponent.hpp"
 
 namespace rtype::ecs::debug {
 

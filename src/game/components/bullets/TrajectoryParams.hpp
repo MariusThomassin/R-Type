@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../../../engine/ecs/core/Types.hpp"
+#include "engine/ecs/core/Types.hpp"
 
 namespace rtype::ecs {
 

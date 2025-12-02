@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/components/TransformComponent.hpp"
-#include "../components/bullets/SpinComponent.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "game/components/bullets/SpinComponent.hpp"
 
 namespace rtype::ecs {
 
