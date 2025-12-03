@@ -2,21 +2,22 @@
 ** EPITECH PROJECT, 2025
 ** R-Type
 ** File description:
-** Color
+** UIColor
 */
 
-#ifndef COLOR_HPP_
-#define COLOR_HPP_
+#ifndef UICOLOR_HPP_
+#define UICOLOR_HPP_
 
 #include <cstdint>
+#include <raylib.h>
 
 namespace rtype::ui {
-    class Color {
+    class UIColor {
         public:
-            Color(uint32_t r, uint32_t g, uint32_t b, uint32_t a);
-            Color();
+            UIColor(uint32_t r, uint32_t g, uint32_t b, uint32_t a);
+            UIColor();
 
-            ~Color() = default;
+            ~UIColor() = default;
 
             void setRed(uint32_t r);
             void setGreen(uint32_t g);
@@ -28,7 +29,9 @@ namespace rtype::ui {
             uint32_t getBlue() const;
             uint32_t getAlpha() const;
 
-            Color& operator=(const Color &other);
+            Color getColor() const;
+
+            UIColor& operator=(const UIColor &other);
 
         private:
             uint32_t _r;
@@ -38,4 +41,4 @@ namespace rtype::ui {
     };
 } // namespace rtype::ui
 
-#endif /* !COLOR_HPP_ */
+#endif /* !UICOLOR_HPP_ */

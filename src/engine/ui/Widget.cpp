@@ -6,7 +6,7 @@
 */
 
 #include <algorithm>
-#include "src/engine/ui/Widget.hpp"
+#include "Widget.hpp"
 
 namespace rtype::ui {
     size_t Widget::s_nextID = 0;
@@ -41,17 +41,17 @@ namespace rtype::ui {
         return _m_transform;
     }
 
-    void Widget::setBackgroundColor(Color color)
+    void Widget::setBackgroundColor(UIColor color)
     {
         _m_style.backgroundColor = color;
     }
 
-    void Widget::setBorderColor(Color color)
+    void Widget::setBorderColor(UIColor color)
     {
         _m_style.borderColor = color;
     }
 
-    void Widget::setTextColor(Color color)
+    void Widget::setTextColor(UIColor color)
     {
         _m_style.textColor = color;
     }
@@ -132,6 +132,11 @@ namespace rtype::ui {
         return false;
     }
 
+    bool Widget::onMouseRelease(float x, float y)
+    {
+        return false;
+    }
+
     bool Widget::onKeyPress(rtype::ecs::events::KeyCode key)
     {
         return false;
@@ -169,15 +174,25 @@ namespace rtype::ui {
         return _m_id;
     }
 
-    void Widget::render()
+    void Widget::update(float deltaTime)
     {
         if (!_m_visible)
             return;
 
-        renderSelf();
+        for (auto child : _m_children) {
+            child->update(deltaTime);
+        }
+    }
+
+    void Widget::render(const rtype::ecs::TransformComponent& transform, const rtype::ecs::RenderContext& ctx) const
+    {
+        if (!_m_visible)
+            return;
+
+        renderSelf(ctx);
 
         for (auto& child : _m_children) {
-            child->render();
+            child->render(transform, ctx);
         }
     }
 

@@ -98,15 +98,26 @@ namespace rtype::ui {
 
     void UIManager::update(float deltaTime)
     {
-        // Update logic for widgets can be added here
-        (void)deltaTime;
+        for (const auto& widget : widgets) {
+            if (widget->isVisible()) {
+                widget->update(deltaTime);
+            }
+        }
     }
 
-    void UIManager::render()
+    void UIManager::clear()
+    {
+        widgets.clear();
+        m_hoveredWidget = nullptr;
+        m_focusedWidget = nullptr;
+    }
+
+    void UIManager::render(const rtype::ecs::RenderContext& ctx)
     {
         for (const auto& widget : widgets) {
             if (widget->isVisible()) {
-                widget->render();
+                rtype::ecs::TransformComponent transform; // Default transform
+                widget->render(transform, ctx);
             }
         }
     }

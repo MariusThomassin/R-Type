@@ -58,12 +58,32 @@ endforeach()
 add_executable(server src/server/main.cpp)
 add_executable(client src/client/main.cpp)
 
+#--------------------------------------------------------------
+# Modern UI Library
+#--------------------------------------------------------------
+# Collect all modern UI source files
+file(GLOB_RECURSE MODERN_UI_SOURCES
+    src/engine/ui/UIColor.cpp
+    src/engine/ui/UIManager.cpp
+    src/engine/ui/Widget.cpp
+    src/engine/ui/widgets/Button.cpp
+    src/engine/ui/widgets/Label.cpp
+    src/engine/ui/widgets/GlowLabel.cpp
+)
+
+add_library(rtype_ui_library STATIC ${MODERN_UI_SOURCES})
+target_include_directories(rtype_ui_library PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(rtype_ui_library PUBLIC raylib)
+
 # Include paths
 target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # Link raylib to client
 target_link_libraries(client PRIVATE raylib)
+
+# Link modern UI library to client
+target_link_libraries(client PRIVATE rtype_ui_library)
 
 # Preserve original binary names
 set_target_properties(server PROPERTIES OUTPUT_NAME "r-type_server")

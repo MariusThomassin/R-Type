@@ -11,6 +11,7 @@
 #include <typeindex>
 #include <unordered_map>
 #include <vector>
+#include "Types.hpp"
 
 namespace rtype::ecs {
 

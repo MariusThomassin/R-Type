@@ -12,13 +12,13 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
-#include "src/engine/graphics/IRenderable.hpp"
-#include "src/engine/ui/Color.hpp"
-#include "src/engine/ecs/events/InputEvents.hpp"
+#include "../graphics/IRenderable.hpp"
+#include "UIColor.hpp"
+#include "../ecs/events/InputEvents.hpp"
 
-#define DEFAULT_BACKGROUND_COLOR rtype::ui::Color(200, 200, 200, 255)
-#define DEFAULT_BORDER_COLOR rtype::ui::Color(0, 0, 0, 255)
-#define DEFAULT_TEXT_COLOR rtype::ui::Color(0, 0, 0, 255)
+#define DEFAULT_BACKGROUND_COLOR rtype::ui::UIColor(200, 200, 200, 255)
+#define DEFAULT_BORDER_COLOR rtype::ui::UIColor(0, 0, 0, 255)
+#define DEFAULT_TEXT_COLOR rtype::ui::UIColor(0, 0, 0, 255)
 
 #define DEFAULT_FONT_SIZE 16
 #define DEFAULT_PADDING 5.0f
@@ -33,9 +33,9 @@ namespace rtype::ui {
     };
 
     struct UIStyle {
-        Color backgroundColor = DEFAULT_BACKGROUND_COLOR;
-        Color borderColor = DEFAULT_BORDER_COLOR;
-        Color textColor = DEFAULT_TEXT_COLOR;
+        UIColor backgroundColor = DEFAULT_BACKGROUND_COLOR;
+        UIColor borderColor = DEFAULT_BORDER_COLOR;
+        UIColor textColor = DEFAULT_TEXT_COLOR;
         size_t fontSize = DEFAULT_FONT_SIZE;
         float borderWidth = DEFAULT_BORDER_WIDTH;
         float padding = DEFAULT_PADDING;
@@ -43,7 +43,7 @@ namespace rtype::ui {
 
     class Widget : public rtype::ecs::IRenderable, public std::enable_shared_from_this<Widget> {
         public:
-            Widget() : _m_visible(true), _m_enabled(true), _m_parent() {};
+            Widget();
             virtual ~Widget() = default;
 
             //Transform getters and setters
@@ -54,12 +54,12 @@ namespace rtype::ui {
             UITransform getAbsoluteTransform() const;
 
             //Style getters and setters
-            void setBackgroundColor(Color color);
-            void setBorderColor(Color color);
-            void setTextColor(Color color);
-            void setFontSize(size_t size);
-            void setBorderWidth(float width);
-            void setPadding(float padding);
+            virtual void setBackgroundColor(UIColor color);
+            virtual void setBorderColor(UIColor color);
+            virtual void setTextColor(UIColor color);
+            virtual void setFontSize(size_t size);
+            virtual void setBorderWidth(float width);
+            virtual void setPadding(float padding);
             void setStyle(const UIStyle& style);
 
             const UIStyle& getStyle() const;
@@ -74,6 +74,7 @@ namespace rtype::ui {
             virtual bool onMouseLeave();
             virtual bool onMouseClick(float x, float y);
             virtual bool onMouseMove(float x, float y);
+            virtual bool onMouseRelease(float x, float y);
             virtual bool onKeyPress(rtype::ecs::events::KeyCode key);
 
             //State management
@@ -88,11 +89,14 @@ namespace rtype::ui {
             //Unique ID
             size_t getID() const;
 
+            virtual void update(float deltaTime);
+
             //IRenderable interface
-            void render();
-            virtual void renderSelf() = 0;
+            void render(const rtype::ecs::TransformComponent& transform, const rtype::ecs::RenderContext& ctx) const override;
 
         protected:
+            virtual void renderSelf(const rtype::ecs::RenderContext& ctx) const = 0;
+
             UITransform _m_transform;
             UIStyle _m_style;
             std::vector<std::shared_ptr<Widget>> _m_children;
