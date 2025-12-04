@@ -2,7 +2,7 @@
 ** EPITECH PROJECT, 2025
 ** R-Type
 ** File description:
-** Widget
+** Widget - Base class for UI elements with ECS event integration
 */
 
 #ifndef WIDGET_HPP_
@@ -41,15 +41,27 @@ namespace rtype::ui {
         float padding = DEFAULT_PADDING;
     };
 
-    class Widget : public rtype::ecs::IRenderable, public std::enable_shared_from_this<Widget> {
+    /**
+     * @brief Base class for UI widgets with ECS event integration
+     * 
+     * Widget provides the foundation for building UI elements with:
+     * - Transform (position, size)
+     * - Style (colors, borders, padding)
+     * - Hierarchy (parent/child relationships)
+     * - Event handling (integrated with ECS EventBus via UIManager)
+     * - Visibility/enabled state
+     * 
+     * Event methods return true if event was consumed (stops propagation).
+     * UIManager automatically routes ECS input events to widgets.
+     */
+    class Widget : public std::enable_shared_from_this<Widget> {
         public:
             Widget();
             virtual ~Widget() = default;
 
-            //Transform getters and setters
+            // Transform
             void setPosition(float x, float y);
             void setSize(float width, float height);
-
             UITransform getTransform() const;
             UITransform getAbsoluteTransform() const;
 
@@ -61,41 +73,49 @@ namespace rtype::ui {
             virtual void setBorderWidth(float width);
             virtual void setPadding(float padding);
             void setStyle(const UIStyle& style);
-
             const UIStyle& getStyle() const;
 
-            //Hierarchy management
+            // Hierarchy
             void addChild(std::shared_ptr<Widget> child);
             void removeChild(std::shared_ptr<Widget> child);
             const std::vector<std::shared_ptr<Widget>>& getChildren() const;
+            std::shared_ptr<Widget> getParent() const;
 
-            //Events
+            // Mouse events (from ECS MouseButtonPressedEvent, MouseMoveEvent, etc.)
             virtual bool onMouseEnter();
             virtual bool onMouseLeave();
-            virtual bool onMouseClick(float x, float y);
+            virtual bool onMouseClick();
             virtual bool onMouseMove(float x, float y);
-            virtual bool onMouseRelease(float x, float y);
-            virtual bool onKeyPress(rtype::ecs::events::KeyCode key);
+            virtual bool onMouseWheel(float delta);
 
-            //State management
+            // Keyboard events (from ECS KeyPressedEvent, KeyReleasedEvent)
+            virtual bool onKeyPress(rtype::ecs::events::KeyCode key);
+            virtual bool onKeyRelease(rtype::ecs::events::KeyCode key);
+
+            // Focus events (managed by UIManager)
+            virtual void onFocus();
+            virtual void onBlur();
+
+            // State
             void setVisible(bool visible);
             void setEnabled(bool enabled);
-
             bool isVisible() const;
             bool isEnabled() const;
+            bool isFocused() const;
 
+            // Hit testing
             bool contains(float x, float y) const;
 
-            //Unique ID
+            // Identification
             size_t getID() const;
 
+            void render() const;
+
+            // Update (called by UIManager each frame)
             virtual void update(float deltaTime);
 
-            //IRenderable interface
-            void render(const rtype::ecs::TransformComponent& transform, const rtype::ecs::RenderContext& ctx) const override;
-
         protected:
-            virtual void renderSelf(const rtype::ecs::RenderContext& ctx) const = 0;
+            virtual void renderSelf() const = 0;
 
             UITransform _m_transform;
             UIStyle _m_style;
@@ -103,7 +123,11 @@ namespace rtype::ui {
             std::weak_ptr<Widget> _m_parent;
             bool _m_visible = true;
             bool _m_enabled = true;
+            bool _m_focused = false;
             size_t _m_id;
+
+            // Allow UIManager to set focus state
+            friend class UIManager;
 
         private:
             static size_t s_nextID;

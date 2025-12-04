@@ -10,6 +10,10 @@
 
 #include <cstdint>
 #include <raylib.h>
+#include <algorithm>
+
+// Forward declare raylib Color to avoid header dependency
+struct Color;
 
 namespace rtype::ui {
     class UIColor {
@@ -29,9 +33,26 @@ namespace rtype::ui {
             uint32_t getBlue() const;
             uint32_t getAlpha() const;
 
-            Color getColor() const;
+            UIColor getColor() const;
 
             UIColor& operator=(const UIColor &other);
+
+            ::Color toRaylib() const;
+            static UIColor fromRaylib(const ::Color& color);
+
+            UIColor withAlpha(uint32_t a) const;
+            static UIColor lerp(const UIColor& a, const UIColor& b, float t);
+
+            static UIColor White() { return UIColor(255, 255, 255, 255); }
+            static UIColor Black() { return UIColor(0, 0, 0, 255); }
+            static UIColor Red() { return UIColor(255, 0, 0, 255); }
+            static UIColor Green() { return UIColor(0, 255, 0, 255); }
+            static UIColor Blue() { return UIColor(0, 0, 255, 255); }
+            static UIColor Yellow() { return UIColor(255, 255, 0, 255); }
+            static UIColor Transparent() { return UIColor(0, 0, 0, 0); }
+            static UIColor Gray() { return UIColor(128, 128, 128, 255); }
+            static UIColor DarkGray() { return UIColor(64, 64, 64, 255); }
+            static UIColor LightGray() { return UIColor(192, 192, 192, 255); }
 
         private:
             uint32_t _r;

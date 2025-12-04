@@ -41,7 +41,7 @@ namespace rtype::ecs {
             float pulse = 1.0f + 0.2f * std::sin(animTime * 8.0f);
             float glowRadius = std::max(width, height) * 0.8f * pulse;
 
-            DrawCircle(static_cast<int>(x), static_cast<int>(y), glowRadius, glowColor.getColor());
+            DrawCircle(static_cast<int>(x), static_cast<int>(y), glowRadius, glowColor.toRaylib());
 
             // Inner glow
             rtype::ui::UIColor innerGlow = {
@@ -50,7 +50,7 @@ namespace rtype::ecs {
                 static_cast<unsigned char>(std::min(255, b + 50)),
                 static_cast<unsigned char>(60 * intensity)
             };
-            DrawCircle(static_cast<int>(x), static_cast<int>(y), glowRadius * 0.5f, innerGlow.getColor());
+            DrawCircle(static_cast<int>(x), static_cast<int>(y), glowRadius * 0.5f, innerGlow.toRaylib());
         }
 
         /**
@@ -61,8 +61,8 @@ namespace rtype::ecs {
             rtype::ui::UIColor color = {r, g, b, a};
             rtype::ui::UIColor coreColor = {255, 255, 255, 200};
 
-            DrawCircle(static_cast<int>(x), static_cast<int>(y), size * 0.5f, color.getColor());
-            DrawCircle(static_cast<int>(x), static_cast<int>(y), size * 0.25f, coreColor.getColor());
+            DrawCircle(static_cast<int>(x), static_cast<int>(y), size * 0.5f, color.toRaylib());
+            DrawCircle(static_cast<int>(x), static_cast<int>(y), size * 0.25f, coreColor.toRaylib());
         }
 
         /**
@@ -96,7 +96,7 @@ namespace rtype::ecs {
             float drawX = abs_t.x + (abs_t.width - textWidth) / 2.0f;
             float drawY = abs_t.y + (abs_t.height - font_size) / 2.0f; 
 
-            DrawText(text.c_str(), (int)drawX, (int)drawY, font_size, color.getColor());
+            DrawText(text.c_str(), (int)drawX, (int)drawY, font_size, color.toRaylib());
         }
 
         inline void drawUiRectOutline(const rtype::ui::UITransform& abs_t, 

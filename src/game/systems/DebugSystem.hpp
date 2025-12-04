@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/core/EventBus.hpp"
-#include "../../engine/ecs/events/InputEvents.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/events/InputEvents.hpp"
 #include "debug/DebugTab.hpp"
 #include "debug/StatsTab.hpp"
 #include "debug/TexturesTab.hpp"
@@ -18,6 +18,8 @@
 #include "debug/EntitySpawnerTab.hpp"
 #include "debug/BulletsTab.hpp"
 #include "debug/PerformanceTab.hpp"
+#include "debug/ModesTab.hpp"
+#include "debug/UILibraryTab.hpp"
 
 #include <raylib.h>
 #include <vector>
@@ -46,6 +48,12 @@ namespace rtype::ecs {
             m_tabs.push_back(std::make_unique<debug::BulletsTab>());
             m_tabs.push_back(std::make_unique<debug::TexturesTab>());
             m_tabs.push_back(std::make_unique<debug::PerformanceTab>());
+            m_tabs.push_back(std::make_unique<debug::UILibraryTab>());
+            
+            // ModesTab needs EventBus reference
+            m_modesTab = std::make_unique<debug::ModesTab>(eventBus);
+            m_tabs.push_back(std::move(m_modesTab));
+            m_modesTabIndex = m_tabs.size() - 1;
 
             subscribeToEvents();
         }
@@ -96,7 +104,7 @@ namespace rtype::ecs {
 
             // Update current tab with mouse state
             if (m_currentTab < m_tabs.size()) {
-                m_tabs[m_currentTab]->updateMouseState(mouse);
+                m_tabs[m_currentTab]->setMouseState(mouse);
                 m_tabs[m_currentTab]->update(dt);
             }
 
@@ -137,12 +145,35 @@ namespace rtype::ecs {
         bool isEnabled() const { return m_enabled; }
         SystemPhase getPhase() const override { return SystemPhase::Input; }
 
+        // Mode state synchronization
+        void updateShowoffState(bool active, const std::string& patternName = "", 
+                               int currentPhase = 0, int totalPhases = 0, float progress = 0.0f) {
+            if (m_modesTabIndex < m_tabs.size()) {
+                auto* modesTab = dynamic_cast<debug::ModesTab*>(m_tabs[m_modesTabIndex].get());
+                if (modesTab) {
+                    modesTab->setShowoffState(active, patternName, currentPhase, totalPhases, progress);
+                }
+            }
+        }
+
+        void updateStressTestState(bool active, bool complete, int intensity = 0, 
+                                   float progress = 0.0f, const std::string& reportFile = "") {
+            if (m_modesTabIndex < m_tabs.size()) {
+                auto* modesTab = dynamic_cast<debug::ModesTab*>(m_tabs[m_modesTabIndex].get());
+                if (modesTab) {
+                    modesTab->setStressTestState(active, complete, intensity, progress, reportFile);
+                }
+            }
+        }
+
     private:
         EventBus& m_eventBus;
         int m_screenWidth, m_screenHeight;
         bool m_enabled = false;
         size_t m_currentTab = 0;
         std::vector<std::unique_ptr<debug::IDebugTab>> m_tabs;
+        std::unique_ptr<debug::ModesTab> m_modesTab;  // Keep reference for state updates
+        size_t m_modesTabIndex = 0;
 
         // Mouse state from events
         float m_mouseX = 0, m_mouseY = 0;

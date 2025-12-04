@@ -39,7 +39,7 @@ namespace rtype::ui {
         (void)deltaTime;
     }
 
-    void Label::renderSelf(const rtype::ecs::RenderContext& ctx) const
+    void Label::renderSelf() const
     {
         UITransform absTransform = getAbsoluteTransform();
         const UIStyle& style = getStyle();

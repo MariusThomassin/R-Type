@@ -2,30 +2,75 @@
 ** EPITECH PROJECT, 2025
 ** R-Type
 ** File description:
-** UIManager
+** UIManager - Manages UI widgets with ECS EventBus integration
 */
 
 #include "UIManager.hpp"
 
 namespace rtype::ui {
-    UIManager::UIManager(rtype::ecs::EventBus& eventBus)  : m_eventBus(eventBus)
+    UIManager::UIManager(rtype::ecs::EventBus& eventBus) : m_eventBus(eventBus)
     {
+        // Subscribe to all input events from EventBus
+        m_mouseClickSubId = m_eventBus.subscribe<rtype::ecs::events::MouseButtonPressedEvent>(
+            [this](const rtype::ecs::events::MouseButtonPressedEvent& e) {
+                handleMouseClick(e);
+            }
+        );
+
+        m_mouseReleaseSubId = m_eventBus.subscribe<rtype::ecs::events::MouseButtonReleasedEvent>(
+            [this](const rtype::ecs::events::MouseButtonReleasedEvent& e) {
+                handleMouseRelease(e);
+            }
+        );
+
+        m_mouseMoveSubId = m_eventBus.subscribe<rtype::ecs::events::MouseMoveEvent>(
+            [this](const rtype::ecs::events::MouseMoveEvent& e) {
+                handleMouseMove(e);
+            }
+        );
+
+        m_mouseWheelSubId = m_eventBus.subscribe<rtype::ecs::events::MouseWheelEvent>(
+            [this](const rtype::ecs::events::MouseWheelEvent& e) {
+                handleMouseWheel(e);
+            }
+        );
+
+        m_keyPressSubId = m_eventBus.subscribe<rtype::ecs::events::KeyPressedEvent>(
+            [this](const rtype::ecs::events::KeyPressedEvent& e) {
+                handleKeyPress(e);
+            }
+        );
+
+        m_keyReleaseSubId = m_eventBus.subscribe<rtype::ecs::events::KeyReleasedEvent>(
+            [this](const rtype::ecs::events::KeyReleasedEvent& e) {
+                handleKeyRelease(e);
+            }
+        );
     }
 
     UIManager::~UIManager()
     {
+        // Unsubscribe from all events
+        m_eventBus.unsubscribe<rtype::ecs::events::MouseButtonPressedEvent>(m_mouseClickSubId);
+        m_eventBus.unsubscribe<rtype::ecs::events::MouseButtonReleasedEvent>(m_mouseReleaseSubId);
+        m_eventBus.unsubscribe<rtype::ecs::events::MouseMoveEvent>(m_mouseMoveSubId);
+        m_eventBus.unsubscribe<rtype::ecs::events::MouseWheelEvent>(m_mouseWheelSubId);
+        m_eventBus.unsubscribe<rtype::ecs::events::KeyPressedEvent>(m_keyPressSubId);
+        m_eventBus.unsubscribe<rtype::ecs::events::KeyReleasedEvent>(m_keyReleaseSubId);
     }
 
     void UIManager::addWidget(std::shared_ptr<Widget> widget)
     {
-        widgets.push_back(widget);
+        if (widget) {
+            m_widgets.push_back(widget);
+        }
     }
 
     void UIManager::removeWidget(std::shared_ptr<Widget> widget)
     {
-        widgets.erase(
-            std::remove(widgets.begin(), widgets.end(), widget),
-            widgets.end()
+        m_widgets.erase(
+            std::remove(m_widgets.begin(), m_widgets.end(), widget),
+            m_widgets.end()
         );
 
         if (m_hoveredWidget == widget) {
@@ -34,41 +79,90 @@ namespace rtype::ui {
         }
 
         if (m_focusedWidget == widget) {
+            m_focusedWidget->onBlur();
             m_focusedWidget = nullptr;
         }
     }
 
-    void UIManager::handleMouseClick(const rtype::ecs::events::MouseButtonPressedEvent& event)
+    void UIManager::clearWidgets()
     {
-        for (auto it = widgets.rbegin(); it != widgets.rend(); ++it) {
-            std::shared_ptr<Widget> widget = *it;
+        if (m_hoveredWidget) {
+            m_hoveredWidget->onMouseLeave();
+            m_hoveredWidget = nullptr;
+        }
+        if (m_focusedWidget) {
+            m_focusedWidget->onBlur();
+            m_focusedWidget = nullptr;
+        }
+        m_widgets.clear();
+    }
 
-            if (widget->isEnabled() && widget->isVisible() && widget->contains(event.x, event.y)) {
-                UITransform absTransform = widget->getAbsoluteTransform();
-                float localX = event.x - absTransform.x;
-                float localY = event.y - absTransform.y;
-                if (widget->onMouseClick(localX, localY)) {
-                    m_focusedWidget = widget;
-                    return;
-                }
+    const std::vector<std::shared_ptr<Widget>>& UIManager::getWidgets() const
+    {
+        return m_widgets;
+    }
+
+    void UIManager::setFocus(std::shared_ptr<Widget> widget)
+    {
+        if (m_focusedWidget == widget) return;
+
+        if (m_focusedWidget) {
+            m_focusedWidget->_m_focused = false;
+            m_focusedWidget->onBlur();
+        }
+
+        m_focusedWidget = widget;
+
+        if (m_focusedWidget) {
+            m_focusedWidget->_m_focused = true;
+            m_focusedWidget->onFocus();
+        }
+    }
+
+    std::shared_ptr<Widget> UIManager::getFocusedWidget() const
+    {
+        return m_focusedWidget;
+    }
+
+    std::shared_ptr<Widget> UIManager::getHoveredWidget() const
+    {
+        return m_hoveredWidget;
+    }
+
+    std::shared_ptr<Widget> UIManager::findWidgetAt(float x, float y)
+    {
+        // Search in reverse order (topmost first)
+        for (auto it = m_widgets.rbegin(); it != m_widgets.rend(); ++it) {
+            std::shared_ptr<Widget> widget = *it;
+            if (widget->isEnabled() && widget->isVisible() && widget->contains(x, y)) {
+                return widget;
             }
         }
-        m_focusedWidget = nullptr;
+        return nullptr;
+    }
+
+    void UIManager::handleMouseClick(const rtype::ecs::events::MouseButtonPressedEvent& event)
+    {
+        // Only handle left mouse button for now
+        if (event.button != rtype::ecs::events::MouseButton::Left) return;
+
+        auto widget = findWidgetAt(event.x, event.y);
+        
+        if (widget) {
+            // Update focus
+            setFocus(widget);
+            widget->onMouseClick();
+        } else {
+            // Clicked outside all widgets - clear focus
+            setFocus(nullptr);
+        }
     }
 
     void UIManager::handleMouseMove(const rtype::ecs::events::MouseMoveEvent& event)
     {
-        std::shared_ptr<Widget> newHoveredWidget = nullptr;
+        auto newHoveredWidget = findWidgetAt(event.x, event.y);
 
-        for (auto it = widgets.rbegin(); it != widgets.rend(); ++it) {
-            std::shared_ptr<Widget> widget = *it;
-
-            if (widget->isEnabled() && widget->isVisible() && widget->contains(event.x, event.y)) {
-                newHoveredWidget = widget;
-                break;
-            }
-        }
-
+        // Handle hover state changes
         if (newHoveredWidget != m_hoveredWidget) {
             if (m_hoveredWidget) {
                 m_hoveredWidget->onMouseLeave();
@@ -79,6 +173,7 @@ namespace rtype::ui {
             m_hoveredWidget = newHoveredWidget;
         }
 
+        // Send move event to hovered widget
         if (m_hoveredWidget) {
             UITransform absTransform = m_hoveredWidget->getAbsoluteTransform();
             float localX = event.x - absTransform.x;
@@ -87,38 +182,61 @@ namespace rtype::ui {
         }
     }
 
-    void UIManager::handleKeyPress(const rtype::ecs::events::KeyCode& key)
+    void UIManager::handleMouseWheel(const rtype::ecs::events::MouseWheelEvent& event)
     {
-        if (m_focusedWidget) {
-            if (m_focusedWidget->isEnabled() && m_focusedWidget->isVisible()) {
-                m_focusedWidget->onKeyPress(key);
-            }
+        // Send wheel event to hovered widget
+        if (m_hoveredWidget && m_hoveredWidget->isEnabled()) {
+            m_hoveredWidget->onMouseWheel(event.delta);
+        }
+    }
+
+    void UIManager::handleKeyPress(const rtype::ecs::events::KeyPressedEvent& event)
+    {
+        // Send key events to focused widget
+        if (m_focusedWidget && m_focusedWidget->isEnabled() && m_focusedWidget->isVisible()) {
+            m_focusedWidget->onKeyPress(event.key);
+        }
+    }
+
+    void UIManager::handleKeyRelease(const rtype::ecs::events::KeyReleasedEvent& event)
+    {
+        if (m_focusedWidget && m_focusedWidget->isEnabled() && m_focusedWidget->isVisible()) {
+            m_focusedWidget->onKeyRelease(event.key);
         }
     }
 
     void UIManager::update(float deltaTime)
     {
-        for (const auto& widget : widgets) {
+        for (const auto& widget : m_widgets) {
             if (widget->isVisible()) {
                 widget->update(deltaTime);
             }
         }
     }
 
-    void UIManager::clear()
+    void UIManager::render() const
     {
-        widgets.clear();
-        m_hoveredWidget = nullptr;
-        m_focusedWidget = nullptr;
-    }
-
-    void UIManager::render(const rtype::ecs::RenderContext& ctx)
-    {
-        for (const auto& widget : widgets) {
+        for (const auto& widget : m_widgets) {
             if (widget->isVisible()) {
-                rtype::ecs::TransformComponent transform; // Default transform
-                widget->render(transform, ctx);
+                widget->render();
             }
         }
     }
-}
+
+    bool UIManager::isCapturingMouse() const
+    {
+        return m_hoveredWidget != nullptr;
+    }
+
+    bool UIManager::isCapturingKeyboard() const
+    {
+        return m_focusedWidget != nullptr;
+    }
+
+    void UIManager::handleMouseRelease(const rtype::ecs::events::MouseButtonReleasedEvent& event)
+    {
+        // Empty implementation - mouse release events not currently handled by widgets
+        (void)event; // Suppress unused parameter warning
+    }
+
+} // namespace rtype::ui

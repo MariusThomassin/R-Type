@@ -11,7 +11,8 @@
 namespace rtype::ui {
     size_t Widget::s_nextID = 0;
 
-    Widget::Widget() : _m_id(s_nextID++), _m_visible(true), _m_enabled(true), _m_parent()
+    Widget::Widget() : _m_transform(), _m_style(), _m_children(), _m_parent(),
+                       _m_visible(true), _m_enabled(true), _m_focused(false), _m_id(s_nextID++)
     {
     }
 
@@ -112,6 +113,11 @@ namespace rtype::ui {
         return _m_children;
     }
 
+    std::shared_ptr<Widget> Widget::getParent() const
+    {
+        return _m_parent.lock();
+    }
+
     bool Widget::onMouseEnter()
     {
         return false;
@@ -122,24 +128,44 @@ namespace rtype::ui {
         return false;
     }
 
-    bool Widget::onMouseClick(float x, float y)
+    bool Widget::onMouseClick()
     {
         return false;
     }
 
     bool Widget::onMouseMove(float x, float y)
     {
+        (void)x;
+        (void)y;
         return false;
     }
 
-    bool Widget::onMouseRelease(float x, float y)
+    bool Widget::onMouseWheel(float delta)
     {
+        (void)delta;
         return false;
     }
 
     bool Widget::onKeyPress(rtype::ecs::events::KeyCode key)
     {
+        (void)key;
         return false;
+    }
+
+    bool Widget::onKeyRelease(rtype::ecs::events::KeyCode key)
+    {
+        (void)key;
+        return false;
+    }
+
+    void Widget::onFocus()
+    {
+        _m_focused = true;
+    }
+
+    void Widget::onBlur()
+    {
+        _m_focused = false;
     }
 
     void Widget::setVisible(bool visible)
@@ -160,6 +186,11 @@ namespace rtype::ui {
     bool Widget::isEnabled() const
     {
         return _m_enabled;
+    }
+
+    bool Widget::isFocused() const
+    {
+        return _m_focused;
     }
 
     bool Widget::contains(float x, float y) const
@@ -184,15 +215,15 @@ namespace rtype::ui {
         }
     }
 
-    void Widget::render(const rtype::ecs::TransformComponent& transform, const rtype::ecs::RenderContext& ctx) const
+    void Widget::render() const
     {
         if (!_m_visible)
             return;
 
-        renderSelf(ctx);
+        renderSelf();
 
         for (auto& child : _m_children) {
-            child->render(transform, ctx);
+            child->render();
         }
     }
 

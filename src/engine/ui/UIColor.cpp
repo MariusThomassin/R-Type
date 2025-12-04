@@ -60,13 +60,13 @@ namespace rtype::ui {
         return this->_a;
     }
 
-    Color UIColor::getColor() const
+    UIColor UIColor::getColor() const
     {
-        Color color;
-        color.r = static_cast<unsigned char>(this->_r);
-        color.g = static_cast<unsigned char>(this->_g);
-        color.b = static_cast<unsigned char>(this->_b);
-        color.a = static_cast<unsigned char>(this->_a);
+        UIColor color;
+        color._r = static_cast<uint32_t>(this->_r);
+        color._g = static_cast<uint32_t>(this->_g);
+        color._b = static_cast<uint32_t>(this->_b);
+        color._a = static_cast<uint32_t>(this->_a);
         return color;
     }
 
@@ -79,6 +79,37 @@ namespace rtype::ui {
             this->_a = other._a;
         }
         return *this;
+    }
+
+    ::Color UIColor::toRaylib() const
+    {
+        return ::Color{
+            static_cast<unsigned char>(_r),
+            static_cast<unsigned char>(_g),
+            static_cast<unsigned char>(_b),
+            static_cast<unsigned char>(_a)
+        };
+    }
+
+    UIColor UIColor::fromRaylib(const ::Color& color)
+    {
+        return UIColor(color.r, color.g, color.b, color.a);
+    }
+
+    UIColor UIColor::withAlpha(uint32_t a) const
+    {
+        return UIColor(_r, _g, _b, a);
+    }
+
+    UIColor UIColor::lerp(const UIColor& a, const UIColor& b, float t)
+    {
+        t = std::clamp(t, 0.0f, 1.0f);
+        return UIColor(
+            static_cast<uint32_t>(a._r + (b._r - a._r) * t),
+            static_cast<uint32_t>(a._g + (b._g - a._g) * t),
+            static_cast<uint32_t>(a._b + (b._b - a._b) * t),
+            static_cast<uint32_t>(a._a + (b._a - a._a) * t)
+        );
     }
 
 } // namespace rtype::ui

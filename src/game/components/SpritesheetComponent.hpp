@@ -6,12 +6,12 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/IComponent.hpp"
-#include "../../engine/graphics/IRenderable.hpp"
-#include "../../engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/core/IComponent.hpp"
+#include "engine/graphics/IRenderable.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
 #include "BulletTypes.hpp"
 #include "BulletSprites.hpp"
-#include "../../engine/graphics/RenderUtils.hpp"
+#include "engine/graphics/RenderUtils.hpp"
 #include <string>
 
 namespace rtype::ecs {
@@ -79,6 +79,10 @@ namespace rtype::ecs {
         std::string getTypeName() const override { return "SpritesheetComponent"; }
         bool isRenderable() const override { return isVisible; }
         int getRenderLayer() const override { return layer; }
+        
+        BulletType getBulletType() const { return m_bulletType; }
+        BulletColor getBulletColor() const { return m_bulletColor; }
+        bool usesBulletMapping() const { return m_useBulletMapping; }
 
         void render(const TransformComponent& transform, const RenderContext& ctx) const override {
             const Texture2D* texture = ctx.getTexture(textureId);
@@ -94,9 +98,22 @@ namespace rtype::ecs {
                 return;
             }
 
-            if (hasGlow && glowIntensity > 0.0f) {
-                RenderUtils::drawGlow(transform.x, transform.y, destW, destH,
-                    tintR, tintG, tintB, glowIntensity, ctx.animTime);
+            // Glow effect using Outline texture (only for Pellet type)
+            if (hasGlow && glowIntensity > 0.0f && m_useBulletMapping && m_bulletType == BulletType::Pellet) {
+                int olSrcX, olSrcY, olSrcW, olSrcH;
+                if (getBulletSourceRect(BulletType::Outline, m_bulletColor, olSrcX, olSrcY, olSrcW, olSrcH)) {
+                    float pulse = 1.0f + 0.05f * std::sin(ctx.animTime * 5.0f);
+                    float glowScale = 1.25f * pulse;
+                    unsigned char glowAlpha = static_cast<unsigned char>(220 * glowIntensity);
+                    
+                    RenderUtils::drawSprite(*texture,
+                        static_cast<float>(olSrcX), static_cast<float>(olSrcY),
+                        static_cast<float>(olSrcW), static_cast<float>(olSrcH),
+                        transform.x, transform.y,
+                        destW * glowScale, destH * glowScale,
+                        transform.rotation + rotation,
+                        {tintR, tintG, tintB, glowAlpha});
+                }
             }
 
             RenderUtils::drawSprite(*texture, srcX, srcY, srcW, srcH,

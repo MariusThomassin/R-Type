@@ -77,38 +77,62 @@ namespace rtype::ecs {
             BeginDrawing();
             ClearBackground({8, 8, 20, 255});
             
-            // Render backgrounds first (layer 0)
-            for (EntityId e : m_registry->getEntitiesWith<TransformComponent, BackgroundComponent>()) {
-                auto& background = m_registry->getComponent<BackgroundComponent>(e);
-                const auto& transform = m_registry->getComponent<TransformComponent>(e);
-                background.updateAnimation(dt);
-                background.render(transform, ctx);
-            }
-
-            // Collect and sort all renderable entities
-            std::vector<EntityId> entities;
-            for (EntityId e : m_registry->getEntitiesWith<TransformComponent, SpriteComponent>()) {
-                entities.push_back(e);
-            }
-            for (EntityId e : m_registry->getEntitiesWith<TransformComponent, SpritesheetComponent>()) {
-                if (!m_registry->hasComponent<SpriteComponent>(e)) {
-                    entities.push_back(e);
+            m_registry->forEach<TransformComponent, BackgroundComponent>(
+                [this, &ctx, dt](EntityId e) {
+                    auto& background = m_registry->getComponent<BackgroundComponent>(e);
+                    const auto& transform = m_registry->getComponent<TransformComponent>(e);
+                    background.updateAnimation(dt);
+                    background.render(transform, ctx);
                 }
-            }
-            // Only add PlayerShip entities when in PLAYING state
-            if (m_gameState && *m_gameState == GameState::PLAYING) {
-                for (EntityId e : m_registry->getEntitiesWith<TransformComponent, PlayerShipComponent>()) {
-                    if (!m_registry->hasComponent<SpriteComponent>(e) && !m_registry->hasComponent<SpritesheetComponent>(e)) {
-                        entities.push_back(e);
+            );
+
+            // Optimization: Use struct to cache layer during collection (avoids repeated lookups during sort)
+            struct RenderItem {
+                EntityId entity;
+                int layer;
+            };
+            
+            std::vector<RenderItem> entities;
+            entities.reserve(m_lastEntityCount > 0 ? m_lastEntityCount + 64 : 256);
+            
+            // Collect SpritesheetComponent entities (most common - bullets)
+            m_registry->forEach<TransformComponent, SpritesheetComponent>(
+                [this, &entities](EntityId e) {
+                    const auto& sheet = m_registry->getComponent<SpritesheetComponent>(e);
+                    entities.push_back({e, sheet.getRenderLayer()});
+                }
+            );
+            
+            // Collect SpriteComponent entities (fewer)
+            m_registry->forEach<TransformComponent, SpriteComponent>(
+                [this, &entities](EntityId e) {
+                    if (!m_registry->hasComponent<SpritesheetComponent>(e)) {
+                        const auto& sprite = m_registry->getComponent<SpriteComponent>(e);
+                        entities.push_back({e, sprite.getRenderLayer()});
                     }
                 }
-            }
+            );
+            
+            // Collect PlayerShipComponent entities (rare)
+            m_registry->forEach<TransformComponent, PlayerShipComponent>(
+                [this, &entities](EntityId e) {
+                    if (!m_registry->hasComponent<SpriteComponent>(e) && 
+                        !m_registry->hasComponent<SpritesheetComponent>(e)) {
+                        const auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
+                        entities.push_back({e, ship.getRenderLayer()});
+                    }
+                }
+            );
 
-            std::sort(entities.begin(), entities.end(), [this](EntityId a, EntityId b) {
-                return getLayer(a) < getLayer(b);
+            m_lastEntityCount = entities.size();
+
+            // Sort using cached layer values (O(n log n) but with fast comparisons)
+            std::sort(entities.begin(), entities.end(), [](const RenderItem& a, const RenderItem& b) {
+                return a.layer < b.layer;
             });
 
-            for (EntityId e : entities) {
+            for (const RenderItem& item : entities) {
+                EntityId e = item.entity;
                 const auto& transform = m_registry->getComponent<TransformComponent>(e);
                 
                 if (m_registry->hasComponent<PlayerShipComponent>(e)) {
@@ -132,8 +156,7 @@ namespace rtype::ecs {
             }
 
             drawUI(ctx);
-
-            // Call overlay callback if set (for DebugSystem)
+            
             if (m_overlayCallback) m_overlayCallback();
 
             EndDrawing();
@@ -167,6 +190,7 @@ namespace rtype::ecs {
     private:
         int m_screenWidth, m_screenHeight;
         float m_animTime;
+        std::size_t m_lastEntityCount = 0;  // Cache for vector reserve optimization
         std::unordered_map<std::string, Texture2D> m_textures;
         std::function<void()> m_overlayCallback;
         rtype::ui::UIManager* m_uiManager = nullptr;
@@ -209,7 +233,7 @@ namespace rtype::ecs {
             
             // Show menu UI only when in menu state
             if (m_uiManager && m_gameState && *m_gameState == GameState::MENU) {
-                m_uiManager->render(ctx);
+                m_uiManager->render();
             }
         }
     };

@@ -5,19 +5,36 @@
 
 #pragma once
 
+// Core types and interfaces
 #include "core/Types.hpp"
+#include "core/EntityTypes.hpp"
 
 #include "core/IComponent.hpp"
 #include "core/IComponentArray.hpp"
-#include "core/ComponentArray.hpp"
 
+// Component storage implementations
+#include "core/SparseSet.hpp"           // Optimized sparse set data structure
+#include "core/ComponentArray.hpp"      // Component storage using SparseSet
+#include "core/ComponentStorage.hpp"    // Alternative storage implementation
+
+// Entity management
 #include "core/Entity.hpp"
+#include "core/EntityPool.hpp"          // Pooled entities with generations
 
+// Query system
+#include "core/View.hpp"                // Cached entity views
+
+// System management
 #include "core/ISystem.hpp"
 #include "core/SystemManager.hpp"
 #include "core/EventBus.hpp"
 
-#include "core/Registry.hpp"
+// Registries
+#include "core/Registry.hpp"            // Main registry (uses EntityId)
+#include "core/SafeRegistry.hpp"        // Safe registry (uses EntityHandle with generations)
+
+// Engine systems
+#include "systems/LifetimeSystem.hpp"   // Entity lifetime management
 
 /**
  * @namespace rtype::ecs
@@ -30,6 +47,12 @@
  * - Component: Pure data attached to entities (no logic)
  * - System: Logic that operates on entities with specific components
  * - Registry: Central manager for all entities and components
+ * 
+ * Performance features:
+ * - Sparse-set based component storage (no hash map overhead)
+ * - Entity pooling with generation counters (safe references)
+ * - Cached views for efficient queries (no allocation per call)
+ * - Deferred entity destruction (safe during iteration)
  * 
  * Example usage:
  * @code

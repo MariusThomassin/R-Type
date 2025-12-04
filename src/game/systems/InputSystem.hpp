@@ -6,13 +6,13 @@
 
 #pragma once
 
-#include "../../engine/ecs/core/ISystem.hpp"
-#include "../../engine/ecs/core/Registry.hpp"
-#include "../../engine/ecs/core/EventBus.hpp"
-#include "../../engine/ecs/events/InputEvents.hpp"
-#include "../components/PlayerComponent.hpp"
-#include "../../engine/ecs/components/VelocityComponent.hpp"
-#include "../components/WeaponComponent.hpp"
+#include "engine/ecs/core/ISystem.hpp"
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/events/InputEvents.hpp"
+#include "game/components/PlayerComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/WeaponComponent.hpp"
 
 namespace rtype::ecs {
 
@@ -36,9 +36,27 @@ namespace rtype::ecs {
 
             m_keyPressedSubId = m_eventBus.subscribe<events::KeyPressedEvent>(
                 [this](const events::KeyPressedEvent& e) {
-                    if (e.key == events::KeyCode::G) {
+                    if (e.key == events::KeyCode::G && !m_showoffActive && !m_stressTestActive) {
                         m_danmakuPressed = true;
                     }
+                    // Note: Showoff (P) and Stress Test (Shift+P) are now controlled via Debug Menu -> Modes tab
+                }
+            );
+
+            m_showoffStartSubId = m_eventBus.subscribe<events::ShowoffStartEvent>(
+                [this](const events::ShowoffStartEvent&) {
+                    m_showoffActive = true;
+                }
+            );
+            m_showoffEndSubId = m_eventBus.subscribe<events::ShowoffEndEvent>(
+                [this](const events::ShowoffEndEvent&) {
+                    m_showoffActive = false;
+                }
+            );
+
+            m_stressTestSubId = m_eventBus.subscribe<events::StressTestToggleEvent>(
+                [this](const events::StressTestToggleEvent&) {
+                    m_stressTestActive = !m_stressTestActive;
                 }
             );
         }
@@ -46,6 +64,9 @@ namespace rtype::ecs {
         ~InputSystem() override {
             m_eventBus.unsubscribe<events::KeyStateEvent>(m_keyStateSubId);
             m_eventBus.unsubscribe<events::KeyPressedEvent>(m_keyPressedSubId);
+            m_eventBus.unsubscribe<events::ShowoffStartEvent>(m_showoffStartSubId);
+            m_eventBus.unsubscribe<events::ShowoffEndEvent>(m_showoffEndSubId);
+            m_eventBus.unsubscribe<events::StressTestToggleEvent>(m_stressTestSubId);
         }
 
         void update(float dt) override {
@@ -53,38 +74,39 @@ namespace rtype::ecs {
 
             if (!m_registry) return;
 
-            auto entities = m_registry->getEntitiesWith<PlayerComponent, VelocityComponent>();
+            m_registry->forEach<PlayerComponent, VelocityComponent>(
+                [this](EntityId entity) {
+                    const auto& player = m_registry->getComponent<PlayerComponent>(entity);
 
-            for (EntityId entity : entities) {
-                const auto& player = m_registry->getComponent<PlayerComponent>(entity);
+                    if (!player.isLocal) return;
 
-                if (!player.isLocal) continue;
+                    auto& velocity = m_registry->getComponent<VelocityComponent>(entity);
 
-                auto& velocity = m_registry->getComponent<VelocityComponent>(entity);
+                    velocity.vx = 0.0f;
+                    velocity.vy = 0.0f;
 
-                velocity.vx = 0.0f;
-                velocity.vy = 0.0f;
+                    if (m_keyState.moveRight()) velocity.vx = m_moveSpeed;
+                    if (m_keyState.moveLeft()) velocity.vx = -m_moveSpeed;
+                    if (m_keyState.moveUp()) velocity.vy = -m_moveSpeed;
+                    if (m_keyState.moveDown()) velocity.vy = m_moveSpeed;
 
-                if (m_keyState.moveRight()) velocity.vx = m_moveSpeed;
-                if (m_keyState.moveLeft()) velocity.vx = -m_moveSpeed;
-                if (m_keyState.moveUp()) velocity.vy = -m_moveSpeed;
-                if (m_keyState.moveDown()) velocity.vy = m_moveSpeed;
+                    if (velocity.vx != 0.0f && velocity.vy != 0.0f) {
+                        float factor = 0.7071f;
+                        velocity.vx *= factor;
+                        velocity.vy *= factor;
+                    }
 
-                if (velocity.vx != 0.0f && velocity.vy != 0.0f) {
-                    float factor = 0.7071f;
-                    velocity.vx *= factor;
-                    velocity.vy *= factor;
+                    if (m_keyState.space) {
+                        m_eventBus.emit(events::ShootEvent{entity});
+                    }
                 }
-
-                if (m_keyState.space) {
-                    m_eventBus.emit(events::ShootEvent{entity});
-                }
-            }
+            );
 
             if (m_danmakuPressed) {
                 m_eventBus.emit(events::DanmakuEvent{0, 0});
                 m_danmakuPressed = false;
             }
+            // Showoff and Stress Test are now controlled via Debug Menu -> Modes tab
         }
 
         SystemPhase getPhase() const override {
@@ -100,9 +122,14 @@ namespace rtype::ecs {
         
         events::KeyState m_keyState;
         bool m_danmakuPressed = false;
+        bool m_showoffActive = false;
+        bool m_stressTestActive = false;
 
         EventBus::SubscriberId m_keyStateSubId;
         EventBus::SubscriberId m_keyPressedSubId;
+        EventBus::SubscriberId m_showoffStartSubId;
+        EventBus::SubscriberId m_showoffEndSubId;
+        EventBus::SubscriberId m_stressTestSubId;
     };
 
 } // namespace rtype::ecs

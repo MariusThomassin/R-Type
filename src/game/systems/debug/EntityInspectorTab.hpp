@@ -6,16 +6,16 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "../../../engine/ecs/components/TransformComponent.hpp"
-#include "../../../engine/ecs/components/VelocityComponent.hpp"
-#include "../../components/SpritesheetComponent.hpp"
-#include "../../components/PlayerShipComponent.hpp"
-#include "../../components/BackgroundComponent.hpp"
-#include "../../../engine/ecs/components/LifetimeComponent.hpp"
-#include "../../components/PlayerComponent.hpp"
-#include "../../components/WeaponComponent.hpp"
-#include "../../components/ProjectileComponent.hpp"
-#include "../../../engine/ecs/components/SpriteComponent.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
+#include "game/components/SpritesheetComponent.hpp"
+#include "game/components/PlayerShipComponent.hpp"
+#include "game/components/BackgroundComponent.hpp"
+#include "engine/ecs/components/LifetimeComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
+#include "game/components/WeaponComponent.hpp"
+#include "game/components/ProjectileComponent.hpp"
+#include "engine/ecs/components/SpriteComponent.hpp"
 #include <vector>
 #include <cstdio>
 
@@ -124,9 +124,9 @@ namespace rtype::ecs::debug {
 
         void refreshEntityList() {
             m_entities.clear();
-            for (EntityId eid : m_registry->getEntitiesWith<TransformComponent>()) {
+            m_registry->forEach<TransformComponent>([this](EntityId eid) {
                 m_entities.push_back(eid);
-            }
+            });
             if (m_selectedIndex >= static_cast<int>(m_entities.size())) {
                 m_selectedIndex = static_cast<int>(m_entities.size()) - 1;
             }

@@ -27,7 +27,7 @@ namespace rtype::ui {
             size_t getFontSize() const;
 
             void update(float deltaTime) override;
-            void renderSelf(const rtype::ecs::RenderContext& ctx) const override;
+            void renderSelf() const override;
 
         private:
             std::string _m_text;
