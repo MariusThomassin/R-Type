@@ -241,7 +241,7 @@ namespace rtype::ui {
             rtype::ecs::RenderUtils::drawUiRectOutline(UItransform, _m_style.borderWidth, _m_style.borderColor);
         }
 
-        rtype::ecs::RenderUtils::drawUiCenteredText(_text, UItransform, _m_style.fontSize, _m_style.textColor);
+        rtype::ecs::RenderUtils::drawUiText(_text, UItransform, _m_style.fontSize, _m_style.textColor, rtype::ecs::TextAlign::Center, rtype::ecs::VerticalAlign::Middle, _m_style.padding);
     }
 
 } // namespace rtype::ui

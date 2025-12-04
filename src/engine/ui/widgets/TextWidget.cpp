@@ -6,12 +6,11 @@
 */
 
 #include "TextWidget.hpp"
-#include <raylib.h>
 
 namespace rtype::ui {
 
-    TextWidget::TextWidget(const std::string& text, size_t fontSize)
-        : _text(text)
+    TextWidget::TextWidget(const std::string& text, size_t fontSize, TextAlign align, VerticalAlign verticalAlign)
+        : _text(text), _textAlign(align), _verticalAlign(verticalAlign)
     {
         _m_style.fontSize = fontSize;
         _m_style.backgroundColor = UIColor::Transparent();
@@ -63,70 +62,17 @@ namespace rtype::ui {
 
         auto transform = getAbsoluteTransform();
         int fontSize = static_cast<int>(_m_style.fontSize);
-        
-        // Draw background if not transparent
+
         if (_m_style.backgroundColor.getAlpha() > 0) {
-            DrawRectangle(
-                static_cast<int>(transform.x),
-                static_cast<int>(transform.y),
-                static_cast<int>(transform.width),
-                static_cast<int>(transform.height),
-                _m_style.backgroundColor.toRaylib()
-            );
+            rtype::ecs::RenderUtils::drawUiRect(transform, _m_style.backgroundColor);
         }
 
-        // Draw border if specified
         if (_m_style.borderWidth > 0) {
-            DrawRectangleLinesEx(
-                Rectangle{transform.x, transform.y, transform.width, transform.height},
-                _m_style.borderWidth,
-                _m_style.borderColor.toRaylib()
-            );
+            rtype::ecs::RenderUtils::drawUiRectOutline(transform, _m_style.borderWidth, _m_style.borderColor);
         }
 
-        // Measure text
-        int textWidth = MeasureText(_text.c_str(), fontSize);
-        int textHeight = fontSize;
+        rtype::ecs::RenderUtils::drawUiText(_text, transform, _m_style.fontSize, _m_style.textColor, _textAlign, _verticalAlign, _m_style.padding);
 
-        // Calculate X position based on alignment
-        float textX = transform.x + _m_style.padding;
-        float availableWidth = transform.width - 2 * _m_style.padding;
-
-        switch (_textAlign) {
-            case TextAlign::Center:
-                textX = transform.x + (transform.width - textWidth) / 2.0f;
-                break;
-            case TextAlign::Right:
-                textX = transform.x + transform.width - textWidth - _m_style.padding;
-                break;
-            case TextAlign::Left:
-            default:
-                break;
-        }
-
-        // Calculate Y position based on vertical alignment
-        float textY = transform.y + _m_style.padding;
-        float availableHeight = transform.height - 2 * _m_style.padding;
-
-        switch (_verticalAlign) {
-            case VerticalAlign::Middle:
-                textY = transform.y + (transform.height - textHeight) / 2.0f;
-                break;
-            case VerticalAlign::Bottom:
-                textY = transform.y + transform.height - textHeight - _m_style.padding;
-                break;
-            case VerticalAlign::Top:
-            default:
-                break;
-        }
-
-        DrawText(
-            _text.c_str(),
-            static_cast<int>(textX),
-            static_cast<int>(textY),
-            fontSize,
-            _m_style.textColor.toRaylib()
-        );
     }
 
 } // namespace rtype::ui

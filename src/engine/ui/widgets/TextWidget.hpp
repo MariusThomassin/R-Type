@@ -8,28 +8,16 @@
 #ifndef TEXTWIDGET_HPP_
 #define TEXTWIDGET_HPP_
 
-#include "../Widget.hpp"
 #include <string>
+#include <raylib.h>
+#include "../Widget.hpp"
+#include "../../graphics/RenderUtils.hpp"
 
 namespace rtype::ui {
 
-    /**
-     * @brief Text alignment options
-     */
-    enum class TextAlign {
-        Left,
-        Center,
-        Right
-    };
-
-    /**
-     * @brief Vertical alignment options
-     */
-    enum class VerticalAlign {
-        Top,
-        Middle,
-        Bottom
-    };
+    // Use TextAlign and VerticalAlign from RenderUtils
+    using TextAlign = rtype::ecs::TextAlign;
+    using VerticalAlign = rtype::ecs::VerticalAlign;
 
     /**
      * @brief A widget that displays text
@@ -45,7 +33,7 @@ namespace rtype::ui {
          * @param text The text to display
          * @param fontSize Size of the font
          */
-        explicit TextWidget(const std::string& text = "", size_t fontSize = DEFAULT_FONT_SIZE);
+        explicit TextWidget(const std::string& text = "", size_t fontSize = DEFAULT_FONT_SIZE, TextAlign align = TextAlign::Left, VerticalAlign verticalAlign = VerticalAlign::Top);
 
         ~TextWidget() override = default;
 

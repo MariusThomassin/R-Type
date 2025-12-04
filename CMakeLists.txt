@@ -90,7 +90,7 @@ set(GAME_CLIENT_SOURCES
     src/engine/ui/UIColor.cpp
     src/engine/ui/Widget.cpp
     src/engine/ui/UIManager.cpp
-    src/engine/ui/widgets/Label.cpp
+    src/engine/ui/widgets/TextWidget.cpp
     src/engine/ui/widgets/ButtonWidget.cpp
 )
 

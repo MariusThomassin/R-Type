@@ -16,12 +16,13 @@
 #include "../game/Systems.hpp"
 #include "../game/systems/DebugSystem.hpp"
 #include "../engine/ui/UIManager.hpp"
-#include "../engine/ui/widgets/Label.hpp"
 #include "../engine/ui/widgets/ButtonWidget.hpp"
+#include "../engine/ui/widgets/TextWidget.hpp"
 
 using namespace rtype::ecs;
 using rtype::ecs::BulletType;
 using rtype::ecs::BulletColor;
+using rtype::ui::UIColor;
 
 constexpr int SCREEN_WIDTH = 1280;
 constexpr int SCREEN_HEIGHT = 720;
@@ -113,26 +114,26 @@ int main() {
     bool shouldExit = false;
 
     // -- Create game title --
-    auto gameTitle = std::make_shared<rtype::ui::Label>("R-TYPE", 64.0f);
+    auto gameTitle = std::make_shared<rtype::ui::TextWidget>("R-TYPE", 64);
     gameTitle->setPosition(SCREEN_WIDTH / 2.0f - 150, 100.0f);
     gameTitle->setSize(300.0f, 80.0f);
-    gameTitle->setBackgroundColor(rtype::ui::UIColor(0, 0, 0, 0)); // Transparent
-    gameTitle->setTextColor(rtype::ui::UIColor(255, 50, 50, 255)); // Rouge vif
+    gameTitle->setBackgroundColor(UIColor::Transparent()); // Transparent
+    gameTitle->setTextColor(UIColor::Red()); // Rouge vif
     uiManager.addWidget(gameTitle);
 
-    auto subtitle = std::make_shared<rtype::ui::Label>("The classic side-scrolling shooter", 24.0f);
+    auto subtitle = std::make_shared<rtype::ui::TextWidget>("The classic side-scrolling shooter", 24);
     subtitle->setPosition(SCREEN_WIDTH / 2.0f - 200, 180.0f);
     subtitle->setSize(400.0f, 40.0f);
-    subtitle->setBackgroundColor(rtype::ui::UIColor(0, 0, 0, 0)); // Transparent
-    subtitle->setTextColor(rtype::ui::UIColor(200, 200, 200, 255)); // Light gray
+    subtitle->setBackgroundColor(UIColor::Transparent()); // Transparent
+    subtitle->setTextColor(UIColor::LightGray()); // Light gray
     uiManager.addWidget(subtitle);
 
     // -- Create Play button --
     auto playButton = std::make_shared<rtype::ui::ButtonWidget>("PLAY");
     playButton->setPosition(SCREEN_WIDTH / 2.0f - 100, 250.0f);
     playButton->setSize(200.0f, 50.0f);
-    playButton->setBackgroundColor(rtype::ui::UIColor(0, 180, 0, 255)); // Vert
-    playButton->setTextColor(rtype::ui::UIColor(255, 255, 255, 255));
+    playButton->setBackgroundColor(UIColor::Green()); // Vert
+    playButton->setTextColor(UIColor::White());
     playButton->setOnClick([&gameState]() {
         std::cout << "Play button clicked! Starting game..." << std::endl;
         gameState = GameState::PLAYING;
@@ -143,8 +144,8 @@ int main() {
     auto exitButton = std::make_shared<rtype::ui::ButtonWidget>("EXIT");
     exitButton->setPosition(SCREEN_WIDTH / 2.0f - 100, 320.0f);
     exitButton->setSize(200.0f, 50.0f);
-    exitButton->setBackgroundColor(rtype::ui::UIColor(180, 0, 0, 255)); // Rouge
-    exitButton->setTextColor(rtype::ui::UIColor(255, 255, 255, 255));
+    exitButton->setBackgroundColor(UIColor::Red()); // Rouge
+    exitButton->setTextColor(UIColor::White());
     exitButton->setOnClick([&shouldExit]() {
         std::cout << "Exit button clicked! Closing window..." << std::endl;
         shouldExit = true;

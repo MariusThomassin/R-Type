@@ -13,6 +13,27 @@
 
 namespace rtype::ecs {
 
+    /**
+     * @brief Text alignment options for rendering
+     */
+    enum class TextAlign {
+        Left,
+        Center,
+        Right
+    };
+
+    /**
+     * @brief Vertical alignment options for rendering
+     */
+    enum class VerticalAlign {
+        Top,
+        Middle,
+        Bottom
+    };
+}
+
+namespace rtype::ecs {
+
     // Forward declarations
     struct TransformComponent;
     struct RenderContext;
@@ -86,22 +107,47 @@ namespace rtype::ecs {
             );
         }
 
-        inline void drawUiCenteredText(const std::string& text, 
-                                    const rtype::ui::UITransform& abs_t, 
-                                    size_t font_size, 
-                                    const rtype::ui::UIColor& color) {
+        inline void drawUiText(const std::string& text, const rtype::ui::UITransform& abs_t, size_t font_size, const rtype::ui::UIColor& color, TextAlign align = TextAlign::Left, VerticalAlign verticalAlign = VerticalAlign::Top, float padding = 0.0f) {
 
-            int textWidth = MeasureText(text.c_str(), font_size);
-            
-            float drawX = abs_t.x + (abs_t.width - textWidth) / 2.0f;
-            float drawY = abs_t.y + (abs_t.height - font_size) / 2.0f; 
+            int textWidth = MeasureText(text.c_str(), static_cast<int>(font_size));
+            int textHeight = static_cast<int>(font_size);
 
-            DrawText(text.c_str(), (int)drawX, (int)drawY, font_size, color.toRaylib());
+            // Calculate X position based on alignment
+            float textX = abs_t.x + padding;
+            float availableWidth = abs_t.width - 2 * padding;
+
+            switch (align) {
+                case TextAlign::Center:
+                    textX = abs_t.x + (abs_t.width - textWidth) / 2.0f;
+                    break;
+                case TextAlign::Right:
+                    textX = abs_t.x + abs_t.width - textWidth - padding;
+                    break;
+                case TextAlign::Left:
+                default:
+                    break;
+            }
+
+            // Calculate Y position based on vertical alignment
+            float textY = abs_t.y + padding;
+            float availableHeight = abs_t.height - 2 * padding;
+
+            switch (verticalAlign) {
+                case VerticalAlign::Middle:
+                    textY = abs_t.y + (abs_t.height - textHeight) / 2.0f;
+                    break;
+                case VerticalAlign::Bottom:
+                    textY = abs_t.y + abs_t.height - textHeight - padding;
+                    break;
+                case VerticalAlign::Top:
+                default:
+                    break;
+            }
+
+            DrawText(text.c_str(), static_cast<int>(textX), static_cast<int>(textY), static_cast<int>(font_size), toRaylibColor(color));
         }
 
-        inline void drawUiRectOutline(const rtype::ui::UITransform& abs_t, 
-                                    float border_width, 
-                                    const rtype::ui::UIColor& color) {
+        inline void drawUiRectOutline(const rtype::ui::UITransform& abs_t, float border_width, const rtype::ui::UIColor& color) {
             DrawRectangleLinesEx(
                 (Rectangle){abs_t.x, abs_t.y, abs_t.width, abs_t.height}, 
                 border_width,
