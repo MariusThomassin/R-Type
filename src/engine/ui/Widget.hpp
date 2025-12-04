@@ -12,12 +12,13 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
-#include "src/engine/ui/Color.hpp"
-#include "src/engine/ecs/events/InputEvents.hpp"
+#include "../graphics/IRenderable.hpp"
+#include "UIColor.hpp"
+#include "../ecs/events/InputEvents.hpp"
 
-#define DEFAULT_BACKGROUND_COLOR rtype::ui::Color(200, 200, 200, 255)
-#define DEFAULT_BORDER_COLOR rtype::ui::Color(0, 0, 0, 255)
-#define DEFAULT_TEXT_COLOR rtype::ui::Color(0, 0, 0, 255)
+#define DEFAULT_BACKGROUND_COLOR rtype::ui::UIColor(200, 200, 200, 255)
+#define DEFAULT_BORDER_COLOR rtype::ui::UIColor(0, 0, 0, 255)
+#define DEFAULT_TEXT_COLOR rtype::ui::UIColor(0, 0, 0, 255)
 
 #define DEFAULT_FONT_SIZE 16
 #define DEFAULT_PADDING 5.0f
@@ -32,9 +33,9 @@ namespace rtype::ui {
     };
 
     struct UIStyle {
-        Color backgroundColor = DEFAULT_BACKGROUND_COLOR;
-        Color borderColor = DEFAULT_BORDER_COLOR;
-        Color textColor = DEFAULT_TEXT_COLOR;
+        UIColor backgroundColor = DEFAULT_BACKGROUND_COLOR;
+        UIColor borderColor = DEFAULT_BORDER_COLOR;
+        UIColor textColor = DEFAULT_TEXT_COLOR;
         size_t fontSize = DEFAULT_FONT_SIZE;
         float borderWidth = DEFAULT_BORDER_WIDTH;
         float padding = DEFAULT_PADDING;
@@ -64,13 +65,13 @@ namespace rtype::ui {
             UITransform getTransform() const;
             UITransform getAbsoluteTransform() const;
 
-            // Style
-            void setBackgroundColor(Color color);
-            void setBorderColor(Color color);
-            void setTextColor(Color color);
-            void setFontSize(size_t size);
-            void setBorderWidth(float width);
-            void setPadding(float padding);
+            //Style getters and setters
+            virtual void setBackgroundColor(UIColor color);
+            virtual void setBorderColor(UIColor color);
+            virtual void setTextColor(UIColor color);
+            virtual void setFontSize(size_t size);
+            virtual void setBorderWidth(float width);
+            virtual void setPadding(float padding);
             void setStyle(const UIStyle& style);
             const UIStyle& getStyle() const;
 
@@ -83,8 +84,7 @@ namespace rtype::ui {
             // Mouse events (from ECS MouseButtonPressedEvent, MouseMoveEvent, etc.)
             virtual bool onMouseEnter();
             virtual bool onMouseLeave();
-            virtual bool onMouseClick(float x, float y);
-            virtual bool onMouseRelease(float x, float y);
+            virtual bool onMouseClick();
             virtual bool onMouseMove(float x, float y);
             virtual bool onMouseWheel(float delta);
 
@@ -109,14 +109,14 @@ namespace rtype::ui {
             // Identification
             size_t getID() const;
 
-            // Rendering
-            void render();
-            virtual void renderSelf() = 0;
+            void render() const;
 
             // Update (called by UIManager each frame)
             virtual void update(float deltaTime);
 
         protected:
+            virtual void renderSelf() const = 0;
+
             UITransform _m_transform;
             UIStyle _m_style;
             std::vector<std::shared_ptr<Widget>> _m_children;

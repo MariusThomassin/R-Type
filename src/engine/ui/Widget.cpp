@@ -6,7 +6,7 @@
 */
 
 #include <algorithm>
-#include "src/engine/ui/Widget.hpp"
+#include "Widget.hpp"
 
 namespace rtype::ui {
     size_t Widget::s_nextID = 0;
@@ -42,17 +42,17 @@ namespace rtype::ui {
         return _m_transform;
     }
 
-    void Widget::setBackgroundColor(Color color)
+    void Widget::setBackgroundColor(UIColor color)
     {
         _m_style.backgroundColor = color;
     }
 
-    void Widget::setBorderColor(Color color)
+    void Widget::setBorderColor(UIColor color)
     {
         _m_style.borderColor = color;
     }
 
-    void Widget::setTextColor(Color color)
+    void Widget::setTextColor(UIColor color)
     {
         _m_style.textColor = color;
     }
@@ -128,17 +128,8 @@ namespace rtype::ui {
         return false;
     }
 
-    bool Widget::onMouseClick(float x, float y)
+    bool Widget::onMouseClick()
     {
-        (void)x;
-        (void)y;
-        return false;
-    }
-
-    bool Widget::onMouseRelease(float x, float y)
-    {
-        (void)x;
-        (void)y;
         return false;
     }
 
@@ -214,7 +205,17 @@ namespace rtype::ui {
         return _m_id;
     }
 
-    void Widget::render()
+    void Widget::update(float deltaTime)
+    {
+        if (!_m_visible)
+            return;
+
+        for (auto child : _m_children) {
+            child->update(deltaTime);
+        }
+    }
+
+    void Widget::render() const
     {
         if (!_m_visible)
             return;
@@ -223,18 +224,6 @@ namespace rtype::ui {
 
         for (auto& child : _m_children) {
             child->render();
-        }
-    }
-
-    void Widget::update(float deltaTime)
-    {
-        (void)deltaTime;
-        // Base implementation does nothing
-        // Subclasses can override for animations, etc.
-        
-        // Update children
-        for (auto& child : _m_children) {
-            child->update(deltaTime);
         }
     }
 

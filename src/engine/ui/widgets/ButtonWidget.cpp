@@ -10,15 +10,37 @@
 
 namespace rtype::ui {
 
-    ButtonWidget::ButtonWidget(const std::string& text)
-        : _text(text)
+    ButtonWidget::ButtonWidget(const std::string& text) : ButtonWidget(text, ButtonState::NORMAL)
     {
-        _m_transform.width = 120.0f;
-        _m_transform.height = 30.0f;
-        
-        _m_style.textColor = Color::White();
-        _m_style.borderWidth = 1.0f;
-        _m_style.borderColor = Color(60, 60, 60, 255);
+    }
+
+    ButtonWidget::ButtonWidget(const std::string& text, ButtonState state) : _text(text), _state(state)
+    {
+        initializeStyles();
+        _m_style = getStateStyle(_state);
+    }
+
+    void ButtonWidget::initializeStyles()
+    {
+        _normalStyle = getStyle();
+
+        _hoveredStyle = _normalStyle;
+        auto hoveredBg = _normalStyle.backgroundColor;
+        hoveredBg.setRed(std::min(255, (int)hoveredBg.getRed() + 20));
+        hoveredBg.setGreen(std::min(255, (int)hoveredBg.getGreen() + 20));
+        hoveredBg.setBlue(std::min(255, (int)hoveredBg.getBlue() + 20));
+        _hoveredStyle.backgroundColor = hoveredBg;
+
+        _pressedStyle = _normalStyle;
+        auto pressedBg = _normalStyle.backgroundColor;
+        pressedBg.setRed(std::max(0, (int)pressedBg.getRed() - 30));
+        pressedBg.setGreen(std::max(0, (int)pressedBg.getGreen() - 30));
+        pressedBg.setBlue(std::max(0, (int)pressedBg.getBlue() - 30));
+        _pressedStyle.backgroundColor = pressedBg;
+
+        _disabledStyle = _normalStyle;
+        _disabledStyle.backgroundColor = UIColor(128, 128, 128, 255);
+        _disabledStyle.textColor = UIColor(64, 64, 64, 255);
     }
 
     void ButtonWidget::setText(const std::string& text)
@@ -31,52 +53,140 @@ namespace rtype::ui {
         return _text;
     }
 
+    void ButtonWidget::setState(ButtonState state)
+    {
+        _state = state;
+        _m_style = getStateStyle(_state);
+    }
+
+    ButtonState ButtonWidget::getState() const
+    {
+        return _m_enabled ? _state : ButtonState::DISABLED;
+    }
+
+    void ButtonWidget::setBackgroundColor(UIColor color)
+    {
+        Widget::setBackgroundColor(color);
+
+        // Update the current state's style
+        UIStyle currentStateStyle = getStateStyle(_state);
+        currentStateStyle.backgroundColor = color;
+        setStateStyle(_state, currentStateStyle);
+
+        // Apply the style immediately
+        _m_style = currentStateStyle;
+    }
+
+    void ButtonWidget::setBorderColor(UIColor color)
+    {
+        Widget::setBorderColor(color);
+        
+        // Update the current state's style
+        UIStyle currentStateStyle = getStateStyle(_state);
+        currentStateStyle.borderColor = color;
+        setStateStyle(_state, currentStateStyle);
+        
+        // Apply the style immediately
+        _m_style = currentStateStyle;
+    }
+
+    void ButtonWidget::setTextColor(UIColor color)
+    {
+        Widget::setTextColor(color);
+        
+        // Update the current state's style
+        UIStyle currentStateStyle = getStateStyle(_state);
+        currentStateStyle.textColor = color;
+        setStateStyle(_state, currentStateStyle);
+        
+        // Apply the style immediately
+        _m_style = currentStateStyle;
+    }
+
+    void ButtonWidget::setFontSize(size_t size)
+    {
+        Widget::setFontSize(size);
+        
+        // Update the current state's style
+        UIStyle currentStateStyle = getStateStyle(_state);
+        currentStateStyle.fontSize = size;
+        setStateStyle(_state, currentStateStyle);
+        
+        // Apply the style immediately
+        _m_style = currentStateStyle;
+    }
+
+    void ButtonWidget::setBorderWidth(float width)
+    {
+        Widget::setBorderWidth(width);
+        
+        // Update the current state's style
+        UIStyle currentStateStyle = getStateStyle(_state);
+        currentStateStyle.borderWidth = width;
+        setStateStyle(_state, currentStateStyle);
+        
+        // Apply the style immediately
+        _m_style = currentStateStyle;
+    }
+
+    void ButtonWidget::setPadding(float padding)
+    {
+        Widget::setPadding(padding);
+        
+        // Update the current state's style
+        UIStyle currentStateStyle = getStateStyle(_state);
+        currentStateStyle.padding = padding;
+        setStateStyle(_state, currentStateStyle);
+        
+        // Apply the style immediately
+        _m_style = currentStateStyle;
+    }
+
+
+
     void ButtonWidget::setOnClick(ClickCallback callback)
     {
         _onClick = std::move(callback);
     }
 
-    void ButtonWidget::setStateColor(ButtonState state, const Color& color)
+    void ButtonWidget::setStateStyle(ButtonState state, const UIStyle& style)
     {
         switch (state) {
-            case ButtonState::Normal:
-                _normalColor = color;
+            case ButtonState::NORMAL:
+                _normalStyle = style;
                 break;
-            case ButtonState::Hovered:
-                _hoverColor = color;
+            case ButtonState::HOVERED:
+                _hoveredStyle = style;
                 break;
-            case ButtonState::Pressed:
-                _pressedColor = color;
+            case ButtonState::PRESSED:
+                _pressedStyle = style;
                 break;
-            case ButtonState::Disabled:
-                _disabledColor = color;
+            case ButtonState::DISABLED:
+                _disabledStyle = style;
                 break;
         }
     }
 
-    Color ButtonWidget::getStateColor(ButtonState state) const
+    UIStyle ButtonWidget::getStateStyle(ButtonState state) const
     {
         switch (state) {
-            case ButtonState::Hovered:
-                return _hoverColor;
-            case ButtonState::Pressed:
-                return _pressedColor;
-            case ButtonState::Disabled:
-                return _disabledColor;
+            case ButtonState::NORMAL:
+                return _normalStyle;
+            case ButtonState::HOVERED:
+                return _hoveredStyle;
+            case ButtonState::PRESSED:
+                return _pressedStyle;
+            case ButtonState::DISABLED:
+                return _disabledStyle;
             default:
-                return _normalColor;
+                return _normalStyle;
         }
-    }
-
-    ButtonState ButtonWidget::getState() const
-    {
-        return _m_enabled ? _state : ButtonState::Disabled;
     }
 
     bool ButtonWidget::onMouseEnter()
     {
-        if (_m_enabled && _state != ButtonState::Pressed) {
-            _state = ButtonState::Hovered;
+        if (_m_enabled && _state != ButtonState::PRESSED) {
+            setState(ButtonState::HOVERED);
         }
         return true;
     }
@@ -84,80 +194,54 @@ namespace rtype::ui {
     bool ButtonWidget::onMouseLeave()
     {
         if (_m_enabled) {
-            _state = ButtonState::Normal;
+            setState(ButtonState::NORMAL);
         }
         return true;
     }
 
-    bool ButtonWidget::onMouseClick(float x, float y)
+    bool ButtonWidget::onMouseClick()
     {
-        (void)x;  // Coordinates no longer needed - caller verified bounds
-        (void)y;
         if (!_m_enabled) return false;
 
-        _state = ButtonState::Pressed;
+        setState(ButtonState::PRESSED);
         if (_onClick) {
             _onClick();
         }
-        _state = ButtonState::Hovered; // Return to hover after click
+        setState(ButtonState::HOVERED); // Return to hover after click
         return true;
     }
 
-    void ButtonWidget::renderSelf()
+    const UIStyle& ButtonWidget::getNormalStyle() const
     {
-        auto transform = getAbsoluteTransform();
+        return _normalStyle;
+    }
+
+    const UIStyle& ButtonWidget::getHoveredStyle() const
+    {
+        return _hoveredStyle;
+    }
+
+    const UIStyle& ButtonWidget::getPressedStyle() const
+    {
+        return _pressedStyle;
+    }
+
+    const UIStyle& ButtonWidget::getDisabledStyle() const
+    {
+        return _disabledStyle;
+    }
+
+    void ButtonWidget::renderSelf() const
+    {
+        auto UItransform = getAbsoluteTransform();
         
-        // Determine background color based on state
-        Color bgColor;
-        switch (getState()) {
-            case ButtonState::Hovered:
-                bgColor = _hoverColor;
-                break;
-            case ButtonState::Pressed:
-                bgColor = _pressedColor;
-                break;
-            case ButtonState::Disabled:
-                bgColor = _disabledColor;
-                break;
-            default:
-                bgColor = _normalColor;
-                break;
+        rtype::ecs::RenderUtils::drawUiRect(UItransform, _m_style.backgroundColor);
+
+        if (_m_style.borderWidth > 0.0f) {
+            rtype::ecs::RenderUtils::drawUiRectOutline(UItransform, _m_style.borderWidth, _m_style.borderColor);
         }
 
-        // Draw button background
-        DrawRectangle(
-            static_cast<int>(transform.x),
-            static_cast<int>(transform.y),
-            static_cast<int>(transform.width),
-            static_cast<int>(transform.height),
-            bgColor.toRaylib()
-        );
-
-        // Draw border
-        if (_m_style.borderWidth > 0) {
-            DrawRectangleLinesEx(
-                Rectangle{transform.x, transform.y, transform.width, transform.height},
-                _m_style.borderWidth,
-                _m_style.borderColor.toRaylib()
-            );
-        }
-
-        // Draw centered text
-        int fontSize = static_cast<int>(_m_style.fontSize);
-        int textWidth = MeasureText(_text.c_str(), fontSize);
-        
-        float textX = transform.x + (transform.width - textWidth) / 2.0f;
-        float textY = transform.y + (transform.height - fontSize) / 2.0f;
-
-        Color textColor = _m_enabled ? _m_style.textColor : _m_style.textColor.withAlpha(128);
-
-        DrawText(
-            _text.c_str(),
-            static_cast<int>(textX),
-            static_cast<int>(textY),
-            fontSize,
-            textColor.toRaylib()
-        );
+        rtype::ecs::RenderUtils::drawUiCenteredText(_text, UItransform, _m_style.fontSize, _m_style.textColor);
     }
 
 } // namespace rtype::ui

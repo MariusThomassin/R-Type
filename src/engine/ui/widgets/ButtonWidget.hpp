@@ -8,9 +8,13 @@
 #ifndef BUTTONWIDGET_HPP_
 #define BUTTONWIDGET_HPP_
 
-#include "src/engine/ui/Widget.hpp"
+
 #include <string>
 #include <functional>
+#include "../Widget.hpp"
+#include "../../graphics/RenderUtils.hpp"
+
+#define DEFAULT_BUTTON_TEXT "Button"
 
 namespace rtype::ui {
 
@@ -18,10 +22,10 @@ namespace rtype::ui {
      * @brief Button state for visual feedback
      */
     enum class ButtonState {
-        Normal,
-        Hovered,
-        Pressed,
-        Disabled
+        NORMAL,
+        HOVERED,
+        PRESSED,
+        DISABLED
     };
 
     /**
@@ -39,7 +43,8 @@ namespace rtype::ui {
          * @brief Construct a new ButtonWidget
          * @param text Button label text
          */
-        explicit ButtonWidget(const std::string& text = "Button");
+        ButtonWidget(const std::string& text = DEFAULT_BUTTON_TEXT);
+        ButtonWidget(const std::string& text, ButtonState state);
 
         ~ButtonWidget() override = default;
 
@@ -56,6 +61,25 @@ namespace rtype::ui {
         const std::string& getText() const;
 
         /**
+         * @brief Set the current button state
+         * @param state The state to set
+         */
+        void setState(ButtonState state);
+
+        /**
+         * @brief Get the current button state
+         * @return Current state
+         */
+        ButtonState getState() const;
+
+        void setBackgroundColor(UIColor color) override;
+        void setBorderColor(UIColor color) override;
+        void setTextColor(UIColor color) override;
+        void setFontSize(size_t size) override;
+        void setBorderWidth(float width) override;
+        void setPadding(float padding) override;
+
+        /**
          * @brief Set the click callback
          * @param callback Function to call when button is clicked
          */
@@ -66,41 +90,64 @@ namespace rtype::ui {
          * @param state The button state
          * @param color The color to use for that state
          */
-        void setStateColor(ButtonState state, const Color& color);
+        void setStateStyle(ButtonState state, const UIStyle& style);
 
         /**
          * @brief Get color for a specific button state
          * @param state The button state
          * @return The color used for that state
          */
-        Color getStateColor(ButtonState state) const;
+        UIStyle getStateStyle(ButtonState state) const;
 
         /**
-         * @brief Get the current button state
-         * @return Current state
+         * @brief Initialize default styles for all button states
          */
-        ButtonState getState() const;
+        void initializeStyles();
+
+        /**
+         * @brief Get the normal state style
+         * @return Normal state style
+         */
+        const UIStyle& getNormalStyle() const;
+
+        /**
+         * @brief Get the hovered state style
+         * @return Hovered state style
+         */
+        const UIStyle& getHoveredStyle() const;
+
+        /**
+         * @brief Get the pressed state style
+         * @return Pressed state style
+         */
+        const UIStyle& getPressedStyle() const;
+
+        /**
+         * @brief Get the disabled state style
+         * @return Disabled state style
+         */
+        const UIStyle& getDisabledStyle() const;
 
         // Event handlers
         bool onMouseEnter() override;
         bool onMouseLeave() override;
-        bool onMouseClick(float x, float y) override;
+        bool onMouseClick() override;
 
         /**
          * @brief Render the button
          */
-        void renderSelf() override;
+        void renderSelf() const override;
 
     protected:
         std::string _text;
+        ButtonState _state = ButtonState::NORMAL;
         ClickCallback _onClick;
-        ButtonState _state = ButtonState::Normal;
 
         // Colors for each state
-        Color _normalColor = Color(80, 80, 80, 255);
-        Color _hoverColor = Color(100, 100, 100, 255);
-        Color _pressedColor = Color(60, 60, 60, 255);
-        Color _disabledColor = Color(50, 50, 50, 128);
+        UIStyle _normalStyle;
+        UIStyle _hoveredStyle;
+        UIStyle _pressedStyle;
+        UIStyle _disabledStyle;
     };
 
 } // namespace rtype::ui

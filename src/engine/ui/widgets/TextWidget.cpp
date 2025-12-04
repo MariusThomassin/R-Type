@@ -14,7 +14,7 @@ namespace rtype::ui {
         : _text(text)
     {
         _m_style.fontSize = fontSize;
-        _m_style.backgroundColor = Color::Transparent();
+        _m_style.backgroundColor = UIColor::Transparent();
     }
 
     void TextWidget::setText(const std::string& text)
@@ -57,7 +57,7 @@ namespace rtype::ui {
         return _wordWrap;
     }
 
-    void TextWidget::renderSelf()
+    void TextWidget::renderSelf() const
     {
         if (_text.empty()) return;
 

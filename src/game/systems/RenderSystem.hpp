@@ -5,15 +5,16 @@
 
 #pragma once
 
-#include "engine/ecs/core/ISystem.hpp"
-#include "engine/graphics/IRenderable.hpp"
-#include "engine/ecs/core/Registry.hpp"
-#include "engine/ecs/components/TransformComponent.hpp"
-#include "engine/ecs/components/SpriteComponent.hpp"
-#include "game/components/SpritesheetComponent.hpp"
-#include "game/components/PlayerShipComponent.hpp"
-#include "game/components/BackgroundComponent.hpp"
-#include "game/components/ProjectileComponent.hpp"
+#include "../../engine/ecs/core/ISystem.hpp"
+#include "../../engine/graphics/IRenderable.hpp"
+#include "../../engine/ecs/core/Registry.hpp"
+#include "../../engine/ecs/components/TransformComponent.hpp"
+#include "../../engine/ecs/components/SpriteComponent.hpp"
+#include "../components/SpritesheetComponent.hpp"
+#include "../components/PlayerShipComponent.hpp"
+#include "../components/BackgroundComponent.hpp"
+#include "../components/ProjectileComponent.hpp"
+#include "../../engine/ui/UIManager.hpp"
 
 #include <raylib.h>
 #include <algorithm>
@@ -22,6 +23,16 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
+
+// Game state for conditional rendering
+enum class GameState {
+    MENU,
+    PLAYING
+};
+
+namespace rtype::ui {
+    class UIManager;
+}
 
 namespace rtype::ecs {
 
@@ -46,6 +57,14 @@ namespace rtype::ecs {
                     UnloadTexture(tex);
                 }
             }
+        }
+
+        void setUIManager(rtype::ui::UIManager* uiManager) {
+            m_uiManager = uiManager;
+        }
+        
+        void setGameStatePtr(const GameState* gameState) {
+            m_gameState = gameState;
         }
 
         void update(float dt) override {
@@ -136,7 +155,7 @@ namespace rtype::ecs {
                 }
             }
 
-            drawUI();
+            drawUI(ctx);
             
             if (m_overlayCallback) m_overlayCallback();
 
@@ -174,6 +193,8 @@ namespace rtype::ecs {
         std::size_t m_lastEntityCount = 0;  // Cache for vector reserve optimization
         std::unordered_map<std::string, Texture2D> m_textures;
         std::function<void()> m_overlayCallback;
+        rtype::ui::UIManager* m_uiManager = nullptr;
+        const GameState* m_gameState = nullptr;
 
         // ==================== Helpers ====================
 
@@ -200,12 +221,20 @@ namespace rtype::ecs {
 
         // ==================== UI ====================
 
-        void drawUI() {
-            DrawText("SCORE", 20, 15, 20, {150, 150, 150, 255});
-            DrawText("00000", 20, 40, 28, WHITE);
-            DrawText("R-TYPE", m_screenWidth - 90, 15, 20, {100, 100, 255, 255});
-            DrawFPS(m_screenWidth - 80, m_screenHeight - 25);
-            DrawText("[O] Debug  [G] Bullets  [Space] Shoot", 10, m_screenHeight - 25, 14, {80, 80, 80, 255});
+        void drawUI(const RenderContext& ctx) {
+            // Show game UI only when playing
+            if (m_gameState && *m_gameState == GameState::PLAYING) {
+                DrawText("SCORE", 20, 15, 20, {150, 150, 150, 255});
+                DrawText("00000", 20, 40, 28, WHITE);
+                DrawText("R-TYPE", m_screenWidth - 90, 15, 20, {100, 100, 255, 255});
+                DrawFPS(m_screenWidth - 80, m_screenHeight - 25);
+                DrawText("[O] Debug  [G] Bullets  [Space] Shoot", 10, m_screenHeight - 25, 14, {80, 80, 80, 255});
+            }
+            
+            // Show menu UI only when in menu state
+            if (m_uiManager && m_gameState && *m_gameState == GameState::MENU) {
+                m_uiManager->render();
+            }
         }
     };
 

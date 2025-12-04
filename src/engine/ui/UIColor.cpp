@@ -2,15 +2,13 @@
 ** EPITECH PROJECT, 2025
 ** R-Type
 ** File description:
-** Color
+** UIColor
 */
 
-#include "Color.hpp"
-#include <raylib.h>
-#include <algorithm>
+#include "UIColor.hpp"
 
 namespace rtype::ui {
-    Color::Color(uint32_t red, uint32_t green, uint32_t blue, uint32_t alpha)
+    UIColor::UIColor(uint32_t red, uint32_t green, uint32_t blue, uint32_t alpha)
     {
         this->_r = red;
         this->_g = green;
@@ -18,56 +16,61 @@ namespace rtype::ui {
         this->_a = alpha;
     }
 
-    Color::Color() : _r(0), _g(0), _b(0), _a(255)
+    UIColor::UIColor() : _r(0), _g(0), _b(0), _a(255)
     {
     }
 
-    Color::Color(const Color &color)
-    {
-        *this = color;
-    }
-
-    void Color::setRed(uint32_t r)
+    void UIColor::setRed(uint32_t r)
     {
         this->_r = r;
     }
 
-    void Color::setGreen(uint32_t g)
+    void UIColor::setGreen(uint32_t g)
     {
         this->_g = g;
     }
 
-    void Color::setBlue(uint32_t b)
+    void UIColor::setBlue(uint32_t b)
     {
         this->_b = b;
     }
 
-    void Color::setAlpha(uint32_t a)
+    void UIColor::setAlpha(uint32_t a)
     {
         this->_a = a;
     }
 
-    uint32_t Color::getRed() const
+    uint32_t UIColor::getRed() const
     {
         return this->_r;
     }
 
-    uint32_t Color::getGreen() const
+    uint32_t UIColor::getGreen() const
     {
         return this->_g;
     }
 
-    uint32_t Color::getBlue() const
+    uint32_t UIColor::getBlue() const
     {
         return this->_b;
     }
 
-    uint32_t Color::getAlpha() const
+    uint32_t UIColor::getAlpha() const
     {
         return this->_a;
     }
 
-    Color& Color::operator=(const Color &other)
+    UIColor UIColor::getColor() const
+    {
+        UIColor color;
+        color._r = static_cast<uint32_t>(this->_r);
+        color._g = static_cast<uint32_t>(this->_g);
+        color._b = static_cast<uint32_t>(this->_b);
+        color._a = static_cast<uint32_t>(this->_a);
+        return color;
+    }
+
+    UIColor& UIColor::operator=(const UIColor &other)
     {
         if (this != &other) {
             this->_r = other._r;
@@ -78,7 +81,7 @@ namespace rtype::ui {
         return *this;
     }
 
-    ::Color Color::toRaylib() const
+    ::Color UIColor::toRaylib() const
     {
         return ::Color{
             static_cast<unsigned char>(_r),
@@ -88,20 +91,20 @@ namespace rtype::ui {
         };
     }
 
-    Color Color::fromRaylib(const ::Color& color)
+    UIColor UIColor::fromRaylib(const ::Color& color)
     {
-        return Color(color.r, color.g, color.b, color.a);
+        return UIColor(color.r, color.g, color.b, color.a);
     }
 
-    Color Color::withAlpha(uint32_t a) const
+    UIColor UIColor::withAlpha(uint32_t a) const
     {
-        return Color(_r, _g, _b, a);
+        return UIColor(_r, _g, _b, a);
     }
 
-    Color Color::lerp(const Color& a, const Color& b, float t)
+    UIColor UIColor::lerp(const UIColor& a, const UIColor& b, float t)
     {
         t = std::clamp(t, 0.0f, 1.0f);
-        return Color(
+        return UIColor(
             static_cast<uint32_t>(a._r + (b._r - a._r) * t),
             static_cast<uint32_t>(a._g + (b._g - a._g) * t),
             static_cast<uint32_t>(a._b + (b._b - a._b) * t),

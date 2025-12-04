@@ -8,7 +8,7 @@
 #ifndef PANELWIDGET_HPP_
 #define PANELWIDGET_HPP_
 
-#include "src/engine/ui/Widget.hpp"
+#include "../Widget.hpp"
 #include <string>
 
 namespace rtype::ui {
@@ -86,13 +86,13 @@ namespace rtype::ui {
         /**
          * @brief Render the panel
          */
-        void renderSelf() override;
+        void renderSelf() const override;
 
     protected:
         bool _hasHeader = false;
         std::string _title;
         float _headerHeight = 25.0f;
-        Color _headerColor = Color(60, 60, 80, 255);
+        Color _headerColor = {60, 60, 80, 255};
     };
 
 } // namespace rtype::ui

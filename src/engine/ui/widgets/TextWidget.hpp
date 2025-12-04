@@ -8,7 +8,7 @@
 #ifndef TEXTWIDGET_HPP_
 #define TEXTWIDGET_HPP_
 
-#include "src/engine/ui/Widget.hpp"
+#include "../Widget.hpp"
 #include <string>
 
 namespace rtype::ui {
@@ -100,7 +100,7 @@ namespace rtype::ui {
         /**
          * @brief Render the text widget
          */
-        void renderSelf() override;
+        void renderSelf() const override;
 
     protected:
         std::string _text;

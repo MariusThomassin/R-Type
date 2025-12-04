@@ -11,8 +11,9 @@
 #include <memory>
 #include <vector>
 #include "Widget.hpp"
-#include "src/engine/ecs/core/EventBus.hpp"
-#include "src/engine/ecs/events/InputEvents.hpp"
+#include "../ecs/core/EventBus.hpp"
+#include "../ecs/events/InputEvents.hpp"
+#include "../ecs/components/TransformComponent.hpp"
 
 namespace rtype::ui
 {
@@ -46,7 +47,7 @@ namespace rtype::ui
         void addWidget(std::shared_ptr<Widget> widget);
         void removeWidget(std::shared_ptr<Widget> widget);
         void clearWidgets();
-        
+
         /**
          * @brief Get all root-level widgets
          */
@@ -76,7 +77,7 @@ namespace rtype::ui
         /**
          * @brief Render all visible widgets
          */
-        void render();
+        void render() const;
 
         /**
          * @brief Check if UI is currently capturing mouse input

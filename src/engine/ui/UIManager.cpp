@@ -151,29 +151,10 @@ namespace rtype::ui {
         if (widget) {
             // Update focus
             setFocus(widget);
-
-            // Convert to local coordinates and dispatch
-            UITransform absTransform = widget->getAbsoluteTransform();
-            float localX = event.x - absTransform.x;
-            float localY = event.y - absTransform.y;
-            widget->onMouseClick(localX, localY);
+            widget->onMouseClick();
         } else {
             // Clicked outside all widgets - clear focus
             setFocus(nullptr);
-        }
-    }
-
-    void UIManager::handleMouseRelease(const rtype::ecs::events::MouseButtonReleasedEvent& event)
-    {
-        if (event.button != rtype::ecs::events::MouseButton::Left) return;
-
-        auto widget = findWidgetAt(event.x, event.y);
-        
-        if (widget) {
-            UITransform absTransform = widget->getAbsoluteTransform();
-            float localX = event.x - absTransform.x;
-            float localY = event.y - absTransform.y;
-            widget->onMouseRelease(localX, localY);
         }
     }
 
@@ -226,12 +207,14 @@ namespace rtype::ui {
 
     void UIManager::update(float deltaTime)
     {
-        for (auto& widget : m_widgets) {
-            widget->update(deltaTime);
+        for (const auto& widget : m_widgets) {
+            if (widget->isVisible()) {
+                widget->update(deltaTime);
+            }
         }
     }
 
-    void UIManager::render()
+    void UIManager::render() const
     {
         for (const auto& widget : m_widgets) {
             if (widget->isVisible()) {
@@ -248,6 +231,12 @@ namespace rtype::ui {
     bool UIManager::isCapturingKeyboard() const
     {
         return m_focusedWidget != nullptr;
+    }
+
+    void UIManager::handleMouseRelease(const rtype::ecs::events::MouseButtonReleasedEvent& event)
+    {
+        // Empty implementation - mouse release events not currently handled by widgets
+        (void)event; // Suppress unused parameter warning
     }
 
 } // namespace rtype::ui

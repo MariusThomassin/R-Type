@@ -13,8 +13,8 @@ namespace rtype::ui {
     PanelWidget::PanelWidget()
     {
         // Default panel styling
-        _m_style.backgroundColor = Color(40, 40, 50, 220);
-        _m_style.borderColor = Color(80, 80, 100, 255);
+        _m_style.backgroundColor = UIColor(40, 40, 50, 220);
+        _m_style.borderColor = UIColor(80, 80, 100, 255);
         _m_style.borderWidth = 1.0f;
         _m_transform.width = 200.0f;
         _m_transform.height = 150.0f;
@@ -78,7 +78,7 @@ namespace rtype::ui {
         return content;
     }
 
-    void PanelWidget::renderSelf()
+    void PanelWidget::renderSelf() const
     {
         auto transform = getAbsoluteTransform();
 
@@ -99,7 +99,7 @@ namespace rtype::ui {
                 static_cast<int>(transform.y),
                 static_cast<int>(transform.width),
                 static_cast<int>(_headerHeight),
-                _headerColor.toRaylib()
+                _headerColor
             );
 
             // Header separator line

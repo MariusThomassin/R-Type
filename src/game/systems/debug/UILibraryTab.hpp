@@ -6,7 +6,11 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "src/engine/ui/Widgets.hpp"
+#include "../../../engine/ui/widgets/TextWidget.hpp"
+#include "../../../engine/ui/widgets/ButtonWidget.hpp"
+#include "../../../engine/ui/widgets/ProgressBarWidget.hpp"
+#include "../../../engine/ui/widgets/PanelWidget.hpp"
+#include "../../../engine/ui/UIColor.hpp"
 #include <vector>
 #include <memory>
 #include <cmath>
@@ -138,7 +142,7 @@ namespace rtype::ecs::debug {
             }
             
             if (over && mouse.leftPressed) {
-                button->onMouseClick(mouse.x, mouse.y);
+                button->onMouseClick();
             }
             
             wasOver = over;
@@ -148,32 +152,32 @@ namespace rtype::ecs::debug {
             // Create text widgets
             m_textLeft = std::make_shared<ui::TextWidget>("Left-aligned text", 14);
             m_textLeft->setTextAlign(ui::TextAlign::Left);
-            m_textLeft->setTextColor(ui::Color::White());
+            m_textLeft->setTextColor(ui::UIColor::White());
 
             m_textCenter = std::make_shared<ui::TextWidget>("Centered text", 14);
             m_textCenter->setTextAlign(ui::TextAlign::Center);
-            m_textCenter->setTextColor(ui::Color(100, 255, 100, 255));
+            m_textCenter->setTextColor(ui::UIColor(100, 255, 100, 255));
 
             m_textRight = std::make_shared<ui::TextWidget>("Right-aligned text", 14);
             m_textRight->setTextAlign(ui::TextAlign::Right);
-            m_textRight->setTextColor(ui::Color(100, 200, 255, 255));
+            m_textRight->setTextColor(ui::UIColor(100, 200, 255, 255));
 
             m_clickCountText = std::make_shared<ui::TextWidget>("Button clicked 0 times", 14);
-            m_clickCountText->setTextColor(ui::Color(255, 200, 100, 255));
+            m_clickCountText->setTextColor(ui::UIColor(255, 200, 100, 255));
 
             // Create buttons
             m_demoButton1 = std::make_shared<ui::ButtonWidget>("Click Me!");
             m_demoButton1->setSize(140, 35);
-            m_demoButton1->setStateColor(ui::ButtonState::Normal, ui::Color(60, 100, 60, 255));
-            m_demoButton1->setStateColor(ui::ButtonState::Hovered, ui::Color(80, 140, 80, 255));
-            m_demoButton1->setStateColor(ui::ButtonState::Pressed, ui::Color(40, 80, 40, 255));
+            m_demoButton1->setBackgroundColor(ui::UIColor(60, 100, 60, 255));
+            // m_demoButton1->setStateColor(ui::ButtonState::Hovered, ui::UIColor(80, 140, 80, 255)); // Not supported in current API
+            // m_demoButton1->setStateColor(ui::ButtonState::Pressed, ui::UIColor(40, 80, 40, 255)); // Not supported in current API
             m_demoButton1->setOnClick([this]() { m_clickCount++; });
 
             m_demoButton2 = std::make_shared<ui::ButtonWidget>("Blue Button");
             m_demoButton2->setSize(140, 35);
-            m_demoButton2->setStateColor(ui::ButtonState::Normal, ui::Color(60, 80, 140, 255));
-            m_demoButton2->setStateColor(ui::ButtonState::Hovered, ui::Color(80, 100, 180, 255));
-            m_demoButton2->setStateColor(ui::ButtonState::Pressed, ui::Color(40, 60, 100, 255));
+            m_demoButton2->setBackgroundColor(ui::UIColor(60, 80, 140, 255));
+            // m_demoButton2->setStateColor(ui::ButtonState::Hovered, ui::UIColor(80, 100, 180, 255)); // Not supported in current API
+            // m_demoButton2->setStateColor(ui::ButtonState::Pressed, ui::UIColor(40, 60, 100, 255)); // Not supported in current API
             m_demoButton2->setOnClick([this]() { m_clickCount += 5; });
 
             m_demoButton3 = std::make_shared<ui::ButtonWidget>("Disabled");
@@ -183,17 +187,17 @@ namespace rtype::ecs::debug {
             // Create progress bars
             m_progressBar1 = std::make_shared<ui::ProgressBarWidget>(0.0f);
             m_progressBar1->setSize(200, 25);
-            m_progressBar1->setFillColor(ui::Color(80, 180, 80, 255));
+            m_progressBar1->setFillColor({80, 180, 80, 255});
             m_progressBar1->setShowLabel(true);
 
             m_progressBar2 = std::make_shared<ui::ProgressBarWidget>(0.0f);
             m_progressBar2->setSize(200, 25);
-            m_progressBar2->setFillColor(ui::Color(80, 140, 200, 255));
+            m_progressBar2->setFillColor({80, 140, 200, 255});
             m_progressBar2->setShowLabel(true);
 
             m_progressBar3 = std::make_shared<ui::ProgressBarWidget>(0.0f);
             m_progressBar3->setSize(200, 25);
-            m_progressBar3->setFillColor(ui::Color(200, 140, 80, 255));
+            m_progressBar3->setFillColor({200, 140, 80, 255});
             m_progressBar3->setShowLabel(true);
 
             // Create demo panel

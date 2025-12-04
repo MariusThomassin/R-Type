@@ -16,8 +16,8 @@ namespace rtype::ui {
         : _value(std::clamp(value, 0.0f, 1.0f))
     {
         // Default progress bar styling
-        _m_style.backgroundColor = Color(40, 40, 50, 255);
-        _m_style.borderColor = Color(80, 80, 100, 255);
+        _m_style.backgroundColor = UIColor(40, 40, 50, 255);
+        _m_style.borderColor = UIColor(80, 80, 100, 255);
         _m_style.borderWidth = 1.0f;
         _m_transform.width = 200.0f;
         _m_transform.height = 20.0f;
@@ -73,7 +73,7 @@ namespace rtype::ui {
         return _labelFormat;
     }
 
-    void ProgressBarWidget::renderSelf()
+    void ProgressBarWidget::renderSelf() const
     {
         auto transform = getAbsoluteTransform();
 
@@ -108,7 +108,7 @@ namespace rtype::ui {
                 static_cast<int>(fillY),
                 static_cast<int>(fillWidth),
                 static_cast<int>(fillHeight),
-                _fillColor.toRaylib()
+                _fillColor
             );
         }
 

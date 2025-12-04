@@ -8,7 +8,7 @@
 #ifndef PROGRESSBARWIDGET_HPP_
 #define PROGRESSBARWIDGET_HPP_
 
-#include "src/engine/ui/Widget.hpp"
+#include "../Widget.hpp"
 #include <string>
 
 namespace rtype::ui {
@@ -101,11 +101,11 @@ namespace rtype::ui {
         /**
          * @brief Render the progress bar
          */
-        void renderSelf() override;
+        void renderSelf() const override;
 
     protected:
         float _value = 0.0f;
-        Color _fillColor = Color(80, 160, 80, 255);
+        Color _fillColor = {80, 160, 80, 255};
         ProgressOrientation _orientation = ProgressOrientation::Horizontal;
         bool _showLabel = false;
         std::string _labelFormat = "%.0f%%";
