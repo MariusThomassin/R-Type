@@ -21,41 +21,26 @@ namespace rtype::ecs {
      * Optimized for high entity counts using cache-friendly iteration.
      */
     class MovementSystem : public ISystem {
-    public:
-        MovementSystem() = default;
-        ~MovementSystem() override = default;
+        public:
+            /**
+             * @brief Construct a new Movement System object
+             */
+            MovementSystem() = default;
+            /**
+             * @brief Destroy the Movement System object
+             */
+            ~MovementSystem() override = default;
 
-        void update(float dt) override {
-            if (!m_registry) return;
+            /**
+             * @brief Update the system
+             * @param dt Delta time since last update
+             */
+            void update(float dt) override;
 
-            // Use forEachWith for direct component access (avoids repeated lookups)
-            m_registry->forEachWith<TransformComponent, VelocityComponent>(
-                [dt](EntityId entity, TransformComponent& transform, VelocityComponent& velocity) {
-                    (void)entity;  // Unused but required for interface
-                    
-                    // Apply acceleration
-                    velocity.vx += velocity.ax * dt;
-                    velocity.vy += velocity.ay * dt;
-
-                    // Clamp to max speed
-                    float speedSq = velocity.vx * velocity.vx + velocity.vy * velocity.vy;
-                    float maxSpeedSq = velocity.maxSpeed * velocity.maxSpeed;
-                    if (speedSq > maxSpeedSq && speedSq > 0.0f) {
-                        float invSpeed = velocity.maxSpeed / std::sqrt(speedSq);
-                        velocity.vx *= invSpeed;
-                        velocity.vy *= invSpeed;
-                    }
-
-                    // Apply velocity to position
-                    transform.x += velocity.vx * dt;
-                    transform.y += velocity.vy * dt;
-                }
-            );
-        }
-
-        SystemPhase getPhase() const override {
-            return SystemPhase::Physics;
-        }
-    };
-
+            /**
+             * @brief Get the system's execution phase
+             * @return SystemPhase The phase in which this system runs
+             */
+            SystemPhase getPhase() const override;
+        };
 } // namespace rtype::ecs

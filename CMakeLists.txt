@@ -72,7 +72,17 @@ endforeach()
 
 # Collect all .cpp files from the engine (non-raylib dependent)
 set(ECS_ENGINE_SOURCES
-    src/engine/ecs/core/src/Registry.cpp
+    # Core ECS files
+    src/engine/ecs/core/Registry.cpp
+    src/engine/ecs/core/EventBus.cpp
+    src/engine/ecs/core/SystemManager.cpp
+    
+    # ECS Systems
+    src/engine/ecs/systems/MovementSystem.cpp
+    src/engine/ecs/systems/LifetimeSystem.cpp
+    
+    # ECS Component utilities
+    src/engine/ecs/components/CollisionUtils.cpp
 )
 
 # Game utility sources - shared (no raylib dependency)
