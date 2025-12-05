@@ -9,9 +9,8 @@
 #include <cmath>
 
 namespace rtype::ecs {
-    namespace SpriteRenderers {
 
-        void renderDefault(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data)
+        void SpriteRenderers::renderDefault(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data)
         {
             float width = data.srcWidth > 0 ? data.srcWidth : 32.0f;
             float height = data.srcHeight > 0 ? data.srcHeight : 32.0f;
@@ -26,7 +25,7 @@ namespace rtype::ecs {
             renderer.drawRectRotated(rect, 0, 0, transform.rotation, data.tint);
         }
 
-        void renderGalagaShip(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime)
+        void SpriteRenderers::renderGalagaShip(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime)
         {
             float x = transform.x;
             float y = transform.y;
@@ -72,7 +71,7 @@ namespace rtype::ecs {
             renderer.drawRect(x - 10*s, y - 1*s, 3*s, 2*s, engineColor);
         }
 
-        void renderGalagaBullet(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data)
+        void SpriteRenderers::renderGalagaBullet(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data)
         {
             float x = transform.x;
             float y = transform.y;
@@ -103,7 +102,7 @@ namespace rtype::ecs {
             }
         }
 
-        void renderEnemy(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime)
+        void SpriteRenderers::renderEnemy(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime)
         {
             float x = transform.x;
             float y = transform.y;
@@ -124,10 +123,8 @@ namespace rtype::ecs {
             renderer.drawCircle(x - 4*s, y - 4*s, 6.0f * s, highlight);
         }
 
-        void renderParticle(IRenderer& renderer, const TransformComponent& transform, const RenderColor& color, float size)
+        void SpriteRenderers::renderParticle(IRenderer& renderer, const TransformComponent& transform, const RenderColor& color, float size)
         {
             renderer.drawCircle(transform.x, transform.y, size * transform.scaleX, color);
         }
-
-    } // namespace SpriteRenderers
 } // namespace rtype::ecs

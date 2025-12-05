@@ -30,51 +30,49 @@ namespace rtype::ecs {
      * These are stateless functions that take render data and produce
      * draw calls. They don't know about ECS, components, or entities.
      */
-    namespace SpriteRenderers {
+    class SpriteRenderers {
+        public:
+            /**
+             * @brief Render a default rectangular sprite
+             * @param renderer The rendering interface
+             * @param transform The transform component data
+             * @param data The sprite render data
+             */
+            void renderDefault(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
 
-        /**
-         * @brief Render a default rectangular sprite
-         * @param renderer The rendering interface
-         * @param transform The transform component data
-         * @param data The sprite render data
-         */
-        void renderDefault(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
+            /**
+             * @brief Render a Galaga-style ship with pixel art and engine effects
+             * @param renderer The rendering interface
+             * @param transform The transform component data
+             * @param data The sprite render data
+             * @param animTime Animation time for engine effects
+             */
+            void renderGalagaShip(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
 
-        /**
-         * @brief Render a Galaga-style ship with pixel art and engine effects
-         * @param renderer The rendering interface
-         * @param transform The transform component data
-         * @param data The sprite render data
-         * @param animTime Animation time for engine effects
-         */
-        void renderGalagaShip(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
+            /**
+             * @brief Render a Galaga-style bullet with trail effects
+             * @param renderer The rendering interface
+             * @param transform The transform component data
+             * @param data The sprite render data
+             */
+            void renderGalagaBullet(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
 
-        /**
-         * @brief Render a Galaga-style bullet with trail effects
-         * @param renderer The rendering interface
-         * @param transform The transform component data
-         * @param data The sprite render data
-         */
-        void renderGalagaBullet(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
+            /**
+             * @brief Render an enemy with pulsing glow effect
+             * @param renderer The rendering interface
+             * @param transform The transform component data
+             * @param data The sprite render data
+             * @param animTime Animation time for glow pulsing
+             */
+            void renderEnemy(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
 
-        /**
-         * @brief Render an enemy with pulsing glow effect
-         * @param renderer The rendering interface
-         * @param transform The transform component data
-         * @param data The sprite render data
-         * @param animTime Animation time for glow pulsing
-         */
-        void renderEnemy(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
-
-        /**
-         * @brief Render a simple particle
-         * @param renderer The rendering interface
-         * @param transform The transform component data
-         * @param color The particle color
-         * @param size The particle size
-         */
-        void renderParticle(IRenderer& renderer, const TransformComponent& transform, const RenderColor& color, float size);
-
-    } // namespace SpriteRenderers
-
+            /**
+             * @brief Render a simple particle
+             * @param renderer The rendering interface
+             * @param transform The transform component data
+             * @param color The particle color
+             * @param size The particle size
+             */
+            void renderParticle(IRenderer& renderer, const TransformComponent& transform, const RenderColor& color, float size);
+    };
 } // namespace rtype::ecs
