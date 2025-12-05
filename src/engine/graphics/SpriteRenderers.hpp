@@ -38,7 +38,7 @@ namespace rtype::ecs {
              * @param transform The transform component data
              * @param data The sprite render data
              */
-            void renderDefault(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
+            static void renderDefault(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
 
             /**
              * @brief Render a Galaga-style ship with pixel art and engine effects
@@ -47,7 +47,7 @@ namespace rtype::ecs {
              * @param data The sprite render data
              * @param animTime Animation time for engine effects
              */
-            void renderGalagaShip(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
+            static void renderGalagaShip(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
 
             /**
              * @brief Render a Galaga-style bullet with trail effects
@@ -55,7 +55,7 @@ namespace rtype::ecs {
              * @param transform The transform component data
              * @param data The sprite render data
              */
-            void renderGalagaBullet(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
+            static void renderGalagaBullet(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data);
 
             /**
              * @brief Render an enemy with pulsing glow effect
@@ -64,7 +64,7 @@ namespace rtype::ecs {
              * @param data The sprite render data
              * @param animTime Animation time for glow pulsing
              */
-            void renderEnemy(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
+            static void renderEnemy(IRenderer& renderer, const TransformComponent& transform, const SpriteRenderData& data, float animTime);
 
             /**
              * @brief Render a simple particle
@@ -73,6 +73,6 @@ namespace rtype::ecs {
              * @param color The particle color
              * @param size The particle size
              */
-            void renderParticle(IRenderer& renderer, const TransformComponent& transform, const RenderColor& color, float size);
+            static void renderParticle(IRenderer& renderer, const TransformComponent& transform, const RenderColor& color, float size);
     };
 } // namespace rtype::ecs
