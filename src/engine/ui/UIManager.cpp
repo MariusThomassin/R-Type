@@ -134,10 +134,46 @@ namespace rtype::ui {
         // Search in reverse order (topmost first)
         for (auto it = m_widgets.rbegin(); it != m_widgets.rend(); ++it) {
             std::shared_ptr<Widget> widget = *it;
-            if (widget->isEnabled() && widget->isVisible() && widget->contains(x, y)) {
-                return widget;
+            if (widget->isEnabled() && widget->isVisible()) {
+                // First check if any child widgets contain the point
+                auto childWidget = findWidgetAtRecursive(*it, x, y);
+                if (childWidget) {
+                    return childWidget;
+                }
+                
+                // If no child contains it, check if the parent widget does
+                if (widget->contains(x, y)) {
+                    return widget;
+                }
             }
         }
+        return nullptr;
+    }
+
+    std::shared_ptr<Widget> UIManager::findWidgetAtRecursive(std::shared_ptr<Widget> parent, float x, float y)
+    {
+        if (!parent || !parent->isEnabled() || !parent->isVisible()) {
+            return nullptr;
+        }
+
+        // Search through children in reverse order (topmost first)
+        const auto& children = parent->getChildren();
+        for (auto it = children.rbegin(); it != children.rend(); ++it) {
+            std::shared_ptr<Widget> child = *it;
+            if (child && child->isEnabled() && child->isVisible()) {
+                // First check grandchildren recursively
+                auto grandChild = findWidgetAtRecursive(child, x, y);
+                if (grandChild) {
+                    return grandChild;
+                }
+                
+                // Then check if this child contains the point
+                if (child->contains(x, y)) {
+                    return child;
+                }
+            }
+        }
+        
         return nullptr;
     }
 
