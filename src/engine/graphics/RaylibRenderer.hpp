@@ -14,157 +14,176 @@ namespace rtype::ecs {
 
     /**
      * @brief Raylib-based renderer implementation
+     * 
+     * @note Implements IRenderer interface using raylib functions
+     * @note Manages texture loading/unloading and basic drawing
      */
     class RaylibRenderer : public IRenderer {
     public:
-        RaylibRenderer(int screenWidth = 1280, int screenHeight = 720)
-            : m_screenWidth(screenWidth)
-            , m_screenHeight(screenHeight) {}
+        /**
+         * @brief Construct a new RaylibRenderer object
+         * @param screenWidth The width of the rendering screen
+         * @param screenHeight The height of the rendering screen
+         */
+        RaylibRenderer(int screenWidth = 1280, int screenHeight = 720);
 
-        ~RaylibRenderer() override {
-            // Unload all textures
-            if (IsWindowReady()) {
-                for (auto& [id, tex] : m_textures) {
-                    UnloadTexture(tex);
-                }
-            }
-        }
+        /**
+         * @brief Destroy the RaylibRenderer object
+         */
+        ~RaylibRenderer() override;
 
         // ==================== Basic Shapes ====================
 
-        void drawRect(float x, float y, float width, float height,
-                      const RenderColor& color) override {
-            DrawRectangle(static_cast<int>(x), static_cast<int>(y),
-                          static_cast<int>(width), static_cast<int>(height),
-                          toRaylibColor(color));
-        }
-
-        void drawRectRotated(const RenderRect& rect, float originX, float originY,
-                             float rotation, const RenderColor& color) override {
-            Rectangle raylibRect = {rect.x, rect.y, rect.width, rect.height};
-            Vector2 origin = {originX, originY};
-            DrawRectanglePro(raylibRect, origin, rotation, toRaylibColor(color));
-        }
-
-        void drawCircle(float centerX, float centerY, float radius,
-                        const RenderColor& color) override {
-            DrawCircle(static_cast<int>(centerX), static_cast<int>(centerY),
-                       radius, toRaylibColor(color));
-        }
-
-        void drawLine(float x1, float y1, float x2, float y2,
-                      const RenderColor& color) override {
-            DrawLine(static_cast<int>(x1), static_cast<int>(y1),
-                     static_cast<int>(x2), static_cast<int>(y2),
-                     toRaylibColor(color));
-        }
+        /**
+         * @brief Draw a filled rectangle
+         * @param x Top-left x coordinate
+         * @param y Top-left y coordinate
+         * @param width Rectangle width
+         * @param height Rectangle height
+         * @param color Fill color
+         */
+        void drawRect(float x, float y, float width, float height, const RenderColor& color) override;
+        /**
+         * @brief Draw a rotated rectangle
+         * @param rect Rectangle parameters
+         * @param originX X coordinate of rotation origin
+         * @param originY Y coordinate of rotation origin
+         * @param rotation Rotation angle in degrees
+         * @param color Fill color
+         */
+        void drawRectRotated(const RenderRect& rect, float originX, float originY, float rotation, const RenderColor& color) override;
+        /**
+         * @brief Draw a filled circle
+         * @param centerX X coordinate of circle center
+         * @param centerY Y coordinate of circle center
+         * @param radius Circle radius
+         * @param color Fill color
+         */
+        void drawCircle(float centerX, float centerY, float radius, const RenderColor& color) override;
+        /**
+         * @brief Draw a line
+         * @param x1 Starting point x coordinate
+         * @param y1 Starting point y coordinate
+         * @param x2 Ending point x coordinate
+         * @param y2 Ending point y coordinate
+         * @param color Line color
+         */
+        void drawLine(float x1, float y1, float x2, float y2, const RenderColor& color) override;
 
         // ==================== Textures ====================
 
-        bool loadTexture(const std::string& id, const std::string& path) override {
-            if (m_textures.find(id) != m_textures.end()) {
-                return true; // Already loaded
-            }
+        /**
+         * @brief Load a texture from file
+         * @param id Unique identifier for the texture
+         * @param path File path to the texture image
+         * @return True if loaded successfully, false otherwise
+         */
+        bool loadTexture(const std::string& id, const std::string& path) override;
+        /**
+         * @brief Unload a previously loaded texture
+         * @param id Unique identifier of the texture to unload
+         */
+        void unloadTexture(const std::string& id) override;
 
-            Texture2D tex = LoadTexture(path.c_str());
-            if (tex.id == 0) {
-                return false;
-            }
-
-            m_textures[id] = tex;
-            return true;
-        }
-
-        void unloadTexture(const std::string& id) override {
-            auto it = m_textures.find(id);
-            if (it != m_textures.end()) {
-                if (IsWindowReady()) {
-                    UnloadTexture(it->second);
-                }
-                m_textures.erase(it);
-            }
-        }
-
-        void drawTexture(const std::string& id, float x, float y,
-                         const RenderColor& tint) override {
-            auto it = m_textures.find(id);
-            if (it != m_textures.end()) {
-                DrawTexture(it->second, static_cast<int>(x), static_cast<int>(y),
-                            toRaylibColor(tint));
-            }
-        }
-
-        void drawTextureRect(const std::string& id,
-                             const RenderRect& src, const RenderRect& dst,
-                             float rotation,
-                             const RenderColor& tint) override {
-            auto it = m_textures.find(id);
-            if (it != m_textures.end()) {
-                Rectangle srcRect = {src.x, src.y, src.width, src.height};
-                Rectangle dstRect = {dst.x, dst.y, dst.width, dst.height};
-                Vector2 origin = {dst.width / 2.0f, dst.height / 2.0f};
-                DrawTexturePro(it->second, srcRect, dstRect, origin,
-                               rotation, toRaylibColor(tint));
-            }
-        }
+        /**
+         * @brief Draw a texture at specified position
+         * @param id Unique identifier of the texture
+         * @param x X coordinate
+         * @param y Y coordinate
+         * @param tint Color tint to apply
+         */
+        void drawTexture(const std::string& id, float x, float y, const RenderColor& tint) override;
+        /**
+         * @brief Draw a portion of a texture with rotation
+         * @param id Unique identifier of the texture
+         * @param src Source rectangle within the texture
+         * @param dst Destination rectangle on screen
+         * @param rotation Rotation angle in degrees
+         * @param tint Color tint to apply
+         */
+        void drawTextureRect(const std::string& id, const RenderRect& src, const RenderRect& dst, float rotation, const RenderColor& tint) override;
 
         // ==================== Text ====================
 
-        void drawText(const std::string& text, float x, float y,
-                      int fontSize, const RenderColor& color) override {
-            DrawText(text.c_str(), static_cast<int>(x), static_cast<int>(y),
-                     fontSize, toRaylibColor(color));
-        }
+        /**
+         * @brief Draw text at specified position
+         * @param text The string to draw
+         * @param x X coordinate
+         * @param y Y coordinate
+         * @param fontSize Font size in points
+         * @param color Text color
+         */
+        void drawText(const std::string& text, float x, float y, int fontSize, const RenderColor& color) override;
 
         // ==================== Frame Management ====================
 
-        void beginFrame() override {
-            BeginDrawing();
-        }
-
-        void endFrame() override {
-            EndDrawing();
-        }
-
-        void clear(const RenderColor& color) override {
-            ClearBackground(toRaylibColor(color));
-        }
+        /**
+         * @brief Begin a new frame for rendering
+         */
+        void beginFrame() override;
+        /**
+         * @brief End the current frame and present it
+         */
+        void endFrame() override;
+        /**
+         * @brief Clear the screen with specified color
+         * @param color Clear color
+         */
+        void clear(const RenderColor& color) override;
 
         // ==================== Screen Info ====================
 
-        int getScreenWidth() const override { return m_screenWidth; }
-        int getScreenHeight() const override { return m_screenHeight; }
-
-        void setScreenSize(int width, int height) {
-            m_screenWidth = width;
-            m_screenHeight = height;
-        }
+        /**
+         * @brief Get the current screen width
+         * @return Screen width in pixels
+         */
+        int getScreenWidth() const override;
+        /**
+         * @brief Get the current screen height
+         * @return Screen height in pixels
+         */
+        int getScreenHeight() const override;
+        /**
+         * @brief Set the screen size
+         * @param width New screen width in pixels
+         * @param height New screen height in pixels
+         */
+        void setScreenSize(int width, int height);
 
         // ==================== Direct Access (for advanced usage) ====================
 
         /**
          * @brief Get raw texture for direct raylib calls
+         * @param id Unique identifier of the texture
+         * @return Pointer to the Texture2D, or nullptr if not found
          * @note Use sparingly - prefer using IRenderer methods
          */
-        const Texture2D* getRawTexture(const std::string& id) const {
-            auto it = m_textures.find(id);
-            return (it != m_textures.end()) ? &it->second : nullptr;
-        }
-
+        const Texture2D* getRawTexture(const std::string& id) const;
         /**
          * @brief Get all textures (for legacy RenderContext compatibility)
+         * @return Map of texture IDs to Texture2D objects
          */
-        const std::unordered_map<std::string, Texture2D>& getTextures() const {
-            return m_textures;
-        }
+        const std::unordered_map<std::string, Texture2D>& getTextures() const;
 
     private:
-        static Color toRaylibColor(const RenderColor& c) {
-            return {c.r, c.g, c.b, c.a};
-        }
+        /**
+         * @brief Convert RenderColor to raylib Color
+         * @param c RenderColor to convert
+         * @return raylib Color representation
+         */
+        static Color toRaylibColor(const RenderColor& c);
 
+        /**
+         * @brief Member variables
+         */
         int m_screenWidth;
+        /**
+         * @brief Member variables
+         */
         int m_screenHeight;
+        /**
+         * @brief Loaded textures mapped by ID
+         */
         std::unordered_map<std::string, Texture2D> m_textures;
     };
 

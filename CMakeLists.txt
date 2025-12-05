@@ -86,6 +86,10 @@ set(GAME_UTILS_SOURCES
 # Game utility sources - client only (raylib dependent)
 set(GAME_CLIENT_SOURCES
     src/game/systems/common/ColorPalette.cpp
+    # Graphics utilities
+    src/engine/graphics/RenderUtils.cpp
+    src/engine/graphics/RaylibRenderer.cpp
+    src/engine/graphics/SpriteRenderers.cpp
     # UI Library (raylib dependent)
     src/engine/ui/UIColor.cpp
     src/engine/ui/Widget.cpp
