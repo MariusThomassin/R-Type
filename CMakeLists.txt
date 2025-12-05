@@ -206,10 +206,34 @@ add_custom_target(clean_bin
     COMMENT "Clean: removing binaries"
 )
 
-add_custom_target(fclean
-    COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}
-    COMMENT "Full clean: removing build directory"
-)
+# Safety function to prevent accidental source deletion
+if(CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
+    message(WARNING "In-source build detected! fclean will be restricted for safety.")
+    add_custom_target(fclean
+        COMMAND ${CMAKE_COMMAND} -E echo "WARNING: In-source build detected"
+        COMMAND ${CMAKE_COMMAND} -E echo "For safety, fclean only removes specific build artifacts"
+        COMMAND ${CMAKE_COMMAND} -E remove -f CMakeCache.txt
+        COMMAND ${CMAKE_COMMAND} -E remove_directory CMakeFiles
+        COMMAND ${CMAKE_COMMAND} -E remove -f Makefile
+        COMMAND ${CMAKE_COMMAND} -E remove -f cmake_install.cmake
+        COMMAND ${CMAKE_COMMAND} -E remove -f r-type_client r-type_server
+        COMMAND ${CMAKE_COMMAND} -E remove -f libecs_engine.a librtype_ui_library.a
+        COMMENT "Safe clean: removing only build artifacts (in-source build protection)"
+    )
+else()
+    add_custom_target(fclean
+        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning build directory: ${CMAKE_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_BINARY_DIR}/CMakeCache.txt
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/CMakeFiles
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/_deps
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_BINARY_DIR}/Makefile
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_BINARY_DIR}/cmake_install.cmake
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_BINARY_DIR}/r-type_client ${CMAKE_BINARY_DIR}/r-type_server
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_BINARY_DIR}/libecs_engine.a ${CMAKE_BINARY_DIR}/librtype_ui_library.a
+        COMMAND ${CMAKE_COMMAND} -E echo "Build directory cleaned successfully"
+        COMMENT "Full clean: removing build directory contents safely"
+    )
+endif()
 
 add_custom_target(re
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target clean
@@ -225,6 +249,8 @@ message(STATUS "==================================================")
 message(STATUS "Project: ${PROJECT_NAME} v${PROJECT_VERSION}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Source Dir: ${CMAKE_SOURCE_DIR}")
+message(STATUS "Binary Dir: ${CMAKE_BINARY_DIR}")
 message(STATUS "Binary Output: ${CMAKE_BINARY_DIR}")
 message(STATUS "==================================================")
 
