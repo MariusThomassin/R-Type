@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "engine/ecs/core/ISystem.hpp"
-#include "engine/ecs/core/Registry.hpp"
-#include "engine/ecs/core/EventBus.hpp"
+#include "../../engine/ecs/core/ISystem.hpp"
+#include "../../engine/ecs/core/Registry.hpp"
+#include "../../engine/ecs/core/EventBus.hpp"
 #include "engine/ecs/events/InputEvents.hpp"
 #include "debug/DebugTab.hpp"
 #include "debug/StatsTab.hpp"
@@ -37,265 +37,168 @@ namespace rtype::ecs {
      * - Press 'O' to toggle debug mode
      */
     class DebugSystem : public ISystem {
-    public:
-        DebugSystem(EventBus& eventBus, int screenWidth = 1280, int screenHeight = 720)
-            : m_eventBus(eventBus), m_screenWidth(screenWidth), m_screenHeight(screenHeight) {
-            
-            m_tabs.push_back(std::make_unique<debug::StatsTab>());
-            m_tabs.push_back(std::make_unique<debug::ArchitectureTab>());
-            m_tabs.push_back(std::make_unique<debug::EntityInspectorTab>());
-            m_tabs.push_back(std::make_unique<debug::EntitySpawnerTab>());
-            m_tabs.push_back(std::make_unique<debug::BulletsTab>());
-            m_tabs.push_back(std::make_unique<debug::TexturesTab>());
-            m_tabs.push_back(std::make_unique<debug::PerformanceTab>());
-            m_tabs.push_back(std::make_unique<debug::UILibraryTab>());
-            
-            // ModesTab needs EventBus reference
-            m_modesTab = std::make_unique<debug::ModesTab>(eventBus);
-            m_tabs.push_back(std::move(m_modesTab));
-            m_modesTabIndex = m_tabs.size() - 1;
+        public:
+            /**
+             * @brief Construct a new Debug System object
+             * @param eventBus Reference to EventBus for input handling
+             * @param screenWidth Width of the game screen
+             * @param screenHeight Height of the game screen
+             */
+            DebugSystem(EventBus& eventBus, int screenWidth = 1280, int screenHeight = 720);
 
-            subscribeToEvents();
-        }
+            /**
+             * @brief Destroy the Debug System object
+             */
+            ~DebugSystem() override;
 
-        ~DebugSystem() override {
-            unsubscribeFromEvents();
-        }
+            /**
+             * @brief Initialize tabs with registry and screen size
+             */
+            void init();
 
-        void init() {
-            for (auto& tab : m_tabs) {
-                tab->setRegistry(m_registry);
-                tab->setScreenSize(m_screenWidth, m_screenHeight);
-            }
-        }
+            /**
+             * @brief Set textures map for tabs that need it
+             * @param textures Pointer to textures map
+             */
+            void setTextures(const std::unordered_map<std::string, Texture2D>* textures);
 
-        void setTextures(const std::unordered_map<std::string, Texture2D>* textures) {
-            for (auto& tab : m_tabs) {
-                tab->setTextures(textures);
-            }
-        }
+            /**
+             * @brief Update the debug system and current tab
+             * @param dt Delta time since last update
+             */
+            void update(float dt) override;
 
-        void update(float dt) override {
-            if (!m_registry) return;
+            /**
+             * @brief Draw the debug overlay and current tab
+             */
+            void draw();
 
-            // Process toggle
-            if (m_pendingToggle) {
-                m_enabled = !m_enabled;
-                m_pendingToggle = false;
-            }
-            
-            if (!m_enabled) return;
+            /**
+             * @brief Check if the debug system is enabled
+             * @return true if enabled
+             */
+            bool isEnabled() const { return m_enabled; }
 
-            // Build mouse input state from events
-            debug::MouseInput mouse;
-            mouse.x = m_mouseX;
-            mouse.y = m_mouseY;
-            mouse.wheelDelta = m_mouseWheelDelta;
-            mouse.leftPressed = m_mouseLeftPressed;
-            mouse.leftDown = m_mouseLeftDown;
-            mouse.rightPressed = m_mouseRightPressed;
-            mouse.rightDown = m_mouseRightDown;
+            /**
+             * @brief Get the execution phase of this system
+             * @return The phase determining update order
+             */
+            SystemPhase getPhase() const override { return SystemPhase::Input; }
 
-            // Handle tab bar clicks
-            handleTabBarClick(mouse);
+            /**
+             * @brief Update the showoff mode state in ModesTab
+             */
+            void updateShowoffState(bool active, const std::string& patternName = "", int currentPhase = 0, int totalPhases = 0, float progress = 0.0f);
 
-            // Handle close button
-            handleCloseButton(mouse);
+            /**
+             * @brief Update the stress test state in ModesTab
+             */
+            void updateStressTestState(bool active, bool complete, int intensity, float progress, const std::string& reportFilename);
 
-            // Update current tab with mouse state
-            if (m_currentTab < m_tabs.size()) {
-                m_tabs[m_currentTab]->setMouseState(mouse);
-                m_tabs[m_currentTab]->update(dt);
-            }
+        private:
+            /**
+             * @brief Subscribe to input events
+             */
+            void subscribeToEvents();
 
-            // Clear single-frame events
-            m_mouseLeftPressed = false;
-            m_mouseRightPressed = false;
-            m_mouseWheelDelta = 0;
-        }
+            /**
+             * @brief Unsubscribe from input events
+             */
+            void unsubscribeFromEvents();
 
-        void draw() {
-            if (!m_enabled) return;
+            /**
+             * @brief Handle tab bar mouse clicks
+             * @param mouse Current mouse input state
+             */
+            void handleTabBarClick(const debug::MouseInput& mouse);
 
-            // Background overlay
-            DrawRectangle(0, 0, m_screenWidth, m_screenHeight, {0, 0, 0, 200});
+            /**
+             * @brief Handle close button clicks
+             * @param mouse Current mouse input state
+             */
+            void handleCloseButton(const debug::MouseInput& mouse);
 
-            // Header
-            DrawRectangle(0, 0, m_screenWidth, 50, {30, 30, 50, 255});
-            DrawText("DEBUG MODE", 20, 15, 24, {255, 255, 100, 255});
+            /**
+             * @brief Draw the tab bar
+             */
+            void drawTabBar();
 
-            // Close button
-            int closeX = m_screenWidth - 45;
-            bool closeHover = m_mouseX >= closeX && m_mouseX < closeX + 35 &&
-                              m_mouseY >= 10 && m_mouseY < 40;
-            DrawRectangle(closeX, 10, 35, 30, closeHover ? Color{150, 60, 60, 255} : Color{100, 40, 40, 255});
-            DrawText("X", closeX + 12, 16, 18, WHITE);
+            /**
+             * @brief Reference to EventBus for communication
+             */
+            EventBus& m_eventBus;
 
-            // Tab bar
-            drawTabBar();
+            /**
+             * @brief Collection of debug tabs
+             */
+            std::vector<std::unique_ptr<debug::IDebugTab>> m_tabs;
 
-            // Current tab content
-            if (m_currentTab < m_tabs.size()) {
-                m_tabs[m_currentTab]->draw(95);
-            }
+            /**
+             * @brief Special reference to ModesTab for state updates
+             */
+            std::unique_ptr<debug::ModesTab> m_modesTab;
 
-            DrawText("[O] Toggle Debug Mode", 10, m_screenHeight - 25, 12, {80, 80, 80, 255});
-        }
+            /**
+             * @brief Index of ModesTab in m_tabs vector
+             */
+            size_t m_modesTabIndex = 0;
 
-        bool isEnabled() const { return m_enabled; }
-        SystemPhase getPhase() const override { return SystemPhase::Input; }
+            /**
+             * @brief Currently active tab index
+             */
+            size_t m_currentTab = 0;
 
-        // Mode state synchronization
-        void updateShowoffState(bool active, const std::string& patternName = "", 
-                               int currentPhase = 0, int totalPhases = 0, float progress = 0.0f) {
-            if (m_modesTabIndex < m_tabs.size()) {
-                auto* modesTab = dynamic_cast<debug::ModesTab*>(m_tabs[m_modesTabIndex].get());
-                if (modesTab) {
-                    modesTab->setShowoffState(active, patternName, currentPhase, totalPhases, progress);
-                }
-            }
-        }
+            /**
+             * @brief Screen dimensions
+             */
+            int m_screenWidth, m_screenHeight;
 
-        void updateStressTestState(bool active, bool complete, int intensity = 0, 
-                                   float progress = 0.0f, const std::string& reportFile = "") {
-            if (m_modesTabIndex < m_tabs.size()) {
-                auto* modesTab = dynamic_cast<debug::ModesTab*>(m_tabs[m_modesTabIndex].get());
-                if (modesTab) {
-                    modesTab->setStressTestState(active, complete, intensity, progress, reportFile);
-                }
-            }
-        }
+            /**
+             * @brief Debug overlay visibility state
+             */
+            bool m_enabled = false;
 
-    private:
-        EventBus& m_eventBus;
-        int m_screenWidth, m_screenHeight;
-        bool m_enabled = false;
-        size_t m_currentTab = 0;
-        std::vector<std::unique_ptr<debug::IDebugTab>> m_tabs;
-        std::unique_ptr<debug::ModesTab> m_modesTab;  // Keep reference for state updates
-        size_t m_modesTabIndex = 0;
+            /**
+             * @brief Pending toggle state (from event)
+             */
+            bool m_pendingToggle = false;
 
-        // Mouse state from events
-        float m_mouseX = 0, m_mouseY = 0;
-        float m_mouseWheelDelta = 0;
-        bool m_mouseLeftPressed = false;
-        bool m_mouseLeftDown = false;
-        bool m_mouseRightPressed = false;
-        bool m_mouseRightDown = false;
-        bool m_pendingToggle = false;
+            /**
+             * @brief Current mouse position and state
+             */
+            int m_mouseX = 0, m_mouseY = 0;
+            /**
+             * @brief Mouse button and wheel states
+             */
+            int m_mouseWheelDelta = 0;
+            /**
+             * @brief Mouse button pressed/down states
+             */
+            bool m_mouseLeftPressed = false, m_mouseLeftDown = false;
+            /**
+             * @brief Mouse button pressed/down states
+             */
+            bool m_mouseRightPressed = false, m_mouseRightDown = false;
 
-        // Event subscriptions
-        EventBus::SubscriberId m_keyPressedSub = 0;
-        EventBus::SubscriberId m_mouseMoveSub = 0;
-        EventBus::SubscriberId m_mouseButtonSub = 0;
-        EventBus::SubscriberId m_mouseButtonReleaseSub = 0;
-        EventBus::SubscriberId m_mouseWheelSub = 0;
-
-        void subscribeToEvents() {
-            m_keyPressedSub = m_eventBus.subscribe<events::KeyPressedEvent>(
-                [this](const events::KeyPressedEvent& e) {
-                    if (e.key == events::KeyCode::O) {
-                        m_pendingToggle = true;
-                    }
-                }
-            );
-
-            m_mouseMoveSub = m_eventBus.subscribe<events::MouseMoveEvent>(
-                [this](const events::MouseMoveEvent& e) {
-                    m_mouseX = e.x;
-                    m_mouseY = e.y;
-                }
-            );
-
-            m_mouseButtonSub = m_eventBus.subscribe<events::MouseButtonPressedEvent>(
-                [this](const events::MouseButtonPressedEvent& e) {
-                    m_mouseX = e.x;
-                    m_mouseY = e.y;
-                    if (e.button == events::MouseButton::Left) {
-                        m_mouseLeftPressed = true;
-                        m_mouseLeftDown = true;
-                    } else if (e.button == events::MouseButton::Right) {
-                        m_mouseRightPressed = true;
-                        m_mouseRightDown = true;
-                    }
-                }
-            );
-
-            m_mouseButtonReleaseSub = m_eventBus.subscribe<events::MouseButtonReleasedEvent>(
-                [this](const events::MouseButtonReleasedEvent& e) {
-                    if (e.button == events::MouseButton::Left) {
-                        m_mouseLeftDown = false;
-                    } else if (e.button == events::MouseButton::Right) {
-                        m_mouseRightDown = false;
-                    }
-                }
-            );
-
-            m_mouseWheelSub = m_eventBus.subscribe<events::MouseWheelEvent>(
-                [this](const events::MouseWheelEvent& e) {
-                    m_mouseWheelDelta = e.delta;
-                }
-            );
-        }
-
-        void unsubscribeFromEvents() {
-            m_eventBus.unsubscribe<events::KeyPressedEvent>(m_keyPressedSub);
-            m_eventBus.unsubscribe<events::MouseMoveEvent>(m_mouseMoveSub);
-            m_eventBus.unsubscribe<events::MouseButtonPressedEvent>(m_mouseButtonSub);
-            m_eventBus.unsubscribe<events::MouseButtonReleasedEvent>(m_mouseButtonReleaseSub);
-            m_eventBus.unsubscribe<events::MouseWheelEvent>(m_mouseWheelSub);
-        }
-
-        void handleTabBarClick(const debug::MouseInput& mouse) {
-            if (!mouse.leftPressed || mouse.y < 52 || mouse.y > 85) return;
-
-            int x = 20;
-            for (size_t i = 0; i < m_tabs.size(); i++) {
-                int width = MeasureText(m_tabs[i]->getName(), 14) + 24;
-                if (mouse.x >= x && mouse.x < x + width) {
-                    m_currentTab = i;
-                    return;
-                }
-                x += width + 4;
-            }
-        }
-
-        void handleCloseButton(const debug::MouseInput& mouse) {
-            int closeX = m_screenWidth - 45;
-            if (mouse.leftPressed && 
-                mouse.x >= closeX && mouse.x < closeX + 35 &&
-                mouse.y >= 10 && mouse.y < 40) {
-                m_enabled = false;
-            }
-        }
-
-        void drawTabBar() {
-            int x = 20;
-
-            for (size_t i = 0; i < m_tabs.size(); i++) {
-                bool active = (i == m_currentTab);
-                const char* name = m_tabs[i]->getName();
-                int width = MeasureText(name, 14) + 24;
-                
-                bool hover = m_mouseX >= x && m_mouseX < x + width &&
-                            m_mouseY >= 55 && m_mouseY < 85;
-                
-                Color bg = active ? Color{60, 70, 110, 255} : 
-                          (hover ? Color{50, 55, 80, 255} : Color{40, 40, 60, 255});
-                Color border = active ? Color{100, 150, 255, 255} : Color{60, 60, 80, 255};
-                Color text = active ? Color{255, 255, 100, 255} : 
-                            (hover ? WHITE : Color{150, 150, 150, 255});
-
-                DrawRectangle(x, 55, width, 30, bg);
-                if (active) {
-                    DrawRectangle(x, 82, width, 3, {100, 150, 255, 255});
-                }
-                DrawRectangleLines(x, 55, width, 30, border);
-                DrawText(name, x + 12, 63, 14, text);
-                
-                x += width + 4;
-            }
-        }
-    };
-
+            /**
+             * @brief Event subscription IDs
+             */
+            EventBus::SubscriberId m_debugToggleSubId;
+            /**
+             * @brief Mouse move event subscription ID
+             */
+            EventBus::SubscriberId m_mouseMoveSub;
+            /**
+             * @brief Mouse button pressed event subscription ID
+             */
+            EventBus::SubscriberId m_mouseButtonPressedSub;
+            /**
+             * @brief Mouse button released event subscription ID
+             */
+            EventBus::SubscriberId m_mouseButtonReleasedSub;
+            /**
+             * @brief Mouse wheel event subscription ID
+             */
+            EventBus::SubscriberId m_mouseWheelSub;
+        };
 } // namespace rtype::ecs

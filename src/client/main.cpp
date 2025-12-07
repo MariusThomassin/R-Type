@@ -18,6 +18,8 @@
 #include "../engine/ui/UIManager.hpp"
 #include "../engine/ui/widgets/ButtonWidget.hpp"
 #include "../engine/ui/widgets/TextWidget.hpp"
+#include "../engine/ui/widgets/PanelWidget.hpp"
+#include "../engine/graphics/RenderUtils.hpp"
 
 using namespace rtype::ecs;
 using rtype::ecs::BulletType;
@@ -113,44 +115,96 @@ int main() {
     SystemManager systems(&registry);
     bool shouldExit = false;
 
-    // -- Create game title --
+    // ==================== Menu Panel Setup ====================
+    
+    // -- Create main menu panel --
+    auto menuPanel = std::make_shared<rtype::ui::PanelWidget>();
+    menuPanel->setPosition(SCREEN_WIDTH / 2.0f - 250, 60.0f);
+    menuPanel->setSize(500.0f, 500.0f);
+    menuPanel->setBackgroundColor(UIColor(0, 0, 0, 180)); // Semi-transparent black background
+    menuPanel->setBorderColor(UIColor(100, 100, 255, 200)); // Blue border with transparency
+    menuPanel->setBorderWidth(2.0f);
+    uiManager.addWidget(menuPanel);
+
+    // Get content bounds for proper positioning within panel
+    auto contentBounds = menuPanel->getContentBounds();
+
+    // -- Create title glow layers for effect (back to front) --
+    auto titleGlow2 = std::make_shared<rtype::ui::TextWidget>("R-TYPE", 64);
+    titleGlow2->setPosition(contentBounds.width / 2.0f - 118, 44.0f); // Properly centered with glow offset
+    titleGlow2->setSize(200.0f, 80.0f);
+    titleGlow2->setBackgroundColor(UIColor::Transparent());
+    titleGlow2->setTextColor(UIColor(255, 30, 30, 60)); // Very dim red glow
+    menuPanel->addChild(titleGlow2);
+
+    auto titleGlow1 = std::make_shared<rtype::ui::TextWidget>("R-TYPE", 64);
+    titleGlow1->setPosition(contentBounds.width / 2.0f - 119, 46.0f); // Slightly offset for glow effect
+    titleGlow1->setSize(200.0f, 80.0f);
+    titleGlow1->setBackgroundColor(UIColor::Transparent());
+    titleGlow1->setTextColor(UIColor(255, 50, 50, 100)); // Dim red glow
+    menuPanel->addChild(titleGlow1);
+
+    // -- Create glowing game title (main title on top) --
     auto gameTitle = std::make_shared<rtype::ui::TextWidget>("R-TYPE", 64);
-    gameTitle->setPosition(SCREEN_WIDTH / 2.0f - 150, 100.0f);
-    gameTitle->setSize(300.0f, 80.0f);
-    gameTitle->setBackgroundColor(UIColor::Transparent()); // Transparent
-    gameTitle->setTextColor(UIColor::Red()); // Rouge vif
-    uiManager.addWidget(gameTitle);
+    gameTitle->setPosition(contentBounds.width / 2.0f - 120, 48.0f); // Centered in panel
+    gameTitle->setSize(200.0f, 80.0f);
+    gameTitle->setBackgroundColor(UIColor::Transparent());
+    gameTitle->setTextColor(UIColor(255, 100, 100, 255)); // Bright red for main text
+    menuPanel->addChild(gameTitle);
 
+    // -- Create subtitle --
     auto subtitle = std::make_shared<rtype::ui::TextWidget>("The classic side-scrolling shooter", 24);
-    subtitle->setPosition(SCREEN_WIDTH / 2.0f - 200, 180.0f);
+    subtitle->setPosition(contentBounds.width / 2.0f - 200, 140.0f); // Centered below title
     subtitle->setSize(400.0f, 40.0f);
-    subtitle->setBackgroundColor(UIColor::Transparent()); // Transparent
-    subtitle->setTextColor(UIColor::LightGray()); // Light gray
-    uiManager.addWidget(subtitle);
+    subtitle->setBackgroundColor(UIColor::Transparent());
+    subtitle->setTextColor(UIColor(200, 200, 255, 255)); // Light blue
+    menuPanel->addChild(subtitle);
 
-    // -- Create Play button --
+    // -- Create Play button with enhanced styling --
     auto playButton = std::make_shared<rtype::ui::ButtonWidget>("PLAY");
-    playButton->setPosition(SCREEN_WIDTH / 2.0f - 100, 250.0f);
-    playButton->setSize(200.0f, 50.0f);
-    playButton->setBackgroundColor(UIColor::Green()); // Vert
+    playButton->setPosition(contentBounds.width / 2.0f - 120, 200.0f); // Centered in panel
+    playButton->setSize(240.0f, 60.0f);
+    playButton->setBackgroundColor(UIColor(0, 150, 0, 200)); // Semi-transparent green
+    playButton->setBorderColor(UIColor(0, 255, 0, 255)); // Bright green border
+    playButton->setBorderWidth(2.0f);
     playButton->setTextColor(UIColor::White());
     playButton->setOnClick([&gameState]() {
         std::cout << "Play button clicked! Starting game..." << std::endl;
         gameState = GameState::PLAYING;
     });
-    uiManager.addWidget(playButton);
+    menuPanel->addChild(playButton);
 
-    // -- Create Exit button --
+    // -- Create Settings button --
+    auto settingsButton = std::make_shared<rtype::ui::ButtonWidget>("SETTINGS");
+    settingsButton->setPosition(contentBounds.width / 2.0f - 120, 280.0f); // Centered in panel
+    settingsButton->setSize(240.0f, 50.0f);
+    settingsButton->setBackgroundColor(UIColor(100, 100, 100, 200)); // Semi-transparent gray
+    settingsButton->setBorderColor(UIColor(150, 150, 150, 255)); // Light gray border
+    settingsButton->setBorderWidth(2.0f);
+    settingsButton->setTextColor(UIColor::White());
+    settingsButton->setOnClick([]() {
+        std::cout << "Settings button clicked!" << std::endl;
+        // TODO: Implement settings menu
+    });
+    menuPanel->addChild(settingsButton);
+
+    // -- Create Exit button with enhanced styling --
     auto exitButton = std::make_shared<rtype::ui::ButtonWidget>("EXIT");
-    exitButton->setPosition(SCREEN_WIDTH / 2.0f - 100, 320.0f);
-    exitButton->setSize(200.0f, 50.0f);
-    exitButton->setBackgroundColor(UIColor::Red()); // Rouge
+    exitButton->setPosition(contentBounds.width / 2.0f - 120, 350.0f); // Centered in panel
+    exitButton->setSize(240.0f, 50.0f);
+    exitButton->setBackgroundColor(UIColor(150, 0, 0, 200)); // Semi-transparent red
+    exitButton->setBorderColor(UIColor(255, 0, 0, 255)); // Bright red border
+    exitButton->setBorderWidth(2.0f);
     exitButton->setTextColor(UIColor::White());
     exitButton->setOnClick([&shouldExit]() {
         std::cout << "Exit button clicked! Closing window..." << std::endl;
         shouldExit = true;
     });
-    uiManager.addWidget(exitButton);
+    menuPanel->addChild(exitButton);
+
+    // ==================== Menu Animation Variables ====================
+    float glowTime = 0.0f;
+    float titlePulse = 1.0f;
 
     auto* inputSystem = systems.addSystem<InputSystem>(eventBus, 350.0f);
     systems.addSystem<MovementSystem>();
@@ -168,7 +222,31 @@ int main() {
     debugSystem->setTextures(renderSystem->getTextures());
     debugSystem->init();
     
-    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, debugSystem]() {
+    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, debugSystem, &gameState, &uiManager, &glowTime]() {
+        // Render UI and menu background only in menu state
+        if (gameState == GameState::MENU) {
+            // Draw animated star field background
+            for (int i = 0; i < 100; i++) {
+                int x = static_cast<int>(fmodf(i * 137.5f, static_cast<float>(SCREEN_WIDTH))); // Pseudo-random positions
+                int y = static_cast<int>(fmodf(i * 273.7f, static_cast<float>(SCREEN_HEIGHT)));
+                float twinkle = sinf(glowTime + i * 0.1f) * 0.5f + 0.5f;
+                int alpha = static_cast<int>(50 + 100 * twinkle);
+                DrawCircle(x, y, 1.0f, Color{255, 255, 255, static_cast<unsigned char>(alpha)});
+            }
+            
+            // Draw subtle gradient overlay
+            for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
+                float intensity = static_cast<float>(y) / SCREEN_HEIGHT;
+                int alpha = static_cast<int>(20 * intensity);
+                DrawRectangle(0, y, SCREEN_WIDTH, 4, Color{0, 0, 50, static_cast<unsigned char>(alpha)});
+            }
+            
+            // Render UI elements
+            uiManager.render();
+        }
+        
+        // Game state overlays
+        debugSystem->draw();
         debugSystem->draw();
         
         // Draw showoff mode indicator
@@ -254,6 +332,20 @@ int main() {
         // Update UI only in menu state
         if (gameState == GameState::MENU) {
             uiManager.update(frameTime);
+            
+            // Update glowing animation
+            glowTime += frameTime * 2.0f; // Speed of glow animation
+            titlePulse = 0.7f + 0.3f * (sinf(glowTime) + 1.0f) / 2.0f; // Pulse between 0.7 and 1.0
+            
+            // Update title glow colors dynamically
+            int baseRed = 255;
+            int glowRed = static_cast<int>(baseRed * titlePulse);
+            int glowAlpha1 = static_cast<int>(150 * titlePulse);
+            int glowAlpha2 = static_cast<int>(80 * titlePulse);
+            
+            gameTitle->setTextColor(UIColor(glowRed, static_cast<int>(100 * titlePulse), static_cast<int>(100 * titlePulse), 255));
+            titleGlow1->setTextColor(UIColor(255, 50, 50, glowAlpha1));
+            titleGlow2->setTextColor(UIColor(255, 30, 30, glowAlpha2));
         }
         
         // Allow ESC to return to menu from game

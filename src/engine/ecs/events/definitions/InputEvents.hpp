@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "engine/ecs/core/EntityTypes.hpp"
+#include "engine/ecs/core/Entity.hpp"
 
 namespace rtype::ecs::events {
 

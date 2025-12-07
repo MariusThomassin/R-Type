@@ -142,6 +142,15 @@ namespace rtype::ui
         std::shared_ptr<Widget> findWidgetAt(float x, float y);
 
         /**
+         * @brief Recursively find widget at coordinates within a parent widget's children
+         * @param parent The parent widget to search within
+         * @param x X coordinate
+         * @param y Y coordinate
+         * @return Shared pointer to the child widget at (x, y) or nullptr if none
+         */
+        std::shared_ptr<Widget> findWidgetAtRecursive(std::shared_ptr<Widget> parent, float x, float y);
+
+        /**
          * @brief List of root-level widgets
          */
         std::vector<std::shared_ptr<Widget>> m_widgets;
