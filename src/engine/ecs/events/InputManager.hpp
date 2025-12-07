@@ -24,6 +24,10 @@ namespace rtype::ecs::events {
      */
     class InputManager {
     public:
+        /**
+         * @brief Construct a new Input Manager object
+         * @param eventBus Reference to the EventBus for dispatching events
+         */
         InputManager(EventBus& eventBus) : m_eventBus(eventBus) {
             initKeyMap();
         }
@@ -38,16 +42,20 @@ namespace rtype::ecs::events {
 
         /**
          * @brief Get current key state (for continuous input like movement)
+         * @return KeyState reference
          */
         const KeyState& getKeyState() const { return m_keyState; }
 
         /**
          * @brief Get current mouse state
+         * @return MouseState reference
          */
         const MouseState& getMouseState() const { return m_mouseState; }
 
         /**
          * @brief Check if a specific key is currently held
+         * @param key The KeyCode to check
+         * @return true if key is down
          */
         bool isKeyDown(KeyCode key) const {
             auto it = m_keyDown.find(key);
@@ -56,6 +64,8 @@ namespace rtype::ecs::events {
 
         /**
          * @brief Check if a key was pressed this frame
+         * @param key The KeyCode to check
+         * @return true if key was pressed this frame
          */
         bool wasKeyPressed(KeyCode key) const {
             auto it = m_keyPressed.find(key);
@@ -63,14 +73,35 @@ namespace rtype::ecs::events {
         }
 
     private:
+        /**
+         * @brief Reference to the EventBus for dispatching events
+         */
         EventBus& m_eventBus;
+        /**
+         * @brief Current input states
+         */
         KeyState m_keyState;
+        /**
+         * @brief Current mouse state
+         */
         MouseState m_mouseState;
-        
+
+        /**
+         * @brief Key state tracking (held and pressed states
+         */
         std::unordered_map<KeyCode, bool> m_keyDown;
+        /**
+         * @brief Keys pressed this frame
+         */
         std::unordered_map<KeyCode, bool> m_keyPressed;
+        /**
+         * @brief Mapping from KeyCode to raylib key codes
+         */
         std::unordered_map<KeyCode, int> m_keyToRaylib;
 
+        /**
+         * @brief Initialize the key mapping between KeyCode and raylib keys
+         */
         void initKeyMap() {
             // Map our KeyCode to raylib keys
             m_keyToRaylib[KeyCode::Up] = KEY_UP;
@@ -113,6 +144,9 @@ namespace rtype::ecs::events {
             m_keyToRaylib[KeyCode::F3] = KEY_F3;
         }
 
+        /**
+         * @brief Poll keyboard state and emit events
+         */
         void pollKeyboard() {
             m_keyPressed.clear();
 
@@ -150,6 +184,9 @@ namespace rtype::ecs::events {
             m_eventBus.emit(KeyStateEvent{m_keyState});
         }
 
+        /**
+         * @brief Poll mouse state and emit events
+         */
         void pollMouse() {
             float newX = static_cast<float>(GetMouseX());
             float newY = static_cast<float>(GetMouseY());
