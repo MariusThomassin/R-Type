@@ -89,9 +89,21 @@ namespace rtype::ui {
         void renderSelf() const override;
 
     protected:
+        /**
+         * @brief Whether the panel has a header
+         */
         bool _hasHeader = false;
+        /**
+         * @brief Header title text
+         */
         std::string _title;
+        /**
+         * @brief Header height in pixels
+         */
         float _headerHeight = 25.0f;
+        /**
+         * @brief Header background color
+         */
         Color _headerColor = {60, 60, 80, 255};
     };
 

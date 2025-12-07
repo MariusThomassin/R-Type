@@ -23,13 +23,27 @@ namespace rtype::ecs {
      */
     class EventBus {
     public:
+        /**
+         * @brief Subscriber identifier type
+         */
         using SubscriberId = std::size_t;
 
+        /**
+         * @brief Construct a new Event Bus object
+         */
         EventBus() = default;
+        /**
+         * @brief Destroy the Event Bus object
+         */
         ~EventBus() = default;
 
-        // Prevent copying
+        /**
+         * @brief Deleted copy constructor and assignment operator
+         */
         EventBus(const EventBus&) = delete;
+        /**
+         * @brief Deleted copy constructor and assignment operator
+         */
         EventBus& operator=(const EventBus&) = delete;
 
         /**
@@ -39,19 +53,20 @@ namespace rtype::ecs {
          * @return Subscriber ID for unsubscribing
          */
         template <typename EventType>
-        SubscriberId subscribe(std::function<void(const EventType&)> callback) {
-            std::type_index typeIndex(typeid(EventType));
+            SubscriberId subscribe(std::function<void(const EventType&)> callback)
+            {
+                std::type_index typeIndex(typeid(EventType));
 
-            SubscriberId id = m_nextSubscriberId++;
+                SubscriberId id = m_nextSubscriberId++;
 
-            auto wrapper = [callback](const std::any& event) {
-                callback(std::any_cast<const EventType&>(event));
-            };
+                auto wrapper = [callback](const std::any& event) {
+                    callback(std::any_cast<const EventType&>(event));
+                };
 
-            m_subscribers[typeIndex].push_back({id, wrapper});
+                m_subscribers[typeIndex].push_back({id, wrapper});
 
-            return id;
-        }
+                return id;
+            }
 
         /**
          * @brief Unsubscribe from an event type
@@ -60,24 +75,25 @@ namespace rtype::ecs {
          * @return true if subscriber was found and removed
          */
         template <typename EventType>
-        bool unsubscribe(SubscriberId subscriberId) {
-            std::type_index typeIndex(typeid(EventType));
+            bool unsubscribe(SubscriberId subscriberId)
+            {
+                std::type_index typeIndex(typeid(EventType));
 
-            auto it = m_subscribers.find(typeIndex);
-            if (it == m_subscribers.end()) {
+                auto it = m_subscribers.find(typeIndex);
+                if (it == m_subscribers.end()) {
+                    return false;
+                }
+
+                auto& subscribers = it->second;
+                for (auto subIt = subscribers.begin(); subIt != subscribers.end(); ++subIt) {
+                    if (subIt->id == subscriberId) {
+                        subscribers.erase(subIt);
+                        return true;
+                    }
+                }
+
                 return false;
             }
-
-            auto& subscribers = it->second;
-            for (auto subIt = subscribers.begin(); subIt != subscribers.end(); ++subIt) {
-                if (subIt->id == subscriberId) {
-                    subscribers.erase(subIt);
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         /**
          * @brief Emit an event to all subscribers
@@ -85,20 +101,21 @@ namespace rtype::ecs {
          * @param event The event data
          */
         template <typename EventType>
-        void emit(const EventType& event) {
-            std::type_index typeIndex(typeid(EventType));
+            void emit(const EventType& event)
+            {
+                std::type_index typeIndex(typeid(EventType));
 
-            auto it = m_subscribers.find(typeIndex);
-            if (it == m_subscribers.end()) {
-                return;
+                auto it = m_subscribers.find(typeIndex);
+                if (it == m_subscribers.end()) {
+                    return;
+                }
+
+                auto subscribers = it->second;
+
+                for (const auto& subscriber : subscribers) {
+                    subscriber.callback(std::any(event));
+                }
             }
-
-            auto subscribers = it->second;
-
-            for (const auto& subscriber : subscribers) {
-                subscriber.callback(std::any(event));
-            }
-        }
 
         /**
          * @brief Emit an event constructed in-place
@@ -107,48 +124,60 @@ namespace rtype::ecs {
          * @param args Constructor arguments
          */
         template <typename EventType, typename... Args>
-        void emitEmplace(Args&&... args) {
-            emit(EventType(std::forward<Args>(args)...));
-        }
+            void emitEmplace(Args&&... args)
+            {
+                emit(EventType(std::forward<Args>(args)...));
+            }
 
         /**
          * @brief Remove all subscribers for an event type
          * @tparam EventType The event type
          */
         template <typename EventType>
-        void clearSubscribers() {
-            std::type_index typeIndex(typeid(EventType));
-            m_subscribers.erase(typeIndex);
-        }
+            void clearSubscribers()
+            {
+                std::type_index typeIndex(typeid(EventType));
+                m_subscribers.erase(typeIndex);
+            }
 
         /**
          * @brief Remove all subscribers for all event types
          */
-        void clearAllSubscribers() {
-            m_subscribers.clear();
-        }
+        void clearAllSubscribers();
 
         /**
          * @brief Get subscriber count for an event type
          * @tparam EventType The event type
          */
         template <typename EventType>
-        std::size_t getSubscriberCount() const {
-            std::type_index typeIndex(typeid(EventType));
-            auto it = m_subscribers.find(typeIndex);
-            if (it == m_subscribers.end()) {
-                return 0;
+            std::size_t getSubscriberCount() const
+            {
+                std::type_index typeIndex(typeid(EventType));
+                auto it = m_subscribers.find(typeIndex);
+                if (it == m_subscribers.end()) {
+                    return 0;
+                }
+                return it->second.size();
             }
-            return it->second.size();
-        }
 
     private:
+        /**
+         * @brief Subscriber information structure
+         * 
+         * Contains subscriber ID and callback function
+         */
         struct Subscriber {
             SubscriberId id;
             std::function<void(const std::any&)> callback;
         };
 
+        /**
+         * @brief Next subscriber ID to assign
+         */
         SubscriberId m_nextSubscriberId = 1;
+        /**
+         * @brief Map of event type to list of subscribers
+         */
         std::unordered_map<std::type_index, std::vector<Subscriber>> m_subscribers;
     };
 

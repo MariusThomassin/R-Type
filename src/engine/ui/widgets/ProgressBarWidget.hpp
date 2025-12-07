@@ -104,10 +104,25 @@ namespace rtype::ui {
         void renderSelf() const override;
 
     protected:
+        /**
+         * @brief Current progress value (0.0 to 1.0)
+         */
         float _value = 0.0f;
+        /**
+         * @brief Fill color of the progress bar
+         */
         Color _fillColor = {80, 160, 80, 255};
+        /**
+         * @brief Orientation of the progress bar
+         */
         ProgressOrientation _orientation = ProgressOrientation::Horizontal;
+        /**
+         * @brief Whether to show the label
+         */
         bool _showLabel = false;
+        /**
+         * @brief Label format string
+         */
         std::string _labelFormat = "%.0f%%";
     };
 

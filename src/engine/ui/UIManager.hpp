@@ -43,9 +43,19 @@ namespace rtype::ui
          */
         ~UIManager();
 
-        // Widget management
+        /**
+         * @brief Add a root-level widget
+         * @param widget The widget to add
+         */
         void addWidget(std::shared_ptr<Widget> widget);
+        /**
+         * @brief Remove a root-level widget
+         * @param widget The widget to remove
+         */
         void removeWidget(std::shared_ptr<Widget> widget);
+        /**
+         * @brief Clear all root-level widgets
+         */
         void clearWidgets();
 
         /**
@@ -92,21 +102,61 @@ namespace rtype::ui
         bool isCapturingKeyboard() const;
 
     private:
-        // Event handlers (called by EventBus subscriptions)
+        /**
+         * @brief Event handlers for ECS input events
+         * @param event The input event data
+         */
         void handleMouseClick(const rtype::ecs::events::MouseButtonPressedEvent& event);
+        /**
+         * @brief Handle mouse release event
+         * @param event The mouse button released event data
+         */
         void handleMouseRelease(const rtype::ecs::events::MouseButtonReleasedEvent& event);
+        /**
+         * @brief Handle mouse move event
+         * @param event The mouse move event data
+         */
         void handleMouseMove(const rtype::ecs::events::MouseMoveEvent& event);
+        /**
+         * @brief Handle mouse wheel event
+         * @param event The mouse wheel event data
+         */
         void handleMouseWheel(const rtype::ecs::events::MouseWheelEvent& event);
+        /**
+         * @brief Handle key press event
+         * @param event The key pressed event data
+         */
         void handleKeyPress(const rtype::ecs::events::KeyPressedEvent& event);
+        /**
+         * @brief Handle key release event
+         * @param event The key released event data
+         */
         void handleKeyRelease(const rtype::ecs::events::KeyReleasedEvent& event);
 
-        // Find widget at position (topmost first)
+        /**
+         * @brief Find the topmost widget at given coordinates
+         * @param x X coordinate
+         * @param y Y coordinate
+         * @return Shared pointer to the widget at (x, y) or nullptr if none
+         */
         std::shared_ptr<Widget> findWidgetAt(float x, float y);
 
+        /**
+         * @brief List of root-level widgets
+         */
         std::vector<std::shared_ptr<Widget>> m_widgets;
+        /**
+         * @brief Currently hovered widget (if any)
+         */
         std::shared_ptr<Widget> m_hoveredWidget;
+        /**
+         * @brief Currently focused widget (if any)
+         */
         std::shared_ptr<Widget> m_focusedWidget;
 
+        /**
+         * @brief Reference to the ECS EventBus
+         */
         rtype::ecs::EventBus& m_eventBus;
 
         // Event subscription IDs for cleanup

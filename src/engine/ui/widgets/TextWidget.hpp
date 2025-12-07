@@ -32,6 +32,8 @@ namespace rtype::ui {
          * @brief Construct a new TextWidget
          * @param text The text to display
          * @param fontSize Size of the font
+         * @param align Horizontal text alignment
+         * @param verticalAlign Vertical text alignment
          */
         explicit TextWidget(const std::string& text = "", size_t fontSize = DEFAULT_FONT_SIZE, TextAlign align = TextAlign::Left, VerticalAlign verticalAlign = VerticalAlign::Top);
 
@@ -91,9 +93,21 @@ namespace rtype::ui {
         void renderSelf() const override;
 
     protected:
+        /**
+         * @brief The text to display
+         */
         std::string _text;
+        /**
+         * @brief Horizontal text alignment
+         */
         TextAlign _textAlign = TextAlign::Left;
+        /**
+         * @brief Vertical text alignment
+         */
         VerticalAlign _verticalAlign = VerticalAlign::Top;
+        /**
+         * @brief Whether word wrapping is enabled
+         */
         bool _wordWrap = false;
     };
 

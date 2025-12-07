@@ -44,6 +44,11 @@ namespace rtype::ui {
          * @param text Button label text
          */
         ButtonWidget(const std::string& text = DEFAULT_BUTTON_TEXT);
+        /**
+         * @brief Construct a new ButtonWidget with initial state
+         * @param text Button label text
+         * @param state Initial button state
+         */
         ButtonWidget(const std::string& text, ButtonState state);
 
         ~ButtonWidget() override = default;
@@ -72,11 +77,35 @@ namespace rtype::ui {
          */
         ButtonState getState() const;
 
+        /**
+         * @brief Override background color for all states
+         * @param color The background color
+         */
         void setBackgroundColor(UIColor color) override;
+        /**
+         * @brief Override border color for all states
+         * @param color The border color
+         */
         void setBorderColor(UIColor color) override;
+        /**
+         * @brief Override text color for all states
+         * @param color The text color
+         */
         void setTextColor(UIColor color) override;
+        /**
+         * @brief Override font size for all states
+         * @param size The font size
+         */
         void setFontSize(size_t size) override;
+        /**
+         * @brief Override border width for all states
+         * @param width The border width
+         */
         void setBorderWidth(float width) override;
+        /**
+         * @brief Override padding for all states
+         * @param padding The padding value
+         */
         void setPadding(float padding) override;
 
         /**
@@ -128,9 +157,20 @@ namespace rtype::ui {
          */
         const UIStyle& getDisabledStyle() const;
 
-        // Event handlers
+        /**
+         * @brief Handle mouse enter event
+         * @return true if event was consumed
+         */
         bool onMouseEnter() override;
+        /**
+         * @brief Handle mouse leave event
+         * @return true if event was consumed
+         */
         bool onMouseLeave() override;
+        /**
+         * @brief Handle mouse click event
+         * @return true if event was consumed
+         */
         bool onMouseClick() override;
 
         /**
@@ -139,8 +179,17 @@ namespace rtype::ui {
         void renderSelf() const override;
 
     protected:
+        /**
+         * @brief Button label text
+         */
         std::string _text;
+        /**
+         * @brief Current button state
+         */
         ButtonState _state = ButtonState::NORMAL;
+        /**
+         * @brief Click callback function
+         */
         ClickCallback _onClick;
 
         // Colors for each state

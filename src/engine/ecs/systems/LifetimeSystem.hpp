@@ -35,132 +35,104 @@ namespace rtype::ecs {
      * - Optional callback for entity destruction events
      */
     class LifetimeSystem : public ISystem {
-    public:
-        using OnEntityExpired = std::function<void(EntityId)>;
+        public:
+            /**
+             * @brief Callback type for entity expiration events
+             */
+            using OnEntityExpired = std::function<void(EntityId)>;
 
-        explicit LifetimeSystem(LifetimeSystemConfig config = {})
-            : m_config(config) {}
+            /**
+             * @brief Construct a new Lifetime System object
+             * @param config Configuration options
+             */
+            explicit LifetimeSystem(LifetimeSystemConfig config = {}) : m_config(config) {}
 
-        ~LifetimeSystem() override = default;
+            /**
+             * @brief Destroy the Lifetime System object
+             */
+            ~LifetimeSystem() override = default;
 
-        void update(float dt) override {
-            if (!m_registry) return;
+            /**
+             * @brief Update the system
+             * @param dt Delta time since last update
+             */
+            void update(float dt) override;
 
-            updateLifetimes(dt);
-            
-            if (m_config.destroyOffscreen) {
-                destroyOffscreen();
-            }
+            /**
+             * @brief Get the system's execution phase
+             * @return SystemPhase The phase in which this system runs
+             */
+            SystemPhase getPhase() const override;
 
-            // Destroy collected expired entities
-            destroyExpired();
-        }
+            /**
+             * @brief Set callback for when entities expire
+             * @param callback The callback function
+             */
+            void setOnExpired(OnEntityExpired callback);
 
-        SystemPhase getPhase() const override {
-            return SystemPhase::GameLogic;
-        }
+            /**
+             * @brief Update screen dimensions for off-screen detection
+             * @param width Screen width in pixels
+             * @param height Screen height in pixels
+             */
+            void setScreenSize(int width, int height);
 
-        /**
-         * @brief Set callback for when entities expire
-         */
-        void setOnExpired(OnEntityExpired callback) {
-            m_onExpired = std::move(callback);
-        }
+            /**
+             * @brief Set the margin beyond screen edges before destruction
+             * @param margin Margin in pixels
+             */
+            void setOffscreenMargin(float margin);
 
-        /**
-         * @brief Update screen dimensions for off-screen detection
-         */
-        void setScreenSize(int width, int height) {
-            m_config.screenWidth = width;
-            m_config.screenHeight = height;
-        }
+            /**
+             * @brief Enable/disable off-screen destruction
+             * @param enabled true to enable, false to disable
+             */
+            void setDestroyOffscreen(bool enabled);
 
-        /**
-         * @brief Set the margin beyond screen edges before destruction
-         */
-        void setOffscreenMargin(float margin) {
-            m_config.offscreenMargin = margin;
-        }
+            /**
+             * @brief Get entities that expired in the last update
+             * Useful for spawning effects, playing sounds, etc.
+             * @return Vector of expired entity IDs
+             */
+            const std::vector<EntityId>& getExpiredEntities() const;
 
-        /**
-         * @brief Enable/disable off-screen destruction
-         */
-        void setDestroyOffscreen(bool enabled) {
-            m_config.destroyOffscreen = enabled;
-        }
+            /**
+             * @brief Get entities destroyed for being off-screen last frame
+             * @return Vector of off-screen destroyed entity IDs
+             */
+            const std::vector<EntityId>& getOffscreenEntities() const;
 
-        /**
-         * @brief Get entities that expired in the last update
-         * Useful for spawning effects, playing sounds, etc.
-         */
-        const std::vector<EntityId>& getExpiredEntities() const {
-            return m_expiredLastFrame;
-        }
+        private:
+            /**
+             * @brief Update lifetimes of entities with LifetimeComponent
+             * @param dt Delta time since last update
+             */
+            void updateLifetimes(float dt);
+            /**
+             * @brief Destroy entities that moved off-screen
+             */
+            void destroyOffscreen();
+            /**
+             * @brief Destroy entities that have expired
+             */
+            void destroyExpired();
 
-        /**
-         * @brief Get entities destroyed for being off-screen last frame
-         */
-        const std::vector<EntityId>& getOffscreenEntities() const {
-            return m_offscreenLastFrame;
-        }
+            /**
+             * @brief Configuration options for the system
+             */
+            LifetimeSystemConfig m_config;
+            /**
+             * @brief Callback for entity expiration events
+             */
+            OnEntityExpired m_onExpired;
 
-    private:
-        void updateLifetimes(float dt) {
-            m_expiredLastFrame.clear();
-
-            // Use the new forEach API for zero-allocation iteration
-            m_registry->forEach<LifetimeComponent>([&](EntityId entity) {
-                auto& lifetime = m_registry->getComponent<LifetimeComponent>(entity);
-                
-                if (lifetime.update(dt)) {
-                    m_expiredLastFrame.push_back(entity);
-                }
-            });
-        }
-
-        void destroyOffscreen() {
-            m_offscreenLastFrame.clear();
-
-            m_registry->forEach<TransformComponent>([&](EntityId entity) {
-                const auto& transform = m_registry->getComponent<TransformComponent>(entity);
-
-                float margin = m_config.offscreenMargin;
-                if (transform.x < -margin || 
-                    transform.x > m_config.screenWidth + margin ||
-                    transform.y < -margin || 
-                    transform.y > m_config.screenHeight + margin) {
-                    m_offscreenLastFrame.push_back(entity);
-                }
-            });
-        }
-
-        void destroyExpired() {
-            // Destroy time-expired entities
-            for (EntityId entity : m_expiredLastFrame) {
-                if (m_registry->entityExists(entity)) {
-                    if (m_onExpired) {
-                        m_onExpired(entity);
-                    }
-                    m_registry->destroyEntity(entity);
-                }
-            }
-
-            // Destroy off-screen entities
-            for (EntityId entity : m_offscreenLastFrame) {
-                if (m_registry->entityExists(entity)) {
-                    if (m_onExpired) {
-                        m_onExpired(entity);
-                    }
-                    m_registry->destroyEntity(entity);
-                }
-            }
-        }
-
-        LifetimeSystemConfig m_config;
-        OnEntityExpired m_onExpired;
-
-        std::vector<EntityId> m_expiredLastFrame;
-        std::vector<EntityId> m_offscreenLastFrame;
-    };
-
+            /**
+             * @brief Entities that expired in the last update
+             */
+            std::vector<EntityId> m_expiredLastFrame;
+            /**
+             * @brief Entities destroyed for being off-screen in the last update
+             */
+            std::vector<EntityId> m_offscreenLastFrame;
+        };
 } // namespace rtype::ecs

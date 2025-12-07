@@ -72,7 +72,17 @@ endforeach()
 
 # Collect all .cpp files from the engine (non-raylib dependent)
 set(ECS_ENGINE_SOURCES
-    src/engine/ecs/core/src/Registry.cpp
+    # Core ECS files
+    src/engine/ecs/core/Registry.cpp
+    src/engine/ecs/core/EventBus.cpp
+    src/engine/ecs/core/SystemManager.cpp
+    
+    # ECS Systems
+    src/engine/ecs/systems/MovementSystem.cpp
+    src/engine/ecs/systems/LifetimeSystem.cpp
+    
+    # ECS Component utilities
+    src/engine/ecs/components/CollisionUtils.cpp
 )
 
 # Game utility sources - shared (no raylib dependency)
@@ -86,6 +96,10 @@ set(GAME_UTILS_SOURCES
 # Game utility sources - client only (raylib dependent)
 set(GAME_CLIENT_SOURCES
     src/game/systems/common/ColorPalette.cpp
+    # Graphics utilities
+    src/engine/graphics/RenderUtils.cpp
+    src/engine/graphics/RaylibRenderer.cpp
+    src/engine/graphics/SpriteRenderers.cpp
     # UI Library (raylib dependent)
     src/engine/ui/UIColor.cpp
     src/engine/ui/Widget.cpp
