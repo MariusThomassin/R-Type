@@ -48,4 +48,10 @@ cscope.*
 Thumbs.db
 
 # Doxygen generated docs
-doc/doxygen/
+doc/doxygen/html/
+doc/doxygen/latex/
+doc/doxygen/xml/
+doc/doxygen/man/
+doc/doxygen/rtf/
+!doc/*.md
+!doc/generate_docs.sh
