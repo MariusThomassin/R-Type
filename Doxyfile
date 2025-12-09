@@ -7,7 +7,7 @@
 
 PROJECT_NAME           = "R-Type ECS Engine"
 PROJECT_NUMBER         = "1.0.0"
-PROJECT_BRIEF          = "A data-oriented Entity Component System game engine"
+PROJECT_BRIEF          = "A data-oriented Entity Component System game engine with multiplayer support"
 PROJECT_LOGO           = 
 
 OUTPUT_DIRECTORY       = doc/doxygen
@@ -44,13 +44,15 @@ EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
-EXTRACT_ANON_NSPACES   = NO
+EXTRACT_ANON_NSPACES   = YES
+EXTRACT_LOCAL_METHODS  = YES
+EXTRACT_PACKAGE        = YES
 
 HIDE_UNDOC_MEMBERS     = NO
 HIDE_UNDOC_CLASSES     = NO
 HIDE_IN_BODY_DOCS      = NO
 
-INTERNAL_DOCS          = NO
+INTERNAL_DOCS          = YES
 CASE_SENSE_NAMES       = YES
 HIDE_SCOPE_NAMES       = NO
 HIDE_COMPOUND_REFERENCE= NO
@@ -247,8 +249,8 @@ UML_LIMIT_NUM_FIELDS   = 10
 TEMPLATE_RELATIONS     = YES
 INCLUDE_GRAPH          = YES
 INCLUDED_BY_GRAPH      = YES
-CALL_GRAPH             = NO
-CALLER_GRAPH           = NO
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
 GRAPHICAL_HIERARCHY    = YES
 DIRECTORY_GRAPH        = YES
 
@@ -256,8 +258,8 @@ DOT_IMAGE_FORMAT       = svg
 INTERACTIVE_SVG        = YES
 DOT_PATH               =
 DOTFILE_DIRS           =
-DOT_GRAPH_MAX_NODES    = 50
-MAX_DOT_GRAPH_DEPTH    = 0
+DOT_GRAPH_MAX_NODES    = 100
+MAX_DOT_GRAPH_DEPTH    = 5
 DOT_TRANSPARENT        = NO
 DOT_MULTI_TARGETS      = NO
 GENERATE_LEGEND        = YES
