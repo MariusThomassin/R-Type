@@ -30,18 +30,18 @@ jobs:
       - name: Setup build environment (macOS)
         if: runner.os == 'macOS'
         run: |
-          echo "Using pre-installed cmake: $(cmake --version)"
+          brew install glfw
+          echo "CMake version: $(cmake --version)"
       
       - name: Setup build environment (Windows)
         if: runner.os == 'Windows'
-        run: |
-          echo "Using pre-installed cmake: $(cmake --version)"
+        uses: microsoft/setup-msbuild@v2
       
       - name: Build project
         id: build
         run: |
-          cmake -B build -S .
-          cmake --build build --config Release
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --verbose
       
       - name: Success message
         if: success()
