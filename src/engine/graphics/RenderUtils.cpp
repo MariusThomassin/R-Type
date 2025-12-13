@@ -110,8 +110,9 @@ namespace rtype::ecs {
 
     void RenderUtils::drawUiRectOutline(const rtype::ui::UITransform& abs_t, float border_width, const rtype::ui::UIColor& color)
     {
+        Rectangle rect = {abs_t.x, abs_t.y, abs_t.width, abs_t.height};
         DrawRectangleLinesEx(
-            (Rectangle){abs_t.x, abs_t.y, abs_t.width, abs_t.height}, 
+            rect, 
             border_width,
             toRaylibColor(color)
         );
