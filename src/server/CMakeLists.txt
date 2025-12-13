@@ -7,6 +7,7 @@ set(SERVER_SOURCES
     main.cpp
     Server.cpp
     GameServer.cpp
+    NetworkManager.cpp
 )
 
 # Game systems sources (shared between client and server, no Raylib dependency)
@@ -31,20 +32,21 @@ target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src/server)
 # but the server won't actually use any Raylib functions
 target_include_directories(server PRIVATE ${CMAKE_BINARY_DIR}/_deps/raylib-src/src)
 
-# Link ECS engine library
+# Link libraries
 target_link_libraries(server PRIVATE ecs_engine)
-
-# Link Asio to server
+target_link_libraries(server PRIVATE rtype_shared)
 target_link_libraries(server PRIVATE asio_lib)
 
 # Preserve original binary name
 set_target_properties(server PROPERTIES OUTPUT_NAME "r-type_server")
 
-# Compiler flags
+# Compiler flags and defines
 if(MSVC)
     target_compile_options(server PRIVATE /W4 /permissive-)
+    target_compile_definitions(server PRIVATE NOGDI NOUSER)  # Avoid Windows GDI conflicts with Raylib
 elseif(MINGW)
     target_compile_options(server PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_definitions(server PRIVATE NOGDI NOUSER)  # Avoid Windows GDI conflicts with Raylib
     target_link_libraries(server PRIVATE ws2_32)
 elseif(UNIX)
     target_compile_options(server PRIVATE -Wall -Wextra -Wpedantic)

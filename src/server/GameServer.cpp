@@ -5,6 +5,11 @@
 
 #include "GameServer.hpp"
 
+// Network includes
+#include "NetworkManager.hpp"
+#include "NetworkIdManager.hpp"
+#include "shared/network/Protocol.hpp"
+
 // System includes (only in .cpp to avoid Raylib dependencies in header)
 #include "engine/ecs/systems/MovementSystem.hpp"
 #include "engine/ecs/systems/LifetimeSystem.hpp"
@@ -18,6 +23,8 @@
 #include "engine/ecs/components/TransformComponent.hpp"
 #include "engine/ecs/components/VelocityComponent.hpp"
 #include "engine/ecs/components/LifetimeComponent.hpp"
+#include "engine/ecs/components/NetworkComponent.hpp"
+#include "engine/ecs/components/ColliderComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 // Note: SpritesheetComponent removed - not needed on headless server
 #include "game/components/bullets/TrajectoryComponent.hpp"
@@ -39,6 +46,8 @@ namespace rtype::server {
         , m_trajectorySystem(nullptr)
         , m_spinSystem(nullptr)
         , m_collisionSystem(nullptr)
+        , m_networkManager(nullptr)
+        , m_networkIdManager(nullptr)
         , m_running(false)
         , m_tickCount(0)
         , m_gameTime(0.0f)
@@ -49,10 +58,20 @@ namespace rtype::server {
         std::srand(static_cast<unsigned>(std::time(nullptr)));
     }
 
+    // Destructor defined here to allow unique_ptr to incomplete types in header
+    GameServer::~GameServer() = default;
+
     void GameServer::initialize() {
         std::cout << "[GameServer] Initializing headless game simulation..." << std::endl;
 
+        // Initialize network managers
+        m_networkIdManager = std::make_unique<NetworkIdManager>();
+        m_networkManager = std::make_unique<NetworkManager>(m_registry, 4242);
+
         initializeSystems();
+
+        // Start network
+        m_networkManager->start();
 
         std::cout << "[GameServer] Initialized successfully!" << std::endl;
         std::cout << "[GameServer] - Fixed timestep: " << FIXED_TIMESTEP << "s (60 Hz)" << std::endl;
@@ -131,6 +150,9 @@ namespace rtype::server {
         m_demoSpawnTimer += dt;
         m_logTimer += dt;
 
+        // Update network (send state updates at 20 Hz)
+        m_networkManager->update(dt);
+
         // Spawn demo projectiles periodically
         if (m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
             spawnDemoProjectiles();
@@ -198,8 +220,16 @@ namespace rtype::server {
             // Projectile (use constructor instead of designated initializers)
             m_registry.addComponent(bullet, ecs::ProjectileComponent(ecs::NULL_ENTITY, 10, false));
 
-            // Note: SpritesheetComponent omitted on server (headless, no rendering)
-            // When we add network sync, we'll send bullet type/color data separately
+            // Collider (for collision detection)
+            ecs::ColliderComponent collider;
+            collider.width = 16.0f;
+            collider.height = 16.0f;
+            collider.layer = ecs::CollisionLayer::EnemyShot;
+            collider.mask = static_cast<ecs::CollisionLayer>(
+                static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                static_cast<uint32_t>(ecs::CollisionLayer::Wall)
+            );
+            m_registry.addComponent(bullet, collider);
 
             // Trajectory (if not Linear)
             if (spawn.trajectory != ecs::TrajectoryType::Linear) {
@@ -219,8 +249,34 @@ namespace rtype::server {
             // Lifetime (auto-destroy after 10 seconds)
             m_registry.addComponent(bullet, ecs::LifetimeComponent(10.0f));
 
+            // Network - Allocate network ID and add NetworkComponent
+            uint32_t networkId = m_networkIdManager->allocate(bullet);
+            m_registry.addComponent(bullet, ecs::NetworkComponent(networkId, false));
+
+            // Send ENTITY_SPAWN to all clients
+            network::EntitySpawnMessage spawnMsg{};
+            spawnMsg.networkId = networkId;
+            spawnMsg.entityType = network::EntityType::PROJECTILE;
+            spawnMsg.x = spawn.x;
+            spawnMsg.y = spawn.y;
+            spawnMsg.rotation = 0.0f;
+            spawnMsg.vx = spawn.velX;
+            spawnMsg.vy = spawn.velY;
+            spawnMsg.trajectoryType = static_cast<uint8_t>(spawn.trajectory);
+            spawnMsg.trajectoryParam1 = 0.0f;  // Will be initialized by trajectory system
+            spawnMsg.trajectoryParam2 = 0.0f;
+            spawnMsg.spinSpeed = 90.0f;
+            spawnMsg.maxLifetime = 10.0f;
+            spawnMsg.colliderWidth = 16.0f;
+            spawnMsg.colliderHeight = 16.0f;
+            spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot);
+            spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                                     static_cast<uint32_t>(ecs::CollisionLayer::Wall);
+
+            m_networkManager->broadcastEntitySpawn(spawnMsg);
+
             std::cout << "  - Spawned " << spawn.name << " bullet at ("
-                      << spawn.x << ", " << spawn.y << ")" << std::endl;
+                      << spawn.x << ", " << spawn.y << ") [networkId=" << networkId << "]" << std::endl;
         }
 
         std::cout << "[GameServer] Spawned " << sizeof(spawns) / sizeof(spawns[0])
@@ -230,6 +286,11 @@ namespace rtype::server {
     void GameServer::stop() {
         std::cout << "[GameServer] Stopping server..." << std::endl;
         m_running = false;
+
+        // Stop network
+        if (m_networkManager) {
+            m_networkManager->stop();
+        }
     }
 
     size_t GameServer::getEntityCount() const {

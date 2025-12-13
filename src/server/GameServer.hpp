@@ -24,6 +24,8 @@ namespace rtype::ecs {
 }
 
 namespace rtype::server {
+    class NetworkManager;
+    class NetworkIdManager;
 
     /**
      * @brief Server-side game simulation
@@ -47,7 +49,7 @@ namespace rtype::server {
         /**
          * @brief Destroy the Game Server object
          */
-        ~GameServer() = default;
+        ~GameServer();  // Defined in .cpp to allow unique_ptr to incomplete types
 
         /**
          * @brief Initialize the server (systems, demo entities)
@@ -128,6 +130,10 @@ namespace rtype::server {
         ecs::TrajectorySystem* m_trajectorySystem;
         ecs::SpinSystem* m_spinSystem;
         ecs::CollisionSystem* m_collisionSystem;
+
+        // Network (owned by GameServer)
+        std::unique_ptr<NetworkManager> m_networkManager;
+        std::unique_ptr<NetworkIdManager> m_networkIdManager;
 
         // Game state
         bool m_running;
