@@ -6,14 +6,30 @@
 set(SERVER_SOURCES
     main.cpp
     Server.cpp
+    GameServer.cpp
+)
+
+# Game systems sources (shared between client and server, no Raylib dependency)
+set(GAME_SYSTEMS_SOURCES
+    # BulletSystem.cpp and PatternSystem.cpp removed - not needed on server
+    # Both use SpritesheetComponent which causes linking errors (RenderUtils dependency)
+    # Server spawns projectiles manually in GameServer::spawnDemoProjectiles()
+    ${CMAKE_SOURCE_DIR}/src/game/systems/CollisionSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/systems/common/ColorPalette.cpp
+    # Note: TrajectorySystem and SpinSystem are header-only
 )
 
 # Server executable
-add_executable(server ${SERVER_SOURCES})
+add_executable(server ${SERVER_SOURCES} ${GAME_SYSTEMS_SOURCES})
 
 # Include paths
 target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR})
 target_include_directories(server PRIVATE ${CMAKE_SOURCE_DIR}/src/server)
+
+# Add Raylib include directory (for headers only, not linking)
+# This allows compilation of game systems that reference Raylib types
+# but the server won't actually use any Raylib functions
+target_include_directories(server PRIVATE ${CMAKE_BINARY_DIR}/_deps/raylib-src/src)
 
 # Link ECS engine library
 target_link_libraries(server PRIVATE ecs_engine)

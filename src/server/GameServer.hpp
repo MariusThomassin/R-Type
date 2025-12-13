@@ -1,0 +1,150 @@
+/*
+** R-Type - GameServer
+** Headless game simulation for multiplayer server
+** Runs ECS at fixed 60 Hz timestep without rendering
+*/
+
+#pragma once
+
+#include "engine/ecs/core/Registry.hpp"
+#include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/core/SystemManager.hpp"
+
+#include <memory>
+#include <chrono>
+#include <iostream>
+
+// Forward declarations to avoid Raylib dependencies in header
+namespace rtype::ecs {
+    class MovementSystem;
+    class LifetimeSystem;
+    class TrajectorySystem;
+    class SpinSystem;
+    class CollisionSystem;
+}
+
+namespace rtype::server {
+
+    /**
+     * @brief Server-side game simulation
+     *
+     * Features:
+     * - Fixed 60 Hz tick rate (deterministic simulation)
+     * - Headless (no rendering, no Raylib dependency)
+     * - Reuses client ECS systems (Movement, Bullet, Pattern, Trajectory)
+     * - Collision detection
+     * - Demo projectile spawning for testing
+     *
+     * Future network sync will be added here.
+     */
+    class GameServer {
+    public:
+        /**
+         * @brief Construct a new Game Server object
+         */
+        GameServer();
+
+        /**
+         * @brief Destroy the Game Server object
+         */
+        ~GameServer() = default;
+
+        /**
+         * @brief Initialize the server (systems, demo entities)
+         */
+        void initialize();
+
+        /**
+         * @brief Run the server game loop
+         *
+         * Runs at fixed 60 Hz timestep until stopped.
+         * Call this from main thread.
+         */
+        void run();
+
+        /**
+         * @brief Stop the server gracefully
+         */
+        void stop();
+
+        /**
+         * @brief Get the current tick count
+         * @return uint64_t Number of ticks since start
+         */
+        uint64_t getTickCount() const { return m_tickCount; }
+
+        /**
+         * @brief Get the current game time in seconds
+         * @return float Game time
+         */
+        float getGameTime() const { return m_gameTime; }
+
+        /**
+         * @brief Get the number of active entities
+         * @return size_t Entity count
+         */
+        size_t getEntityCount() const;
+
+    private:
+        /**
+         * @brief Initialize all ECS systems
+         */
+        void initializeSystems();
+
+        /**
+         * @brief Spawn demo projectiles periodically
+         *
+         * Spawns bullets with different trajectories:
+         * - Linear
+         * - Sinusoidal
+         * - Spiral
+         * - Homing
+         * - Circular
+         * - Zigzag
+         * - Figure8
+         */
+        void spawnDemoProjectiles();
+
+        /**
+         * @brief Update game simulation by one tick
+         * @param dt Fixed delta time (1/60 seconds)
+         */
+        void tick(float dt);
+
+        /**
+         * @brief Log server status periodically
+         */
+        void logStatus();
+
+    private:
+        // ECS Core
+        ecs::Registry m_registry;
+        ecs::EventBus m_eventBus;
+        ecs::SystemManager m_systemManager;
+
+        // Systems (owned by SystemManager, stored as raw pointers for access)
+        ecs::MovementSystem* m_movementSystem;
+        ecs::LifetimeSystem* m_lifetimeSystem;
+        ecs::TrajectorySystem* m_trajectorySystem;
+        ecs::SpinSystem* m_spinSystem;
+        ecs::CollisionSystem* m_collisionSystem;
+
+        // Game state
+        bool m_running;
+        uint64_t m_tickCount;
+        float m_gameTime;
+        float m_demoSpawnTimer;
+
+        // Constants
+        static constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;
+        static constexpr float DEMO_SPAWN_INTERVAL = 2.0f; // Spawn demo bullets every 2 seconds
+        static constexpr float LOG_INTERVAL = 5.0f; // Log status every 5 seconds
+        static constexpr int SCREEN_WIDTH = 1280;
+        static constexpr int SCREEN_HEIGHT = 720;
+
+        // Demo spawn state
+        int m_demoSpawnCounter;
+        float m_logTimer;
+    };
+
+} // namespace rtype::server
