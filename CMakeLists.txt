@@ -18,12 +18,18 @@ include(FetchContent)
 FetchContent_Declare(
     raylib
     GIT_REPOSITORY https://github.com/raysan5/raylib.git
-    GIT_TAG 5.0
+    GIT_TAG master
     GIT_SHALLOW TRUE
 )
 
 # Don't build raylib examples
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+
+# Fix CMake policy issues with newer CMake versions
+if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+endif()
 
 FetchContent_MakeAvailable(raylib)
 
