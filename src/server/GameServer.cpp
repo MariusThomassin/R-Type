@@ -98,6 +98,8 @@ namespace rtype::server {
             std::cout << "[GameServer] Client " << clientId << " is ready!" << std::endl;
             
             // Get player count outside mutex to avoid potential lock ordering issues
+            // Note: There's a potential race if a player disconnects between this call
+            // and the check below, but this is a safe race (we might just delay game start)
             size_t playerCount = m_playerManager->getPlayerCount();
             
             {
