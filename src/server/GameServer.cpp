@@ -61,6 +61,7 @@ namespace rtype::server {
         , m_demoSpawnTimer(0.0f)
         , m_demoSpawnCounter(0)
         , m_logTimer(0.0f)
+        , m_gameStarted(false)
     {
         std::srand(static_cast<unsigned>(std::time(nullptr)));
     }
@@ -91,6 +92,20 @@ namespace rtype::server {
 
         m_networkManager->setOnClientInput([this](uint32_t clientId, const network::ClientInputMessage& input) {
             m_playerManager->applyInput(clientId, input);
+        });
+
+        m_networkManager->setOnPlayerReady([this](uint32_t clientId) {
+            std::cout << "[GameServer] Client " << clientId << " is ready!" << std::endl;
+            m_readyClients.insert(clientId);
+
+            // Check if game should start (2+ players, all ready)
+            size_t playerCount = m_playerManager->getPlayerCount();
+            size_t readyCount = m_readyClients.size();
+
+            if (!m_gameStarted && playerCount >= 2 && readyCount >= 2) {
+                m_gameStarted = true;
+                std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
+            }
         });
 
         // Subscribe to collision events for player-projectile damage
@@ -186,8 +201,8 @@ namespace rtype::server {
         // Update player manager (clamp positions, etc.)
         m_playerManager->update(dt);
 
-        // Spawn demo projectiles periodically
-        if (m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
+        // Spawn demo projectiles periodically (only if game has started)
+        if (m_gameStarted && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
             spawnDemoProjectiles();
             m_demoSpawnTimer = 0.0f;
         }

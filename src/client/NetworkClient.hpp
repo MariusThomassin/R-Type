@@ -85,6 +85,13 @@ namespace rtype::client {
          */
         void sendInput(const network::ClientInputMessage& input);
 
+        /**
+         * @brief Send player ready message to server
+         *
+         * Called when the player clicks Play button
+         */
+        void sendPlayerReady();
+
     private:
         /**
          * @brief Reception loop (runs in separate thread)

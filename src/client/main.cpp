@@ -177,9 +177,14 @@ int main() {
     playButton->setBorderColor(UIColor(0, 255, 0, 255)); // Bright green border
     playButton->setBorderWidth(2.0f);
     playButton->setTextColor(UIColor::White());
-    playButton->setOnClick([&gameState]() {
+    playButton->setOnClick([&gameState, &networkClient]() {
         std::cout << "Play button clicked! Starting game..." << std::endl;
         gameState = GameState::PLAYING;
+
+        // Send PLAYER_READY to server
+        if (networkClient.isConnected()) {
+            networkClient.sendPlayerReady();
+        }
     });
     menuPanel->addChild(playButton);
 

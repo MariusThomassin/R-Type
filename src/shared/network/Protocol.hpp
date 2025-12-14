@@ -19,6 +19,7 @@ namespace rtype::network {
         CLIENT_HELLO = 0,        // Initial connection
         CLIENT_INPUT = 1,        // Player input
         CLIENT_DISCONNECT = 2,   // Clean disconnect
+        PLAYER_READY = 3,        // Player clicked Play button and is ready
 
         // Server → Client
         SERVER_WELCOME = 10,     // Connection response (assigns clientId)
@@ -87,6 +88,13 @@ namespace rtype::network {
         uint32_t sequenceNumber;    // For prediction/reconciliation (future)
         uint8_t inputFlags;          // Bitfield: UP|DOWN|LEFT|RIGHT|SHOOT
         float deltaTime;             // For lag compensation
+    };
+
+    /**
+     * @brief PLAYER_READY: Player has clicked Play and is ready to start
+     */
+    struct PlayerReadyMessage {
+        uint32_t clientId;          // Client ID that is ready
     };
 
     // ============================================================

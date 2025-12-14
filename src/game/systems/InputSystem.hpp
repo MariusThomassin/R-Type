@@ -111,7 +111,8 @@ namespace rtype::ecs {
                 if (m_keyState.space) inputFlags |= 0x10;          // INPUT_SHOOT
 
                 // If in network mode, send inputs to server instead of applying locally
-                if (m_networkClient && inputFlags != 0) {
+                // IMPORTANT: Always send inputs, even when inputFlags = 0, so server knows to stop movement
+                if (m_networkClient) {
                     ClientInputMessage msg;
                     msg.sequenceNumber = m_inputSequence++;
                     msg.inputFlags = inputFlags;
@@ -141,14 +142,23 @@ namespace rtype::ecs {
                                 velocity.vx *= factor;
                                 velocity.vy *= factor;
                             }
+                        }
+                    );
+                }
 
-                            if (m_keyState.space) {
+                // Handle shooting (Space key) - works in both network and local mode
+                if (m_keyState.space) {
+                    m_registry->forEach<PlayerComponent>(
+                        [this](EntityId entity) {
+                            const auto& player = m_registry->getComponent<PlayerComponent>(entity);
+                            if (player.isLocal) {
                                 m_eventBus.emit(events::ShootEvent{entity});
                             }
                         }
                     );
                 }
 
+                // Handle danmaku spawning (G key) - works in both network and local mode
                 if (m_danmakuPressed) {
                     m_eventBus.emit(events::DanmakuEvent{0, 0});
                     m_danmakuPressed = false;
