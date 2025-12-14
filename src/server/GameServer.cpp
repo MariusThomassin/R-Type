@@ -102,7 +102,7 @@ namespace rtype::server {
             size_t playerCount = m_playerManager->getPlayerCount();
             size_t readyCount = m_readyClients.size();
 
-            if (!m_gameStarted && playerCount >= 2 && readyCount >= 2) {
+            if (!m_gameStarted && playerCount >= 2 && readyCount >= playerCount) {
                 m_gameStarted = true;
                 std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
             }
