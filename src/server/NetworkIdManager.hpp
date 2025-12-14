@@ -27,15 +27,29 @@ namespace rtype::server {
          *
          * @param entity Local entity ID
          * @return Assigned network ID (starting from 1)
+         *
+         * IMPORTANT: If an entity is reused by the Registry (entity ID recycled after destruction),
+         * we MUST detect this and assign a NEW networkId, not reuse the old one.
+         * We do this by checking if the entity already has a mapping, and if so,
+         * removing it first to ensure a fresh allocation.
          */
         uint32_t allocate(ecs::Entity entity) {
-            // Check if already allocated
+            // Check if this entity ID was previously used (entity recycling)
             auto it = m_entityToNetworkId.find(entity);
             if (it != m_entityToNetworkId.end()) {
-                return it->second;
+                // Entity ID was recycled! Remove the old mapping to prevent conflicts.
+                // This can happen when the Registry reuses entity IDs after destruction.
+                uint32_t oldNetworkId = it->second;
+                std::cerr << "[NetworkIdManager] WARNING: Entity " << entity
+                         << " was recycled with old networkId=" << oldNetworkId
+                         << ". Removing stale mapping and allocating new ID." << std::endl;
+
+                // Remove old mappings
+                m_networkIdToEntity.erase(oldNetworkId);
+                m_entityToNetworkId.erase(it);
             }
 
-            // Allocate new ID
+            // Allocate new ID (always increment, never reuse networkIds)
             uint32_t networkId = m_nextId++;
             m_entityToNetworkId[entity] = networkId;
             m_networkIdToEntity[networkId] = entity;

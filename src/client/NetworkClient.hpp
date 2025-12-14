@@ -78,6 +78,13 @@ namespace rtype::client {
          */
         uint32_t getClientId() const { return m_clientId; }
 
+        /**
+         * @brief Send player input to server
+         *
+         * @param input Input message
+         */
+        void sendInput(const network::ClientInputMessage& input);
+
     private:
         /**
          * @brief Reception loop (runs in separate thread)
@@ -112,6 +119,16 @@ namespace rtype::client {
         void handleEntityDestroy(const network::EntityDestroyMessage& message);
 
         /**
+         * @brief Handle PLAYER_SPAWN message (main thread)
+         */
+        void handlePlayerSpawn(const network::PlayerSpawnMessage& message);
+
+        /**
+         * @brief Handle PLAYER_HIT message (main thread)
+         */
+        void handlePlayerHit(const network::PlayerHitMessage& message);
+
+        /**
          * @brief Send CLIENT_HELLO to server
          */
         void sendHello();
@@ -141,6 +158,9 @@ namespace rtype::client {
 
         // Network ID mapping (networkId → local Entity)
         std::unordered_map<uint32_t, ecs::Entity> m_networkIdToEntity;
+
+        // Input sequence number
+        uint32_t m_inputSequence;
     };
 
 } // namespace rtype::client

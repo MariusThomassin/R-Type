@@ -9,6 +9,7 @@ set(GAME_CLIENT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/systems/PatternSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/game/systems/DebugSystem.cpp
     ${CMAKE_SOURCE_DIR}/src/game/systems/BulletSystem.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/systems/InputSystem.cpp
     # Graphics utilities
     ${CMAKE_SOURCE_DIR}/src/engine/graphics/RenderUtils.cpp
     ${CMAKE_SOURCE_DIR}/src/engine/graphics/RaylibRenderer.cpp

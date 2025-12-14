@@ -6,6 +6,8 @@
 #include "engine/ecs/components/TransformComponent.hpp"
 #include "engine/ecs/components/VelocityComponent.hpp"
 #include "engine/ecs/components/NetworkComponent.hpp"
+#include "engine/ecs/components/HealthComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
 
 namespace rtype::server {
 
@@ -164,6 +166,14 @@ namespace rtype::server {
                 break;
             }
 
+            case network::MessageType::CLIENT_INPUT: {
+                network::ClientInputMessage msg;
+                if (network::deserializeMessage(buffer, msg)) {
+                    handleClientInput(msg, senderEndpoint);
+                }
+                break;
+            }
+
             default:
                 std::cerr << "[NetworkManager] Unknown message type: "
                          << static_cast<int>(header.type) << std::endl;
@@ -173,49 +183,83 @@ namespace rtype::server {
 
     void NetworkManager::handleClientHello(const network::ClientHelloMessage& message,
                                           const asio::ip::udp::endpoint& senderEndpoint) {
-        std::lock_guard<std::mutex> lock(m_clientsMutex);
+        uint32_t clientId;
 
-        // Check if client already connected
-        ClientInfo* existing = findClient(senderEndpoint);
-        if (existing) {
-            std::cout << "[NetworkManager] Client already connected: "
-                     << senderEndpoint << " (clientId=" << existing->clientId << ")" << std::endl;
-            return;
+        {
+            std::lock_guard<std::mutex> lock(m_clientsMutex);
+
+            // Check if client already connected
+            ClientInfo* existing = findClient(senderEndpoint);
+            if (existing) {
+                std::cout << "[NetworkManager] Client already connected: "
+                         << senderEndpoint << " (clientId=" << existing->clientId << ")" << std::endl;
+                return;
+            }
+
+            // Assign client ID
+            clientId = m_nextClientId++;
+            m_clients.emplace_back(clientId, senderEndpoint);
+
+            std::cout << "[NetworkManager] Client connected: " << senderEndpoint
+                     << " (clientId=" << clientId << ", protocol=" << message.protocolVersion << ")" << std::endl;
+
+            // Send welcome message
+            network::ServerWelcomeMessage welcome;
+            welcome.clientId = clientId;
+            welcome.protocolVersion = 1;
+            welcome.serverTime = 0.0f;  // TODO: Actual server time
+
+            auto welcomeBuffer = network::serializeMessage(network::MessageType::SERVER_WELCOME, welcome);
+            sendTo(welcomeBuffer, senderEndpoint);
+
+            // Send full snapshot to new client
+            sendSnapshotToClient(m_clients.back());
+
+            std::cout << "[NetworkManager] Sent welcome and snapshot to client " << clientId << std::endl;
+        } // Release lock here
+
+        // Notify via callback OUTSIDE the lock to avoid deadlock
+        if (m_onClientConnected) {
+            m_onClientConnected(clientId);
         }
-
-        // Assign client ID
-        uint32_t clientId = m_nextClientId++;
-        m_clients.emplace_back(clientId, senderEndpoint);
-
-        std::cout << "[NetworkManager] Client connected: " << senderEndpoint
-                 << " (clientId=" << clientId << ", protocol=" << message.protocolVersion << ")" << std::endl;
-
-        // Send welcome message
-        network::ServerWelcomeMessage welcome;
-        welcome.clientId = clientId;
-        welcome.protocolVersion = 1;
-        welcome.serverTime = 0.0f;  // TODO: Actual server time
-
-        auto welcomeBuffer = network::serializeMessage(network::MessageType::SERVER_WELCOME, welcome);
-        sendTo(welcomeBuffer, senderEndpoint);
-
-        // Send full snapshot to new client
-        sendSnapshotToClient(m_clients.back());
-
-        std::cout << "[NetworkManager] Sent welcome and snapshot to client " << clientId << std::endl;
     }
 
     void NetworkManager::handleClientDisconnect(const network::ClientDisconnectMessage& message) {
-        std::lock_guard<std::mutex> lock(m_clientsMutex);
+        bool found = false;
 
-        // Find and remove client
-        auto it = std::find_if(m_clients.begin(), m_clients.end(),
-            [&](const ClientInfo& client) { return client.clientId == message.clientId; });
+        {
+            std::lock_guard<std::mutex> lock(m_clientsMutex);
 
-        if (it != m_clients.end()) {
-            std::cout << "[NetworkManager] Client disconnected: " << it->endpoint
-                     << " (clientId=" << message.clientId << ")" << std::endl;
-            m_clients.erase(it);
+            // Find and remove client
+            auto it = std::find_if(m_clients.begin(), m_clients.end(),
+                [&](const ClientInfo& client) { return client.clientId == message.clientId; });
+
+            if (it != m_clients.end()) {
+                std::cout << "[NetworkManager] Client disconnected: " << it->endpoint
+                         << " (clientId=" << message.clientId << ")" << std::endl;
+                m_clients.erase(it);
+                found = true;
+            }
+        } // Release lock here
+
+        // Notify via callback OUTSIDE the lock to avoid deadlock
+        if (found && m_onClientDisconnected) {
+            m_onClientDisconnected(message.clientId);
+        }
+    }
+
+    void NetworkManager::handleClientInput(const network::ClientInputMessage& message,
+                                          const asio::ip::udp::endpoint& senderEndpoint) {
+        // Find client by endpoint
+        ClientInfo* client = findClient(senderEndpoint);
+        if (!client) {
+            std::cerr << "[NetworkManager] Received input from unknown client: " << senderEndpoint << std::endl;
+            return;
+        }
+
+        // Notify via callback
+        if (m_onClientInput) {
+            m_onClientInput(client->clientId, message);
         }
     }
 
@@ -254,33 +298,52 @@ namespace rtype::server {
         std::cout << "[NetworkManager] Sending snapshot to client " << client.clientId
                  << " (" << entityCount << " entities)" << std::endl;
 
-        // Send each entity as ENTITY_SPAWN
+        // Send each entity (use PLAYER_SPAWN for players, ENTITY_SPAWN for others)
         m_registry.forEach<ecs::NetworkComponent>([this, &client](ecs::EntityId entity) {
             auto* networkComp = m_registry.tryGetComponent<ecs::NetworkComponent>(entity);
             auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(entity);
-            auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(entity);
+            auto* playerComp = m_registry.tryGetComponent<ecs::PlayerComponent>(entity);
 
             if (!networkComp || !transform) {
                 return;
             }
 
-            // Build spawn message
-            network::EntitySpawnMessage spawnMsg{};
-            spawnMsg.networkId = static_cast<uint32_t>(networkComp->networkId);
-            spawnMsg.entityType = network::EntityType::PROJECTILE;  // For now, all are projectiles
-            spawnMsg.x = transform->x;
-            spawnMsg.y = transform->y;
-            spawnMsg.rotation = transform->rotation;
+            // If it's a player, send PLAYER_SPAWN message
+            if (playerComp) {
+                auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(entity);
 
-            if (velocity) {
-                spawnMsg.vx = velocity->vx;
-                spawnMsg.vy = velocity->vy;
+                network::PlayerSpawnMessage playerMsg{};
+                playerMsg.networkId = static_cast<uint32_t>(networkComp->networkId);
+                playerMsg.clientId = playerComp->networkClientId;  // Use stored client ID
+                playerMsg.playerSlot = playerComp->slot;
+                playerMsg.x = transform->x;
+                playerMsg.y = transform->y;
+                playerMsg.health = health ? static_cast<float>(health->currentHealth) : 100.0f;
+
+                auto buffer = network::serializeMessage(network::MessageType::PLAYER_SPAWN, playerMsg);
+                sendTo(buffer, client.endpoint);
             }
+            // Otherwise, send ENTITY_SPAWN (projectile, enemy, etc.)
+            else {
+                auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(entity);
 
-            // TODO: Add trajectory, spin, lifetime, collider data
+                network::EntitySpawnMessage spawnMsg{};
+                spawnMsg.networkId = static_cast<uint32_t>(networkComp->networkId);
+                spawnMsg.entityType = network::EntityType::PROJECTILE;  // For now, all are projectiles
+                spawnMsg.x = transform->x;
+                spawnMsg.y = transform->y;
+                spawnMsg.rotation = transform->rotation;
 
-            auto buffer = network::serializeMessage(network::MessageType::ENTITY_SPAWN, spawnMsg);
-            sendTo(buffer, client.endpoint);
+                if (velocity) {
+                    spawnMsg.vx = velocity->vx;
+                    spawnMsg.vy = velocity->vy;
+                }
+
+                // TODO: Add trajectory, spin, lifetime, collider data
+
+                auto buffer = network::serializeMessage(network::MessageType::ENTITY_SPAWN, spawnMsg);
+                sendTo(buffer, client.endpoint);
+            }
         });
     }
 

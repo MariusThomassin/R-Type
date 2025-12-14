@@ -26,6 +26,7 @@ namespace rtype::ecs {
 namespace rtype::server {
     class NetworkManager;
     class NetworkIdManager;
+    class PlayerManager;
 
     /**
      * @brief Server-side game simulation
@@ -118,6 +119,12 @@ namespace rtype::server {
          */
         void logStatus();
 
+        /**
+         * @brief Handle player-projectile collision events
+         * @param event Collision event data
+         */
+        void handlePlayerCollision(const ecs::CollisionEvent& event);
+
     private:
         // ECS Core
         ecs::Registry m_registry;
@@ -134,6 +141,7 @@ namespace rtype::server {
         // Network (owned by GameServer)
         std::unique_ptr<NetworkManager> m_networkManager;
         std::unique_ptr<NetworkIdManager> m_networkIdManager;
+        std::unique_ptr<PlayerManager> m_playerManager;
 
         // Game state
         bool m_running;
@@ -151,6 +159,9 @@ namespace rtype::server {
         // Demo spawn state
         int m_demoSpawnCounter;
         float m_logTimer;
+
+        // Event subscriptions
+        ecs::EventBus::SubscriberId m_collisionSubId;
     };
 
 } // namespace rtype::server

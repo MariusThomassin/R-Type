@@ -215,7 +215,7 @@ int main() {
     float glowTime = 0.0f;
     float titlePulse = 1.0f;
 
-    auto* inputSystem = systems.addSystem<InputSystem>(eventBus, 350.0f);
+    auto* inputSystem = systems.addSystem<InputSystem>(eventBus, 350.0f, &networkClient);
     systems.addSystem<MovementSystem>();
     auto* bulletSystem = systems.addSystem<BulletSystem>(eventBus);
     bulletSystem->setScreenSize(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -325,9 +325,10 @@ int main() {
     // ==================== Create Game Entities ====================
     Entity background = createBackground(registry, SCREEN_WIDTH, SCREEN_HEIGHT);
     (void)background;
-    
-    Entity player = createPlayer(registry, 1);
-    (void)player;
+
+    // NOTE: Player is now created by the server and spawned via network
+    // Entity player = createPlayer(registry, 1);
+    // (void)player;
 
     // ==================== Game Loop (Fixed Timestep) ====================
     float accumulator = 0.0f;

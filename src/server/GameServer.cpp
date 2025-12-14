@@ -8,6 +8,7 @@
 // Network includes
 #include "NetworkManager.hpp"
 #include "NetworkIdManager.hpp"
+#include "PlayerManager.hpp"
 #include "shared/network/Protocol.hpp"
 
 // System includes (only in .cpp to avoid Raylib dependencies in header)
@@ -25,10 +26,15 @@
 #include "engine/ecs/components/LifetimeComponent.hpp"
 #include "engine/ecs/components/NetworkComponent.hpp"
 #include "engine/ecs/components/ColliderComponent.hpp"
+#include "engine/ecs/components/HealthComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
 // Note: SpritesheetComponent removed - not needed on headless server
 #include "game/components/bullets/TrajectoryComponent.hpp"
 #include "game/components/bullets/SpinComponent.hpp"
+
+// Event includes
+#include "engine/ecs/core/EventBus.hpp"
 
 #include <thread>
 #include <cmath>
@@ -48,6 +54,7 @@ namespace rtype::server {
         , m_collisionSystem(nullptr)
         , m_networkManager(nullptr)
         , m_networkIdManager(nullptr)
+        , m_playerManager(nullptr)
         , m_running(false)
         , m_tickCount(0)
         , m_gameTime(0.0f)
@@ -67,8 +74,31 @@ namespace rtype::server {
         // Initialize network managers
         m_networkIdManager = std::make_unique<NetworkIdManager>();
         m_networkManager = std::make_unique<NetworkManager>(m_registry, 4242);
+        m_playerManager = std::make_unique<PlayerManager>(m_registry, *m_networkManager, *m_networkIdManager);
 
         initializeSystems();
+
+        // Set up network callbacks for player management
+        m_networkManager->setOnClientConnected([this](uint32_t clientId) {
+            std::cout << "[GameServer] Client connected: " << clientId << ", spawning player..." << std::endl;
+            m_playerManager->spawnPlayer(clientId);
+        });
+
+        m_networkManager->setOnClientDisconnected([this](uint32_t clientId) {
+            std::cout << "[GameServer] Client disconnected: " << clientId << ", removing player..." << std::endl;
+            m_playerManager->removePlayer(clientId);
+        });
+
+        m_networkManager->setOnClientInput([this](uint32_t clientId, const network::ClientInputMessage& input) {
+            m_playerManager->applyInput(clientId, input);
+        });
+
+        // Subscribe to collision events for player-projectile damage
+        m_collisionSubId = m_eventBus.subscribe<ecs::CollisionEvent>(
+            [this](const ecs::CollisionEvent& event) {
+                handlePlayerCollision(event);
+            }
+        );
 
         // Start network
         m_networkManager->start();
@@ -153,6 +183,9 @@ namespace rtype::server {
         // Update network (send state updates at 20 Hz)
         m_networkManager->update(dt);
 
+        // Update player manager (clamp positions, etc.)
+        m_playerManager->update(dt);
+
         // Spawn demo projectiles periodically
         if (m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
             spawnDemoProjectiles();
@@ -183,29 +216,29 @@ namespace rtype::server {
         };
 
         SpawnDef spawns[] = {
-            // Linear (left to right)
-            {100.0f, 200.0f, 300.0f, 0.0f, ecs::TrajectoryType::Linear, "Linear"},
+            // Linear (left to right) - Moved away from player corners
+            {50.0f, 250.0f, 300.0f, 0.0f, ecs::TrajectoryType::Linear, "Linear"},
 
-            // Sinusoidal (wavy motion)
-            {100.0f, 300.0f, 250.0f, 0.0f, ecs::TrajectoryType::Sinusoidal, "Sinusoidal"},
+            // Sinusoidal (wavy motion) - Safe center-left position
+            {50.0f, 350.0f, 250.0f, 0.0f, ecs::TrajectoryType::Sinusoidal, "Sinusoidal"},
 
-            // Spiral (expanding spiral)
-            {400.0f, 360.0f, 200.0f, 0.0f, ecs::TrajectoryType::Spiral, "Spiral"},
+            // Spiral (expanding spiral) - Center of screen
+            {640.0f, 360.0f, 200.0f, 0.0f, ecs::TrajectoryType::Spiral, "Spiral"},
 
-            // Circular (orbit motion)
-            {600.0f, 400.0f, 150.0f, 0.0f, ecs::TrajectoryType::Circular, "Circular"},
+            // Circular (orbit motion) - Center-right
+            {900.0f, 400.0f, 150.0f, 0.0f, ecs::TrajectoryType::Circular, "Circular"},
 
-            // Zigzag (sharp turns)
-            {100.0f, 500.0f, 280.0f, 0.0f, ecs::TrajectoryType::Zigzag, "Zigzag"},
+            // Zigzag (sharp turns) - Bottom center-left, away from corners
+            {300.0f, 500.0f, 280.0f, 0.0f, ecs::TrajectoryType::Zigzag, "Zigzag"},
 
-            // Figure8 (infinity symbol)
-            {800.0f, 360.0f, 100.0f, 0.0f, ecs::TrajectoryType::Figure8, "Figure8"},
+            // Figure8 (infinity symbol) - Right side center
+            {1000.0f, 360.0f, 100.0f, 0.0f, ecs::TrajectoryType::Figure8, "Figure8"},
 
-            // Pendulum (swinging)
-            {200.0f, 600.0f, 200.0f, 0.0f, ecs::TrajectoryType::Pendulum, "Pendulum"},
+            // Pendulum (swinging) - Bottom center
+            {500.0f, 600.0f, 200.0f, 0.0f, ecs::TrajectoryType::Pendulum, "Pendulum"},
 
-            // Whip (accelerate then decelerate)
-            {100.0f, 100.0f, 150.0f, 100.0f, ecs::TrajectoryType::Whip, "Whip"}
+            // Whip (accelerate then decelerate) - Center top, away from corners
+            {640.0f, 50.0f, 150.0f, 100.0f, ecs::TrajectoryType::Whip, "Whip"}
         };
 
         for (const auto& spawn : spawns) {
@@ -308,6 +341,71 @@ namespace rtype::server {
         std::cout << "  - Game Time: " << m_gameTime << "s" << std::endl;
         std::cout << "  - Active Entities: " << getEntityCount() << std::endl;
         std::cout << "  - FPS: ~60 (fixed timestep)" << std::endl;
+    }
+
+    void GameServer::handlePlayerCollision(const ecs::CollisionEvent& event) {
+        // Determine which entity is the player and which is the projectile
+        ecs::EntityId playerEntityId = ecs::NULL_ENTITY;
+        ecs::EntityId projectileEntityId = ecs::NULL_ENTITY;
+
+        auto* playerA = m_registry.tryGetComponent<ecs::PlayerComponent>(event.entityA);
+        auto* playerB = m_registry.tryGetComponent<ecs::PlayerComponent>(event.entityB);
+        auto* projectileA = m_registry.tryGetComponent<ecs::ProjectileComponent>(event.entityA);
+        auto* projectileB = m_registry.tryGetComponent<ecs::ProjectileComponent>(event.entityB);
+
+        if (playerA && projectileB) {
+            playerEntityId = event.entityA;
+            projectileEntityId = event.entityB;
+        } else if (playerB && projectileA) {
+            playerEntityId = event.entityB;
+            projectileEntityId = event.entityA;
+        } else {
+            // Not a player-projectile collision, ignore
+            return;
+        }
+
+        // Get components
+        auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(playerEntityId);
+        auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(playerEntityId);
+        auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(playerEntityId);
+        auto* projectile = m_registry.tryGetComponent<ecs::ProjectileComponent>(projectileEntityId);
+
+        if (!health || !transform || !network || !projectile) {
+            return; // Missing components
+        }
+
+        // Apply damage
+        int damage = projectile->damage;
+        health->currentHealth -= damage;
+        if (health->currentHealth < 0) {
+            health->currentHealth = 0;
+        }
+
+        std::cout << "[GameServer] Player hit! NetworkID=" << network->networkId
+                  << " Health: " << health->currentHealth << "/" << health->maxHealth << std::endl;
+
+        // Broadcast PLAYER_HIT message to all clients
+        network::PlayerHitMessage hitMsg;
+        hitMsg.networkId = network->networkId;
+        hitMsg.newHealth = static_cast<float>(health->currentHealth);
+        hitMsg.hitX = transform->x;
+        hitMsg.hitY = transform->y;
+
+        auto buffer = network::serializeMessage(network::MessageType::PLAYER_HIT, hitMsg);
+        m_networkManager->broadcast(buffer);
+
+        // Remove projectile from network ID manager before destroying
+        auto* projectileNetwork = m_registry.tryGetComponent<ecs::NetworkComponent>(projectileEntityId);
+        if (projectileNetwork) {
+            ecs::Entity projectileEntity(projectileEntityId);
+            m_networkIdManager->remove(projectileEntity);
+            m_networkManager->broadcastEntityDestroy(projectileNetwork->networkId);
+        }
+
+        // Destroy the projectile
+        m_registry.destroyEntity(projectileEntityId);
+
+        // TODO: If health <= 0, handle player death (not implemented yet)
     }
 
 } // namespace rtype::server

@@ -8,10 +8,13 @@
 #include "engine/ecs/components/LifetimeComponent.hpp"
 #include "engine/ecs/components/NetworkComponent.hpp"
 #include "engine/ecs/components/ColliderComponent.hpp"
+#include "engine/ecs/components/HealthComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include "game/components/SpritesheetComponent.hpp"
 #include "game/components/bullets/TrajectoryComponent.hpp"
 #include "game/components/bullets/SpinComponent.hpp"
+#include "game/components/PlayerShipComponent.hpp"
 
 namespace rtype::client {
 
@@ -22,6 +25,7 @@ namespace rtype::client {
         , m_running(false)
         , m_connected(false)
         , m_clientId(0)
+        , m_inputSequence(0)
     {
         std::cout << "[NetworkClient] Initialized" << std::endl;
     }
@@ -132,6 +136,22 @@ namespace rtype::client {
                     break;
                 }
 
+                case network::MessageType::PLAYER_SPAWN: {
+                    network::PlayerSpawnMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handlePlayerSpawn(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::PLAYER_HIT: {
+                    network::PlayerHitMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handlePlayerHit(msg);
+                    }
+                    break;
+                }
+
                 default:
                     std::cerr << "[NetworkClient] Unknown message type: "
                              << static_cast<int>(pending.type) << std::endl;
@@ -202,6 +222,14 @@ namespace rtype::client {
         m_clientId = message.clientId;
         std::cout << "[NetworkClient] Connected! Assigned clientId=" << m_clientId
                  << " (protocol v" << message.protocolVersion << ")" << std::endl;
+
+        // Clear any stale entity mappings from previous sessions
+        // This prevents networkId conflicts when reconnecting to a fresh server
+        if (!m_networkIdToEntity.empty()) {
+            std::cout << "[NetworkClient] Clearing " << m_networkIdToEntity.size()
+                     << " stale entity mappings from previous session" << std::endl;
+            m_networkIdToEntity.clear();
+        }
     }
 
     void NetworkClient::handleEntitySpawn(const network::EntitySpawnMessage& message) {
@@ -343,6 +371,98 @@ namespace rtype::client {
         } catch (const std::exception& e) {
             std::cerr << "[NetworkClient] Exception during send: " << e.what() << std::endl;
         }
+    }
+
+    void NetworkClient::sendInput(const network::ClientInputMessage& input) {
+        if (!m_connected) {
+            return;
+        }
+
+        auto buffer = network::serializeMessage(network::MessageType::CLIENT_INPUT, input);
+        sendToServer(buffer);
+    }
+
+    void NetworkClient::handlePlayerSpawn(const network::PlayerSpawnMessage& message) {
+        std::cout << "[NetworkClient] Received PLAYER_SPAWN (networkId=" << message.networkId
+                  << ", clientId=" << message.clientId << ", slot=" << (int)message.playerSlot << ")" << std::endl;
+
+        // Check if entity already exists
+        auto it = m_networkIdToEntity.find(message.networkId);
+        if (it != m_networkIdToEntity.end()) {
+            std::cerr << "[NetworkClient] Player already exists for networkId " << message.networkId << std::endl;
+            return;
+        }
+
+        // Determine if this is OUR player
+        bool isLocal = (message.clientId == m_clientId);
+
+        // Create entity
+        ecs::Entity entity = m_registry.createEntity();
+
+        // Add components
+        ecs::PlayerComponent playerComp(message.playerSlot, 3);
+        playerComp.isLocal = isLocal;
+        m_registry.addComponent(entity, playerComp);
+
+        m_registry.addComponent(entity, ecs::TransformComponent(message.x, message.y, 0.0f));
+        m_registry.addComponent(entity, ecs::VelocityComponent(0.0f, 0.0f, 200.0f));
+        m_registry.addComponent(entity, ecs::HealthComponent(static_cast<int>(message.health), 100));
+        m_registry.addComponent(entity, ecs::NetworkComponent(message.networkId, isLocal));
+
+        // Add visual component (PlayerShipComponent for rendering)
+        ecs::PlayerShipComponent shipComp(ecs::PlayerShipComponent::ShipStyle::Classic);
+        shipComp.layer = 10;
+        m_registry.addComponent(entity, shipComp);
+
+        // Map networkId → entity
+        m_networkIdToEntity[message.networkId] = entity;
+
+        std::cout << "[NetworkClient] Created player entity " << entity
+                  << " (networkId=" << message.networkId << ", isLocal=" << isLocal << ")" << std::endl;
+    }
+
+    void NetworkClient::handlePlayerHit(const network::PlayerHitMessage& message) {
+        std::cout << "[NetworkClient] Received PLAYER_HIT (networkId=" << message.networkId
+                  << ", newHealth=" << message.newHealth << ")" << std::endl;
+
+        // Find entity
+        auto it = m_networkIdToEntity.find(message.networkId);
+        if (it == m_networkIdToEntity.end()) {
+            std::cerr << "[NetworkClient] Player not found for networkId " << message.networkId << std::endl;
+            return;
+        }
+
+        ecs::Entity entity = it->second;
+
+        // Update health
+        auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(entity);
+        if (health) {
+            health->currentHealth = static_cast<int>(message.newHealth);
+        }
+
+        // Spawn hit effect at impact position
+        ecs::Entity hitEffect = m_registry.createEntity();
+
+        // Position at hit location
+        m_registry.addComponent(hitEffect, ecs::TransformComponent(message.hitX, message.hitY, 0.0f));
+
+        // Visual effect - red circle with strong glow that fades out
+        ecs::SpritesheetComponent sprite;
+        sprite.setBullet(ecs::BulletType::Ball, ecs::BulletColor::Red);
+        sprite.hasGlow = true;
+        sprite.glowIntensity = 1.0f;  // Maximum glow for visibility
+        sprite.frameWidth = 32;  // Larger size
+        sprite.frameHeight = 32;
+        m_registry.addComponent(hitEffect, sprite);
+
+        // Auto-destroy after 0.3 seconds
+        m_registry.addComponent(hitEffect, ecs::LifetimeComponent(0.3f));
+
+        // Float upward slightly
+        m_registry.addComponent(hitEffect, ecs::VelocityComponent(0.0f, -50.0f, 0.0f));
+
+        std::cout << "[NetworkClient] Player health updated to " << message.newHealth
+                  << " - spawned hit effect" << std::endl;
     }
 
 } // namespace rtype::client

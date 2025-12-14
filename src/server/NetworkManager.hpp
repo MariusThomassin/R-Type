@@ -13,6 +13,7 @@
 #include <vector>
 #include <iostream>
 #include <chrono>
+#include <functional>
 
 namespace rtype::server {
 
@@ -103,6 +104,35 @@ namespace rtype::server {
          */
         size_t getClientCount() const;
 
+        /**
+         * @brief Set callback for client connection events
+         * @param callback Function called when a client connects (clientId)
+         */
+        void setOnClientConnected(std::function<void(uint32_t)> callback) {
+            m_onClientConnected = callback;
+        }
+
+        /**
+         * @brief Set callback for client disconnection events
+         * @param callback Function called when a client disconnects (clientId)
+         */
+        void setOnClientDisconnected(std::function<void(uint32_t)> callback) {
+            m_onClientDisconnected = callback;
+        }
+
+        /**
+         * @brief Set callback for client input events
+         * @param callback Function called when client input is received
+         */
+        void setOnClientInput(std::function<void(uint32_t, const network::ClientInputMessage&)> callback) {
+            m_onClientInput = callback;
+        }
+
+        /**
+         * @brief Broadcast to all clients (public for PlayerManager)
+         */
+        void broadcast(const std::vector<uint8_t>& buffer);
+
     private:
         /**
          * @brief Reception loop (runs in separate thread)
@@ -130,11 +160,10 @@ namespace rtype::server {
         void handleClientDisconnect(const network::ClientDisconnectMessage& message);
 
         /**
-         * @brief Broadcast message to all connected clients
-         *
-         * @param buffer Serialized message
+         * @brief Handle CLIENT_INPUT message
          */
-        void broadcast(const std::vector<uint8_t>& buffer);
+        void handleClientInput(const network::ClientInputMessage& message,
+                              const asio::ip::udp::endpoint& senderEndpoint);
 
         /**
          * @brief Send message to specific endpoint
@@ -182,6 +211,11 @@ namespace rtype::server {
 
         // Server port
         uint16_t m_port;
+
+        // Callbacks
+        std::function<void(uint32_t)> m_onClientConnected;
+        std::function<void(uint32_t)> m_onClientDisconnected;
+        std::function<void(uint32_t, const network::ClientInputMessage&)> m_onClientInput;
     };
 
 } // namespace rtype::server

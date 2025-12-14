@@ -17,7 +17,7 @@ namespace rtype::network {
     enum class MessageType : uint8_t {
         // Client → Server
         CLIENT_HELLO = 0,        // Initial connection
-        CLIENT_INPUT = 1,        // Player input (for later)
+        CLIENT_INPUT = 1,        // Player input
         CLIENT_DISCONNECT = 2,   // Clean disconnect
 
         // Server → Client
@@ -25,7 +25,9 @@ namespace rtype::network {
         ENTITY_SPAWN = 11,       // Spawn new entity
         ENTITY_STATE = 12,       // Update position/velocity
         ENTITY_DESTROY = 13,     // Destroy entity
-        SERVER_SNAPSHOT = 14     // Full world state snapshot
+        SERVER_SNAPSHOT = 14,    // Full world state snapshot
+        PLAYER_SPAWN = 15,       // Spawn player entity
+        PLAYER_HIT = 16          // Player took damage
     };
 
     /**
@@ -64,6 +66,27 @@ namespace rtype::network {
      */
     struct ClientDisconnectMessage {
         uint32_t clientId;
+    };
+
+    /**
+     * @brief Input flags for player controls (bitfield)
+     */
+    enum InputFlags : uint8_t {
+        INPUT_NONE  = 0,        // 0x00
+        INPUT_UP    = 1 << 0,   // 0x01
+        INPUT_DOWN  = 1 << 1,   // 0x02
+        INPUT_LEFT  = 1 << 2,   // 0x04
+        INPUT_RIGHT = 1 << 3,   // 0x08
+        INPUT_SHOOT = 1 << 4    // 0x10
+    };
+
+    /**
+     * @brief CLIENT_INPUT: Player input state
+     */
+    struct ClientInputMessage {
+        uint32_t sequenceNumber;    // For prediction/reconciliation (future)
+        uint8_t inputFlags;          // Bitfield: UP|DOWN|LEFT|RIGHT|SHOOT
+        float deltaTime;             // For lag compensation
     };
 
     // ============================================================
@@ -135,6 +158,26 @@ namespace rtype::network {
         uint32_t entityCount;
         float serverTime;
         // Followed by entityCount × EntitySpawnMessage
+    };
+
+    /**
+     * @brief PLAYER_SPAWN: Spawn player entity
+     */
+    struct PlayerSpawnMessage {
+        uint32_t networkId;
+        uint32_t clientId;      // Which client owns this player
+        uint8_t playerSlot;     // 0-3 (up to 4 players)
+        float x, y;
+        float health;
+    };
+
+    /**
+     * @brief PLAYER_HIT: Player took damage
+     */
+    struct PlayerHitMessage {
+        uint32_t networkId;
+        float newHealth;
+        float hitX, hitY;       // Impact position (for visual effect)
     };
 
     // ============================================================
@@ -216,6 +259,8 @@ namespace rtype::network {
             case MessageType::ENTITY_STATE: return "ENTITY_STATE";
             case MessageType::ENTITY_DESTROY: return "ENTITY_DESTROY";
             case MessageType::SERVER_SNAPSHOT: return "SERVER_SNAPSHOT";
+            case MessageType::PLAYER_SPAWN: return "PLAYER_SPAWN";
+            case MessageType::PLAYER_HIT: return "PLAYER_HIT";
             default: return "UNKNOWN";
         }
     }
