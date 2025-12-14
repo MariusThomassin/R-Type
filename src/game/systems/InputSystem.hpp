@@ -146,8 +146,9 @@ namespace rtype::ecs {
                     );
                 }
 
-                // Handle shooting (Space key) - works in both network and local mode
-                if (m_keyState.space) {
+                // Handle shooting (Space key) - only in local mode
+                // In network mode, shooting is handled by server via INPUT_SHOOT flag
+                if (m_keyState.space && !m_networkClient) {
                     m_registry->forEach<PlayerComponent>(
                         [this](EntityId entity) {
                             const auto& player = m_registry->getComponent<PlayerComponent>(entity);
