@@ -92,6 +92,10 @@ namespace rtype::network {
 
     /**
      * @brief PLAYER_READY: Player has clicked Play and is ready to start
+     * 
+     * This message is sent when the player clicks the Play button in the main menu.
+     * The game starts only when at least 2 clients have sent this message.
+     * This ensures that the game begins with enough players for multiplayer gameplay.
      */
     struct PlayerReadyMessage {
         uint32_t clientId;          // Client ID that is ready
