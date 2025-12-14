@@ -14,6 +14,7 @@
 #include <chrono>
 #include <iostream>
 #include <set>
+#include <mutex>
 
 // Forward declarations to avoid Raylib dependencies in header
 namespace rtype::ecs {
@@ -164,6 +165,9 @@ namespace rtype::server {
 
         // Track which clients are ready (clicked Play)
         std::set<uint32_t> m_readyClients;
+
+        // Thread synchronization for m_readyClients and m_gameStarted
+        mutable std::mutex m_gameStateMutex;
 
         // Event subscriptions
         ecs::EventBus::SubscriberId m_collisionSubId;

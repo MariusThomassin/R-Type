@@ -96,15 +96,19 @@ namespace rtype::server {
 
         m_networkManager->setOnPlayerReady([this](uint32_t clientId) {
             std::cout << "[GameServer] Client " << clientId << " is ready!" << std::endl;
-            m_readyClients.insert(clientId);
+            
+            {
+                std::lock_guard<std::mutex> lock(m_gameStateMutex);
+                m_readyClients.insert(clientId);
 
-            // Check if game should start (2+ players, all ready)
-            size_t playerCount = m_playerManager->getPlayerCount();
-            size_t readyCount = m_readyClients.size();
+                // Check if game should start (2+ players, all ready)
+                size_t playerCount = m_playerManager->getPlayerCount();
+                size_t readyCount = m_readyClients.size();
 
-            if (!m_gameStarted && playerCount >= 2 && readyCount >= playerCount) {
-                m_gameStarted = true;
-                std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
+                if (!m_gameStarted && playerCount >= 2 && readyCount >= playerCount) {
+                    m_gameStarted = true;
+                    std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
+                }
             }
         });
 
@@ -202,7 +206,13 @@ namespace rtype::server {
         m_playerManager->update(dt);
 
         // Spawn demo projectiles periodically (only if game has started)
-        if (m_gameStarted && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
+        bool gameStarted;
+        {
+            std::lock_guard<std::mutex> lock(m_gameStateMutex);
+            gameStarted = m_gameStarted;
+        }
+        
+        if (gameStarted && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
             spawnDemoProjectiles();
             m_demoSpawnTimer = 0.0f;
         }
