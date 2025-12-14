@@ -1,5 +1,6 @@
 <div align="center">
 
+```
 ██████╗       ████████╗██╗   ██╗██████╗ ███████╗
 ██╔══██╗      ╚══██╔══╝╚██╗ ██╔╝██╔══██╗██╔════╝
 ██████╔╝█████╗   ██║    ╚████╔╝ ██████╔╝█████╗  
@@ -22,7 +23,6 @@
 [![C++17](https://img.shields.io/badge/C++-17-00599C?style=for-the-badge&logo=c%2B%2B)](.)
 [![Cross-Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-blue?style=for-the-badge)](.)
 [![ECS](https://img.shields.io/badge/Architecture-ECS-ff69b4?style=for-the-badge)](doc/ECS_Architecture.puml)
-[![Doxygen Documentation](https://img.shields.io/badge/docs-Doxygen-blue?style=for-the-badge&logo=read-the-docs)](https://mariusthomassin.github.io/R-Type/)
 
 </div>
 
@@ -179,17 +179,6 @@ cmake --build build -j$(sysctl -n hw.ncpu)
 </a>
 
 `830 lines`
-
-</td>
-<td align="center" width="25%">
-
-### 📘 API DOCS
-
-<a href="https://mariusthomassin.github.io/R-Type/">
-  <b>🔍 Doxygen</b>
-</a>
-
-`Complete API Reference`
 
 </td>
 <td align="center" width="25%">
