@@ -44,21 +44,41 @@ namespace rtype::ui {
     void SettingsWidget::setMusicVolume(float volume) {
         _config.musicVolume = std::clamp(volume, 0.0f, 100.0f);
         
-        if (_volumeSlider) {
-            _volumeSlider->setRangeValue(_config.musicVolume);
+        if (_musicVolumeSlider) {
+            _musicVolumeSlider->setRangeValue(_config.musicVolume);
         }
         
-        if (_volumeDisplay) {
-            _volumeDisplay->setText(std::to_string(static_cast<int>(_config.musicVolume)) + "%");
+        if (_musicVolumeDisplay) {
+            _musicVolumeDisplay->setText(std::to_string(static_cast<int>(_config.musicVolume)) + "%");
         }
         
-        if (_callbacks.onVolumeChange) {
-            _callbacks.onVolumeChange(_config.musicVolume);
+        if (_callbacks.onMusicVolumeChange) {
+            _callbacks.onMusicVolumeChange(_config.musicVolume);
         }
     }
 
     float SettingsWidget::getMusicVolume() const {
         return _config.musicVolume;
+    }
+
+    void SettingsWidget::setEffectsVolume(float volume) {
+        _config.effectsVolume = std::clamp(volume, 0.0f, 100.0f);
+        
+        if (_effectsVolumeSlider) {
+            _effectsVolumeSlider->setRangeValue(_config.effectsVolume);
+        }
+        
+        if (_effectsVolumeDisplay) {
+            _effectsVolumeDisplay->setText(std::to_string(static_cast<int>(_config.effectsVolume)) + "%");
+        }
+        
+        if (_callbacks.onEffectsVolumeChange) {
+            _callbacks.onEffectsVolumeChange(_config.effectsVolume);
+        }
+    }
+
+    float SettingsWidget::getEffectsVolume() const {
+        return _config.effectsVolume;
     }
 
     SettingsConfig SettingsWidget::getConfig() const {
@@ -141,51 +161,93 @@ namespace rtype::ui {
         
         addChild(_musicOffButton);
         
-        // -- Volume Slider Section --
-        _volumeLabel = std::make_shared<TextWidget>("Volume:", 24);
-        _volumeLabel->setPosition(80.0f, 200.0f);
-        _volumeLabel->setTextColor(UIColor(200, 200, 200, 255));
-        _volumeLabel->setBackgroundColor(UIColor::Transparent());
-        addChild(_volumeLabel);
+        // -- Music Volume Slider Section --
+        _musicVolumeLabel = std::make_shared<TextWidget>("Music Volume:", 22);
+        _musicVolumeLabel->setPosition(80.0f, 180.0f);
+        _musicVolumeLabel->setTextColor(UIColor(200, 200, 200, 255));
+        _musicVolumeLabel->setBackgroundColor(UIColor::Transparent());
+        addChild(_musicVolumeLabel);
         
-        _volumeSlider = std::make_shared<SliderWidget>(_config.musicVolume / 100.0f);
-        _volumeSlider->setPosition(200.0f, 210.0f);
-        _volumeSlider->setSize(280.0f, 30.0f);
-        _volumeSlider->setRange(0.0f, 100.0f);
-        _volumeSlider->setRangeValue(_config.musicVolume);
-        _volumeSlider->setFillColor({0, 150, 255, 255}); // Blue fill
-        _volumeSlider->setBackgroundColor(UIColor(60, 60, 60, 255)); // Dark background
-        _volumeSlider->setBorderColor(UIColor(100, 100, 100, 255));
-        _volumeSlider->setBorderWidth(1.0f);
-        _volumeSlider->setLabelFormat("%.0f%%");
-        _volumeSlider->setShowLabel(true);
+        _musicVolumeSlider = std::make_shared<SliderWidget>(_config.musicVolume / 100.0f);
+        _musicVolumeSlider->setPosition(200.0f, 210.0f);
+        _musicVolumeSlider->setSize(260.0f, 30.0f);
+        _musicVolumeSlider->setRange(0.0f, 100.0f);
+        _musicVolumeSlider->setRangeValue(_config.musicVolume);
+        _musicVolumeSlider->setFillColor({0, 150, 255, 255}); // Blue fill for music
+        _musicVolumeSlider->setBackgroundColor(UIColor(60, 60, 60, 255));
+        _musicVolumeSlider->setBorderColor(UIColor(100, 100, 100, 255));
+        _musicVolumeSlider->setBorderWidth(1.0f);
+        _musicVolumeSlider->setLabelFormat("%.0f%%");
+        _musicVolumeSlider->setShowLabel(true);
         
-        _volumeSlider->setOnValueChange([this](float newVolume) {
+        _musicVolumeSlider->setOnValueChange([this](float newVolume) {
             _config.musicVolume = newVolume;
             
-            // Update display
-            if (_volumeDisplay) {
-                _volumeDisplay->setText(std::to_string(static_cast<int>(newVolume)) + "%");
+            if (_musicVolumeDisplay) {
+                _musicVolumeDisplay->setText(std::to_string(static_cast<int>(newVolume)) + "%");
             }
             
-            std::cout << "Volume changed to: " << static_cast<int>(newVolume) << "%" << std::endl;
+            std::cout << "Music volume changed to: " << static_cast<int>(newVolume) << "%" << std::endl;
             
-            // Call callback
-            if (_callbacks.onVolumeChange) {
-                _callbacks.onVolumeChange(newVolume);
+            if (_callbacks.onMusicVolumeChange) {
+                _callbacks.onMusicVolumeChange(newVolume);
             }
         });
         
-        addChild(_volumeSlider);
+        addChild(_musicVolumeSlider);
         
-        // Volume percentage display
-        _volumeDisplay = std::make_shared<TextWidget>(
+        // Music volume percentage display
+        _musicVolumeDisplay = std::make_shared<TextWidget>(
             std::to_string(static_cast<int>(_config.musicVolume)) + "%", 18);
-        _volumeDisplay->setPosition(490.0f, 205.0f);
-        _volumeDisplay->setSize(60.0f, 30.0f);
-        _volumeDisplay->setTextColor(UIColor(150, 200, 255, 255));
-        _volumeDisplay->setBackgroundColor(UIColor::Transparent());
-        addChild(_volumeDisplay);
+        _musicVolumeDisplay->setPosition(470.0f, 205.0f);
+        _musicVolumeDisplay->setSize(60.0f, 30.0f);
+        _musicVolumeDisplay->setTextColor(UIColor(150, 200, 255, 255));
+        _musicVolumeDisplay->setBackgroundColor(UIColor::Transparent());
+        addChild(_musicVolumeDisplay);
+
+        // -- Effects Volume Slider Section --
+        _effectsVolumeLabel = std::make_shared<TextWidget>("Effects Volume:", 22);
+        _effectsVolumeLabel->setPosition(80.0f, 260.0f);
+        _effectsVolumeLabel->setTextColor(UIColor(200, 200, 200, 255));
+        _effectsVolumeLabel->setBackgroundColor(UIColor::Transparent());
+        addChild(_effectsVolumeLabel);
+        
+        _effectsVolumeSlider = std::make_shared<SliderWidget>(_config.effectsVolume / 100.0f);
+        _effectsVolumeSlider->setPosition(200.0f, 290.0f);
+        _effectsVolumeSlider->setSize(260.0f, 30.0f);
+        _effectsVolumeSlider->setRange(0.0f, 100.0f);
+        _effectsVolumeSlider->setRangeValue(_config.effectsVolume);
+        _effectsVolumeSlider->setFillColor({255, 150, 0, 255}); // Orange fill for effects
+        _effectsVolumeSlider->setBackgroundColor(UIColor(60, 60, 60, 255));
+        _effectsVolumeSlider->setBorderColor(UIColor(100, 100, 100, 255));
+        _effectsVolumeSlider->setBorderWidth(1.0f);
+        _effectsVolumeSlider->setLabelFormat("%.0f%%");
+        _effectsVolumeSlider->setShowLabel(true);
+        
+        _effectsVolumeSlider->setOnValueChange([this](float newVolume) {
+            _config.effectsVolume = newVolume;
+            
+            if (_effectsVolumeDisplay) {
+                _effectsVolumeDisplay->setText(std::to_string(static_cast<int>(newVolume)) + "%");
+            }
+            
+            std::cout << "Effects volume changed to: " << static_cast<int>(newVolume) << "%" << std::endl;
+            
+            if (_callbacks.onEffectsVolumeChange) {
+                _callbacks.onEffectsVolumeChange(newVolume);
+            }
+        });
+        
+        addChild(_effectsVolumeSlider);
+        
+        // Effects volume percentage display
+        _effectsVolumeDisplay = std::make_shared<TextWidget>(
+            std::to_string(static_cast<int>(_config.effectsVolume)) + "%", 18);
+        _effectsVolumeDisplay->setPosition(470.0f, 285.0f);
+        _effectsVolumeDisplay->setSize(60.0f, 30.0f);
+        _effectsVolumeDisplay->setTextColor(UIColor(255, 200, 150, 255));
+        _effectsVolumeDisplay->setBackgroundColor(UIColor::Transparent());
+        addChild(_effectsVolumeDisplay);
     }
 
     void SettingsWidget::createPanelButtons() {

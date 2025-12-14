@@ -98,7 +98,13 @@ namespace rtype::ui {
 
         // Handle dragging anywhere on the slider
         if (_isDragging && _draggable) {
-            updateValueFromMouse(x, y);
+            // Convert global coordinates to local coordinates, same as in onMouseClick
+            Vector2 mousePos = GetMousePosition();
+            UITransform absTransform = getAbsoluteTransform();
+            float localX = mousePos.x - absTransform.x;
+            float localY = mousePos.y - absTransform.y;
+            
+            updateValueFromMouse(localX, localY);
             return true; // Consume the event while dragging
         }
 

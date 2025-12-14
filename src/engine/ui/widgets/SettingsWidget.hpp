@@ -23,6 +23,7 @@ namespace rtype::ui {
     struct SettingsConfig {
         bool musicEnabled = true;
         float musicVolume = 75.0f;
+        float effectsVolume = 75.0f;  // Separate volume for sound effects
         // Add more settings here as needed
     };
 
@@ -31,7 +32,8 @@ namespace rtype::ui {
      */
     struct SettingsCallbacks {
         std::function<void(bool)> onMusicToggle = nullptr;
-        std::function<void(float)> onVolumeChange = nullptr;
+        std::function<void(float)> onMusicVolumeChange = nullptr;    // Music volume callback
+        std::function<void(float)> onEffectsVolumeChange = nullptr;  // Effects volume callback
         std::function<void()> onClose = nullptr;
     };
 
@@ -81,6 +83,18 @@ namespace rtype::ui {
          * @return Volume percentage (0-100)
          */
         float getMusicVolume() const;
+
+        /**
+         * @brief Set the effects volume
+         * @param volume Volume percentage (0-100)
+         */
+        void setEffectsVolume(float volume);
+
+        /**
+         * @brief Get the current effects volume
+         * @return Volume percentage (0-100)
+         */
+        float getEffectsVolume() const;
 
         /**
          * @brief Get the current settings configuration
@@ -137,9 +151,12 @@ namespace rtype::ui {
         std::shared_ptr<TextWidget> _musicLabel;
         std::shared_ptr<ButtonWidget> _musicOnButton;
         std::shared_ptr<ButtonWidget> _musicOffButton;
-        std::shared_ptr<TextWidget> _volumeLabel;
-        std::shared_ptr<SliderWidget> _volumeSlider;
-        std::shared_ptr<TextWidget> _volumeDisplay;
+        std::shared_ptr<TextWidget> _musicVolumeLabel;      // Music volume label
+        std::shared_ptr<SliderWidget> _musicVolumeSlider;   // Music volume slider
+        std::shared_ptr<TextWidget> _musicVolumeDisplay;    // Music volume display
+        std::shared_ptr<TextWidget> _effectsVolumeLabel;    // Effects volume label
+        std::shared_ptr<SliderWidget> _effectsVolumeSlider; // Effects volume slider
+        std::shared_ptr<TextWidget> _effectsVolumeDisplay;  // Effects volume display
         std::shared_ptr<ButtonWidget> _backButton;
     };
 

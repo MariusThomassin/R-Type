@@ -8,6 +8,7 @@
 #include <raylib.h>
 
 #include <iostream>
+#include <string>
 #include "../engine/ecs/ECS.hpp"
 #include "../engine/ecs/core/EventBus.hpp"
 #include "../engine/ecs/events/Events.hpp"
@@ -31,6 +32,88 @@ using rtype::ui::UIColor;
 constexpr int SCREEN_WIDTH = 1280;
 constexpr int SCREEN_HEIGHT = 720;
 constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;  // 60 Hz game logic
+
+// Music system variables
+static Music backgroundMusic = {};
+static bool musicLoaded = false;
+static bool musicEnabled = true;
+static float musicVolume = 0.75f;
+static std::string currentMusicPath = "assets/sound/music/Sketchbook 2024-10-13.ogg";
+
+/**
+ * @brief Initialize and load background music
+ */
+void initializeMusic() {
+    if (!IsAudioDeviceReady()) {
+        std::cout << "Audio device not ready, cannot load music" << std::endl;
+        return;
+    }
+    
+    backgroundMusic = LoadMusicStream(currentMusicPath.c_str());
+    if (backgroundMusic.frameCount > 0) {
+        musicLoaded = true;
+        SetMusicVolume(backgroundMusic, musicVolume);
+        std::cout << "Background music loaded: " << currentMusicPath << std::endl;
+        
+        if (musicEnabled) {
+            PlayMusicStream(backgroundMusic);
+            std::cout << "Background music started" << std::endl;
+        }
+    } else {
+        std::cout << "Failed to load background music: " << currentMusicPath << std::endl;
+    }
+}
+
+/**
+ * @brief Update music playback (call every frame)
+ */
+void updateMusic() {
+    if (musicLoaded && musicEnabled) {
+        UpdateMusicStream(backgroundMusic);
+        
+        // Loop the music when it finishes
+        if (!IsMusicStreamPlaying(backgroundMusic)) {
+            PlayMusicStream(backgroundMusic);
+        }
+    }
+}
+
+/**
+ * @brief Set music enabled/disabled state
+ */
+void setMusicEnabled(bool enabled) {
+    musicEnabled = enabled;
+    if (musicLoaded) {
+        if (enabled) {
+            PlayMusicStream(backgroundMusic);
+            std::cout << "Background music resumed" << std::endl;
+        } else {
+            PauseMusicStream(backgroundMusic);
+            std::cout << "Background music paused" << std::endl;
+        }
+    }
+}
+
+/**
+ * @brief Set music volume (0.0 to 1.0)
+ */
+void setMusicVolume(float volume) {
+    musicVolume = volume;
+    if (musicLoaded) {
+        SetMusicVolume(backgroundMusic, musicVolume);
+    }
+}
+
+/**
+ * @brief Clean up music resources
+ */
+void cleanupMusic() {
+    if (musicLoaded) {
+        UnloadMusicStream(backgroundMusic);
+        musicLoaded = false;
+        std::cout << "Background music unloaded" << std::endl;
+    }
+}
 
 /**
  * @brief Create the player entity with all necessary components
@@ -130,18 +213,25 @@ int main() {
     rtype::ui::SettingsConfig initialConfig;
     initialConfig.musicEnabled = true;
     initialConfig.musicVolume = 75.0f;
+    initialConfig.effectsVolume = 75.0f;  // Initial effects volume
 
     // ==================== Button Click Sound Setup ====================
     // Set a default click sound for all buttons
-    rtype::ui::ButtonWidget::setDefaultClickSound("assets/sound/mixkit-sci-fi-click-900.wav");
-    // Set initial volume to match settings (convert percentage to 0.0-1.0 range)
-    rtype::ui::ButtonWidget::setSoundVolume(initialConfig.musicVolume / 100.0f);
+    rtype::ui::ButtonWidget::setDefaultClickSound("assets/sound/mixkit-modern-technology-select-3124.wav");
+    // Set initial volume to match effects volume settings (convert percentage to 0.0-1.0 range)
+    rtype::ui::ButtonWidget::setSoundVolume(initialConfig.effectsVolume / 100.0f);
     
     std::cout << "Button click sound system initialized!" << std::endl;
     std::cout << "- Default click sound: mixkit-modern-technology-select-3124.wav" << std::endl;
     std::cout << "- All buttons will now play sound on click" << std::endl;
     std::cout << "- Use button->setClickSound(\"path\") to customize individual button sounds" << std::endl;
     std::cout << "- Use button->setClickSoundEnabled(false) to disable sound for specific buttons" << std::endl;
+
+    // ==================== Background Music Setup ====================
+    // Initialize music system with initial settings
+    ::musicEnabled = initialConfig.musicEnabled;
+    ::musicVolume = initialConfig.musicVolume / 100.0f;
+    initializeMusic();
     
     auto settingsWidget = std::make_shared<rtype::ui::SettingsWidget>(initialConfig);
     settingsWidget->setPosition(SCREEN_WIDTH / 2.0f - 300, SCREEN_HEIGHT / 2.0f - 250);
@@ -150,11 +240,15 @@ int main() {
     rtype::ui::SettingsCallbacks callbacks;
     callbacks.onMusicToggle = [](bool enabled) {
         std::cout << "Music " << (enabled ? "enabled" : "disabled") << "!" << std::endl;
-        // TODO: Add actual music control functionality here
+        setMusicEnabled(enabled);
     };
-    callbacks.onVolumeChange = [](float volume) {
-        std::cout << "Volume changed to: " << static_cast<int>(volume) << "%" << std::endl;
-        // Update button click sound volume to match settings
+    callbacks.onMusicVolumeChange = [](float volume) {
+        std::cout << "Music volume changed to: " << static_cast<int>(volume) << "%" << std::endl;
+        setMusicVolume(volume / 100.0f);  // Convert percentage to 0.0-1.0 range
+    };
+    callbacks.onEffectsVolumeChange = [](float volume) {
+        std::cout << "Effects volume changed to: " << static_cast<int>(volume) << "%" << std::endl;
+        // Update button click sound volume to match effects volume settings
         rtype::ui::ButtonWidget::setSoundVolume(volume / 100.0f);  // Convert percentage to 0.0-1.0 range
     };
     // Create settings widget first without close callback
@@ -304,6 +398,9 @@ int main() {
         accumulator += frameTime;
 
         inputManager.pollInput();
+        
+        // Update background music
+        updateMusic();
 
         // Update UI only in menu state
         if (gameState == GameState::MENU) {
@@ -351,6 +448,7 @@ int main() {
     }
 
     // ==================== Cleanup ====================
+    cleanupMusic();      // Clean up music resources
     CloseAudioDevice();  // Clean up audio device
     CloseWindow();
 
