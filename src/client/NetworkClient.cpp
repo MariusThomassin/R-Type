@@ -16,6 +16,7 @@
 #include "game/components/bullets/SpinComponent.hpp"
 #include "game/components/PlayerShipComponent.hpp"
 #include "game/components/WeaponComponent.hpp"
+#include "game/components/WeaponConstants.hpp"
 
 namespace rtype::client {
 
@@ -426,8 +427,8 @@ namespace rtype::client {
         m_registry.addComponent(entity, ecs::NetworkComponent(message.networkId, isLocal));
 
         // Add weapon component (for shooting missiles with Space key)
-        ecs::WeaponComponent weapon(0.15f, 10);  // 0.15s cooldown, 10 damage
-        weapon.projectileSpeed = 800.0f;
+        ecs::WeaponComponent weapon(ecs::WeaponConstants::DEFAULT_FIRE_RATE, ecs::WeaponConstants::DEFAULT_DAMAGE);
+        weapon.projectileSpeed = ecs::WeaponConstants::DEFAULT_PROJECTILE_SPEED;
         m_registry.addComponent(entity, weapon);
 
         // Add visual component (PlayerShipComponent for rendering)
