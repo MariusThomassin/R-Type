@@ -100,9 +100,6 @@ namespace rtype::server {
             // Get player count outside mutex to avoid potential lock ordering issues
             size_t playerCount = m_playerManager->getPlayerCount();
             
-            // Check if game should start before acquiring mutex
-            bool alreadyStarted = m_gameStarted.load();
-            
             bool shouldStartGame = false;
             size_t readyCount = 0;
             {
@@ -111,14 +108,12 @@ namespace rtype::server {
                 readyCount = m_readyClients.size();
 
                 // Check if game should start (2+ players, all ready)
-                if (!alreadyStarted && playerCount >= 2 && readyCount >= playerCount) {
+                // Double-check m_gameStarted inside the lock to avoid race condition
+                if (!m_gameStarted.load() && playerCount >= 2 && readyCount >= playerCount) {
                     shouldStartGame = true;
+                    m_gameStarted.store(true);
+                    std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
                 }
-            }
-            
-            if (shouldStartGame) {
-                m_gameStarted.store(true);
-                std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
             }
         });
 
