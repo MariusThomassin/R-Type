@@ -8,6 +8,7 @@
 #include "SliderWidget.hpp"
 #include "raylib.h"
 #include <algorithm>
+#include <cmath>
 
 namespace rtype::ui {
 
@@ -149,8 +150,12 @@ namespace rtype::ui {
         
         // Call callback with the new range value
         if (_onValueChange) {
-            if (std::abs(newRangeValue - oldRangeValue) > 1.0f) { // Less sensitive - only update every 1%
-                _onValueChange(newRangeValue);
+            // Round the new range value to ensure consistent display
+            float roundedNewValue = std::round(newRangeValue);
+            float roundedOldValue = std::round(oldRangeValue);
+            
+            if (std::abs(roundedNewValue - roundedOldValue) >= 1.0f) { // Only update when percentage changes
+                _onValueChange(roundedNewValue);
             }
         }
     }

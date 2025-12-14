@@ -153,10 +153,8 @@ namespace rtype::ui {
         std::shared_ptr<ButtonWidget> _musicOffButton;
         std::shared_ptr<TextWidget> _musicVolumeLabel;      // Music volume label
         std::shared_ptr<SliderWidget> _musicVolumeSlider;   // Music volume slider
-        std::shared_ptr<TextWidget> _musicVolumeDisplay;    // Music volume display
         std::shared_ptr<TextWidget> _effectsVolumeLabel;    // Effects volume label
         std::shared_ptr<SliderWidget> _effectsVolumeSlider; // Effects volume slider
-        std::shared_ptr<TextWidget> _effectsVolumeDisplay;  // Effects volume display
         std::shared_ptr<ButtonWidget> _backButton;
     };
 

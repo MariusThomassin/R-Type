@@ -48,10 +48,6 @@ namespace rtype::ui {
             _musicVolumeSlider->setRangeValue(_config.musicVolume);
         }
         
-        if (_musicVolumeDisplay) {
-            _musicVolumeDisplay->setText(std::to_string(static_cast<int>(_config.musicVolume)) + "%");
-        }
-        
         if (_callbacks.onMusicVolumeChange) {
             _callbacks.onMusicVolumeChange(_config.musicVolume);
         }
@@ -66,10 +62,6 @@ namespace rtype::ui {
         
         if (_effectsVolumeSlider) {
             _effectsVolumeSlider->setRangeValue(_config.effectsVolume);
-        }
-        
-        if (_effectsVolumeDisplay) {
-            _effectsVolumeDisplay->setText(std::to_string(static_cast<int>(_config.effectsVolume)) + "%");
         }
         
         if (_callbacks.onEffectsVolumeChange) {
@@ -183,10 +175,6 @@ namespace rtype::ui {
         _musicVolumeSlider->setOnValueChange([this](float newVolume) {
             _config.musicVolume = newVolume;
             
-            if (_musicVolumeDisplay) {
-                _musicVolumeDisplay->setText(std::to_string(static_cast<int>(newVolume)) + "%");
-            }
-            
             std::cout << "Music volume changed to: " << static_cast<int>(newVolume) << "%" << std::endl;
             
             if (_callbacks.onMusicVolumeChange) {
@@ -195,15 +183,6 @@ namespace rtype::ui {
         });
         
         addChild(_musicVolumeSlider);
-        
-        // Music volume percentage display
-        _musicVolumeDisplay = std::make_shared<TextWidget>(
-            std::to_string(static_cast<int>(_config.musicVolume)) + "%", 18);
-        _musicVolumeDisplay->setPosition(470.0f, 205.0f);
-        _musicVolumeDisplay->setSize(60.0f, 30.0f);
-        _musicVolumeDisplay->setTextColor(UIColor(150, 200, 255, 255));
-        _musicVolumeDisplay->setBackgroundColor(UIColor::Transparent());
-        addChild(_musicVolumeDisplay);
 
         // -- Effects Volume Slider Section --
         _effectsVolumeLabel = std::make_shared<TextWidget>("Effects Volume:", 22);
@@ -227,10 +206,6 @@ namespace rtype::ui {
         _effectsVolumeSlider->setOnValueChange([this](float newVolume) {
             _config.effectsVolume = newVolume;
             
-            if (_effectsVolumeDisplay) {
-                _effectsVolumeDisplay->setText(std::to_string(static_cast<int>(newVolume)) + "%");
-            }
-            
             std::cout << "Effects volume changed to: " << static_cast<int>(newVolume) << "%" << std::endl;
             
             if (_callbacks.onEffectsVolumeChange) {
@@ -239,15 +214,6 @@ namespace rtype::ui {
         });
         
         addChild(_effectsVolumeSlider);
-        
-        // Effects volume percentage display
-        _effectsVolumeDisplay = std::make_shared<TextWidget>(
-            std::to_string(static_cast<int>(_config.effectsVolume)) + "%", 18);
-        _effectsVolumeDisplay->setPosition(470.0f, 285.0f);
-        _effectsVolumeDisplay->setSize(60.0f, 30.0f);
-        _effectsVolumeDisplay->setTextColor(UIColor(255, 200, 150, 255));
-        _effectsVolumeDisplay->setBackgroundColor(UIColor::Transparent());
-        addChild(_effectsVolumeDisplay);
     }
 
     void SettingsWidget::createPanelButtons() {
