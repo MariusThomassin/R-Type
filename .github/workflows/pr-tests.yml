@@ -30,7 +30,8 @@ jobs:
       - name: Setup build environment (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install glfw
+          brew install cmake glfw
+          brew upgrade cmake # Ensure CMake is updated to a compatible version
           echo "CMake version: $(cmake --version)"
       
       - name: Setup build environment (Windows)
