@@ -216,7 +216,7 @@ namespace rtype::server {
         m_playerManager->update(dt);
 
         // Spawn demo projectiles periodically (only if game has started)
-        if (m_gameStarted && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
+        if (m_gameStarted.load() && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
             spawnDemoProjectiles();
             m_demoSpawnTimer = 0.0f;
         }
