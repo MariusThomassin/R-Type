@@ -13,6 +13,9 @@
 #include <memory>
 #include <chrono>
 #include <iostream>
+#include <set>
+#include <mutex>
+#include <atomic>
 
 // Forward declarations to avoid Raylib dependencies in header
 namespace rtype::ecs {
@@ -159,6 +162,13 @@ namespace rtype::server {
         // Demo spawn state
         int m_demoSpawnCounter;
         float m_logTimer;
+        std::atomic<bool> m_gameStarted;  // True when 2+ clients ready and projectiles can spawn
+
+        // Track which clients are ready (clicked Play)
+        std::set<uint32_t> m_readyClients;
+
+        // Thread synchronization for m_readyClients
+        mutable std::mutex m_readyClientsMutex;
 
         // Event subscriptions
         ecs::EventBus::SubscriberId m_collisionSubId;

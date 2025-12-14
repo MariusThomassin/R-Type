@@ -9,6 +9,8 @@
 #include "engine/ecs/components/HealthComponent.hpp"
 #include "engine/ecs/components/ColliderComponent.hpp"
 #include "game/components/PlayerComponent.hpp"
+#include "game/components/WeaponComponent.hpp"
+#include "game/components/WeaponConstants.hpp"
 #include <iostream>
 #include <algorithm>
 
@@ -59,6 +61,11 @@ namespace rtype::server {
         m_registry.addComponent(player, playerComp);
 
         m_registry.addComponent(player, ecs::HealthComponent(100, 100)); // 100 HP
+
+        // Weapon component (for shooting missiles)
+        ecs::WeaponComponent weapon(ecs::WeaponConstants::DEFAULT_FIRE_RATE, ecs::WeaponConstants::DEFAULT_DAMAGE);
+        weapon.projectileSpeed = ecs::WeaponConstants::DEFAULT_PROJECTILE_SPEED;
+        m_registry.addComponent(player, weapon);
 
         // Collider (approximate player ship size)
         ecs::ColliderComponent collider;

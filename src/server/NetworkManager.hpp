@@ -129,6 +129,14 @@ namespace rtype::server {
         }
 
         /**
+         * @brief Set callback for player ready events
+         * @param callback Function called when client sends PLAYER_READY
+         */
+        void setOnPlayerReady(std::function<void(uint32_t)> callback) {
+            m_onPlayerReady = callback;
+        }
+
+        /**
          * @brief Broadcast to all clients (public for PlayerManager)
          */
         void broadcast(const std::vector<uint8_t>& buffer);
@@ -163,6 +171,12 @@ namespace rtype::server {
          * @brief Handle CLIENT_INPUT message
          */
         void handleClientInput(const network::ClientInputMessage& message,
+                              const asio::ip::udp::endpoint& senderEndpoint);
+
+        /**
+         * @brief Handle PLAYER_READY message
+         */
+        void handlePlayerReady(const network::PlayerReadyMessage& message,
                               const asio::ip::udp::endpoint& senderEndpoint);
 
         /**
@@ -216,6 +230,7 @@ namespace rtype::server {
         std::function<void(uint32_t)> m_onClientConnected;
         std::function<void(uint32_t)> m_onClientDisconnected;
         std::function<void(uint32_t, const network::ClientInputMessage&)> m_onClientInput;
+        std::function<void(uint32_t)> m_onPlayerReady;
     };
 
 } // namespace rtype::server

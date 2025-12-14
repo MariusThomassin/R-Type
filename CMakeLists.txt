@@ -11,14 +11,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #--------------------------------------------------------------
 # Dependencies (FetchContent)
 #--------------------------------------------------------------
-
 include(FetchContent)
 
 # Raylib (fetched from GitHub)
 FetchContent_Declare(
     raylib
     GIT_REPOSITORY https://github.com/raysan5/raylib.git
-    GIT_TAG master
+    GIT_TAG 5.0
     GIT_SHALLOW TRUE
 )
 
@@ -31,14 +30,27 @@ if(POLICY CMP0077)
     cmake_policy(SET CMP0077 NEW)
 endif()
 
-FetchContent_MakeAvailable(raylib)
+# Set FetchContent properties to avoid hanging
+set(FETCHCONTENT_QUIET OFF)
+set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE ALWAYS)
 
-# Asio (standalone, header-only networking library)
+# Try to find system raylib first, then fetch if not found
+find_package(raylib QUIET)
+if(NOT raylib_FOUND)
+    message(STATUS "System raylib not found, downloading...")
+    FetchContent_Declare(
+        raylib
+        URL https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz
+        TIMEOUT 60
+    )
+    FetchContent_MakeAvailable(raylib)
+endif()
+
+# For Asio, use header-only download
 FetchContent_Declare(
     asio
-    GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
-    GIT_TAG asio-1-29-0
-    GIT_SHALLOW TRUE
+    URL https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-28-0.tar.gz  
+    TIMEOUT 60
 )
 FetchContent_MakeAvailable(asio)
 

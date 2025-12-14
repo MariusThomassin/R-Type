@@ -18,6 +18,11 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.27.0'
+      
       - name: Setup build environment (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -30,9 +35,8 @@ jobs:
       - name: Setup build environment (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake glfw
-          brew upgrade cmake # Ensure CMake is updated to a compatible version
-          echo "CMake version: $(cmake --version)"
+          brew install glfw
+          cmake --version
       
       - name: Setup build environment (Windows)
         if: runner.os == 'Windows'
