@@ -146,6 +146,11 @@ namespace rtype::ui {
         return false;
     }
 
+    bool Widget::onMouseRelease()
+    {
+        return false;
+    }
+
     bool Widget::onKeyPress(rtype::ecs::events::KeyCode key)
     {
         (void)key;
