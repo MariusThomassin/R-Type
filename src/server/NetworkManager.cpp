@@ -174,6 +174,14 @@ namespace rtype::server {
                 break;
             }
 
+            case network::MessageType::PLAYER_READY: {
+                network::PlayerReadyMessage msg;
+                if (network::deserializeMessage(buffer, msg)) {
+                    handlePlayerReady(msg, senderEndpoint);
+                }
+                break;
+            }
+
             default:
                 std::cerr << "[NetworkManager] Unknown message type: "
                          << static_cast<int>(header.type) << std::endl;
@@ -260,6 +268,23 @@ namespace rtype::server {
         // Notify via callback
         if (m_onClientInput) {
             m_onClientInput(client->clientId, message);
+        }
+    }
+
+    void NetworkManager::handlePlayerReady(const network::PlayerReadyMessage& message,
+                                          const asio::ip::udp::endpoint& senderEndpoint) {
+        // Find client by endpoint
+        ClientInfo* client = findClient(senderEndpoint);
+        if (!client) {
+            std::cerr << "[NetworkManager] Received PLAYER_READY from unknown client: " << senderEndpoint << std::endl;
+            return;
+        }
+
+        std::cout << "[NetworkManager] Client " << client->clientId << " is ready!" << std::endl;
+
+        // Notify via callback
+        if (m_onPlayerReady) {
+            m_onPlayerReady(client->clientId);
         }
     }
 

@@ -15,6 +15,8 @@
 #include "game/components/bullets/TrajectoryComponent.hpp"
 #include "game/components/bullets/SpinComponent.hpp"
 #include "game/components/PlayerShipComponent.hpp"
+#include "game/components/WeaponComponent.hpp"
+#include "game/components/WeaponConstants.hpp"
 
 namespace rtype::client {
 
@@ -382,6 +384,21 @@ namespace rtype::client {
         sendToServer(buffer);
     }
 
+    void NetworkClient::sendPlayerReady() {
+        if (!m_connected) {
+            std::cerr << "[NetworkClient] Cannot send PLAYER_READY - not connected!" << std::endl;
+            return;
+        }
+
+        network::PlayerReadyMessage msg;
+        msg.clientId = m_clientId;
+
+        auto buffer = network::serializeMessage(network::MessageType::PLAYER_READY, msg);
+        sendToServer(buffer);
+
+        std::cout << "[NetworkClient] Sent PLAYER_READY to server (clientId=" << m_clientId << ")" << std::endl;
+    }
+
     void NetworkClient::handlePlayerSpawn(const network::PlayerSpawnMessage& message) {
         std::cout << "[NetworkClient] Received PLAYER_SPAWN (networkId=" << message.networkId
                   << ", clientId=" << message.clientId << ", slot=" << (int)message.playerSlot << ")" << std::endl;
@@ -408,6 +425,11 @@ namespace rtype::client {
         m_registry.addComponent(entity, ecs::VelocityComponent(0.0f, 0.0f, 200.0f));
         m_registry.addComponent(entity, ecs::HealthComponent(static_cast<int>(message.health), 100));
         m_registry.addComponent(entity, ecs::NetworkComponent(message.networkId, isLocal));
+
+        // Add weapon component (for shooting missiles with Space key)
+        ecs::WeaponComponent weapon(ecs::WeaponConstants::DEFAULT_FIRE_RATE, ecs::WeaponConstants::DEFAULT_DAMAGE);
+        weapon.projectileSpeed = ecs::WeaponConstants::DEFAULT_PROJECTILE_SPEED;
+        m_registry.addComponent(entity, weapon);
 
         // Add visual component (PlayerShipComponent for rendering)
         ecs::PlayerShipComponent shipComp(ecs::PlayerShipComponent::ShipStyle::Classic);

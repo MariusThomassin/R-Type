@@ -61,6 +61,7 @@ namespace rtype::server {
         , m_demoSpawnTimer(0.0f)
         , m_demoSpawnCounter(0)
         , m_logTimer(0.0f)
+        , m_gameStarted{false}
     {
         std::srand(static_cast<unsigned>(std::time(nullptr)));
     }
@@ -91,6 +92,28 @@ namespace rtype::server {
 
         m_networkManager->setOnClientInput([this](uint32_t clientId, const network::ClientInputMessage& input) {
             m_playerManager->applyInput(clientId, input);
+        });
+
+        m_networkManager->setOnPlayerReady([this](uint32_t clientId) {
+            std::cout << "[GameServer] Client " << clientId << " is ready!" << std::endl;
+            
+            // Get player count outside mutex to avoid potential lock ordering issues
+            // Note: There's a potential race if a player disconnects between this call
+            // and the check below, but this is a safe race (we might just delay game start)
+            size_t playerCount = m_playerManager->getPlayerCount();
+            
+            {
+                std::lock_guard<std::mutex> lock(m_readyClientsMutex);
+                m_readyClients.insert(clientId);
+                size_t readyCount = m_readyClients.size();
+
+                // Check if game should start (2+ players, all ready)
+                // Double-check m_gameStarted inside the lock to avoid race condition
+                if (!m_gameStarted.load() && playerCount >= 2 && readyCount >= playerCount) {
+                    m_gameStarted.store(true);
+                    std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
+                }
+            }
         });
 
         // Subscribe to collision events for player-projectile damage
@@ -186,8 +209,8 @@ namespace rtype::server {
         // Update player manager (clamp positions, etc.)
         m_playerManager->update(dt);
 
-        // Spawn demo projectiles periodically
-        if (m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
+        // Spawn demo projectiles periodically (only if game has started)
+        if (m_gameStarted.load() && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
             spawnDemoProjectiles();
             m_demoSpawnTimer = 0.0f;
         }
