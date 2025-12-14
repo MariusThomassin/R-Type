@@ -61,7 +61,7 @@ namespace rtype::server {
         , m_demoSpawnTimer(0.0f)
         , m_demoSpawnCounter(0)
         , m_logTimer(0.0f)
-        , m_gameStarted(false)
+        , m_gameStarted{false}
     {
         std::srand(static_cast<unsigned>(std::time(nullptr)));
     }
@@ -101,7 +101,7 @@ namespace rtype::server {
             size_t playerCount = m_playerManager->getPlayerCount();
             
             // Check if game should start before acquiring mutex
-            bool alreadyStarted = m_gameStarted;
+            bool alreadyStarted = m_gameStarted.load();
             
             bool shouldStartGame = false;
             size_t readyCount = 0;
@@ -117,7 +117,7 @@ namespace rtype::server {
             }
             
             if (shouldStartGame) {
-                m_gameStarted = true;
+                m_gameStarted.store(true);
                 std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
             }
         });
