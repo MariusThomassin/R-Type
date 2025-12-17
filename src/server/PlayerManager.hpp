@@ -7,6 +7,8 @@
 
 #include "engine/ecs/core/Registry.hpp"
 #include "engine/ecs/core/Entity.hpp"
+#include "engine/ecs/components/TransformComponent.hpp"
+#include "game/components/WeaponComponent.hpp"
 #include "shared/network/Protocol.hpp"
 #include "NetworkManager.hpp"
 #include "NetworkIdManager.hpp"
@@ -95,6 +97,17 @@ namespace rtype::server {
          */
         void clampToScreen(ecs::Entity entity);
 
+        /**
+         * @brief Spawn a projectile from player
+         * @param player Player entity
+         * @param clientId Client ID of player
+         * @param transform Player transform
+         * @param weapon Player weapon component
+         */
+        void spawnPlayerProjectile(ecs::Entity player, uint32_t clientId,
+                                   const ecs::TransformComponent& transform,
+                                   const ecs::WeaponComponent& weapon);
+
         ecs::Registry& m_registry;
         NetworkManager& m_networkManager;
         NetworkIdManager& m_networkIdManager;
@@ -112,6 +125,9 @@ namespace rtype::server {
 
         // Player speed
         static constexpr float PLAYER_SPEED = 200.0f;
+
+        // Game time tracker for weapon cooldowns
+        float m_gameTime = 0.0f;
     };
 
 } // namespace rtype::server
