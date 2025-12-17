@@ -23,6 +23,7 @@
 #include "../engine/ui/widgets/SettingsWidget.hpp"
 #include "../engine/ui/widgets/MainMenuWidget.hpp"
 #include "../engine/graphics/RenderUtils.hpp"
+#include "NetworkClient.hpp"
 
 using namespace rtype::ecs;
 using rtype::ecs::BulletType;
@@ -207,6 +208,14 @@ int main() {
     SystemManager systems(&registry);
     bool shouldExit = false;
 
+    // ==================== Network Setup ====================
+    rtype::client::NetworkClient networkClient(registry);
+
+    // Connect to server (localhost for now)
+    if (!networkClient.connect("127.0.0.1", 4242)) {
+        std::cerr << "[Main] Failed to connect to server, continuing in offline mode" << std::endl;
+    }
+
     // ==================== Settings Panel Setup ====================
     
     // Create settings widget with initial configuration
@@ -281,6 +290,11 @@ int main() {
         shouldExit = true;
     };
 
+    // Send PLAYER_READY to server
+    if (networkClient.isConnected()) {
+        networkClient.sendPlayerReady();
+    }
+
     mainMenuWidget->setCallbacks(menuCallbacks);
     uiManager.addWidget(mainMenuWidget);
     mainMenuWidget->initialize(); // Initialize after adding to UI manager
@@ -293,7 +307,7 @@ int main() {
     };
     settingsWidget->setCallbacks(callbacks);
 
-    auto* inputSystem = systems.addSystem<InputSystem>(eventBus, 350.0f);
+    auto* inputSystem = systems.addSystem<InputSystem>(eventBus, 350.0f, &networkClient);
     systems.addSystem<MovementSystem>();
     auto* bulletSystem = systems.addSystem<BulletSystem>(eventBus);
     bulletSystem->setScreenSize(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -386,9 +400,10 @@ int main() {
     // ==================== Create Game Entities ====================
     Entity background = createBackground(registry, SCREEN_WIDTH, SCREEN_HEIGHT);
     (void)background;
-    
-    Entity player = createPlayer(registry, 1);
-    (void)player;
+
+    // NOTE: Player is now created by the server and spawned via network
+    // Entity player = createPlayer(registry, 1);
+    // (void)player;
 
     // ==================== Game Loop (Fixed Timestep) ====================
     float accumulator = 0.0f;
@@ -412,6 +427,9 @@ int main() {
             std::cout << "Returning to menu..." << std::endl;
             gameState = GameState::MENU;
         }
+
+        // Update network (process received messages)
+        networkClient.update();
 
         while (accumulator >= FIXED_TIMESTEP) {
             // Update game systems based on game state

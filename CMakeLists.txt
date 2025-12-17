@@ -82,6 +82,9 @@ endforeach()
 # Build engine library first (contains ecs_engine and rtype_ui_library)
 add_subdirectory(src/engine)
 
+# Build shared library (network protocol)
+add_subdirectory(src/shared)
+
 # Then build server and client executables
 add_subdirectory(src/server)
 add_subdirectory(src/client)

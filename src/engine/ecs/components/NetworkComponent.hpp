@@ -16,22 +16,23 @@ namespace rtype::ecs {
      * client/server in multiplayer.
      */
     struct NetworkComponent : public IComponent {
-        int networkId = -1;           // Unique network identifier
+        uint32_t networkId = 0;       // Unique network identifier (0 = not assigned)
         bool isOwned = false;         // Is this client the owner?
         bool needsSync = false;       // Dirty flag for sync
         float lastSyncTime = 0.0f;    // Last time entity was synced
         float syncInterval = 0.05f;   // Minimum time between syncs (20 Hz)
 
+        // Interpolation data (for client-side smoothing)
         float interpX = 0.0f;
         float interpY = 0.0f;
         float interpProgress = 1.0f;
 
         NetworkComponent() = default;
 
-        explicit NetworkComponent(int netId)
+        explicit NetworkComponent(uint32_t netId)
             : networkId(netId) {}
 
-        NetworkComponent(int netId, bool owned)
+        NetworkComponent(uint32_t netId, bool owned)
             : networkId(netId), isOwned(owned) {}
 
         /**
