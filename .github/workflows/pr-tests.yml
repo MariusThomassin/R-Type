@@ -48,6 +48,11 @@ jobs:
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release --verbose
       
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure --verbose
+
       - name: Success message
         if: success()
         run: |

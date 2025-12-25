@@ -59,6 +59,14 @@ add_library(asio_lib INTERFACE)
 target_include_directories(asio_lib INTERFACE ${asio_SOURCE_DIR}/asio/include)
 target_compile_definitions(asio_lib INTERFACE ASIO_STANDALONE)
 
+# Catch2 for testing (header-only library)
+FetchContent_Declare(
+    catch2
+    URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.5.0.tar.gz
+    TIMEOUT 60
+)
+FetchContent_MakeAvailable(catch2)
+
 #--------------------------------------------------------------
 # Default build type (if not using multi-config generator)
 #--------------------------------------------------------------
@@ -96,6 +104,12 @@ add_subdirectory(src/shared)
 # Then build server and client executables
 add_subdirectory(src/server)
 add_subdirectory(src/client)
+
+#--------------------------------------------------------------
+# Testing
+#--------------------------------------------------------------
+enable_testing()
+add_subdirectory(tests)
 
 #--------------------------------------------------------------
 # Custom Rules
