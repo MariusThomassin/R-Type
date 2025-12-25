@@ -128,7 +128,42 @@ namespace rtype::server {
          */
         void handlePlayerCollision(const ecs::CollisionEvent& event);
 
+        /**
+         * @brief Handle player death (health <= 0)
+         * @param playerEntity Player entity that died
+         */
+        void handlePlayerDeath(ecs::EntityId playerEntity);
+
+        /**
+         * @brief Update pending respawns
+         * @param dt Delta time
+         */
+        void updateRespawns(float dt);
+
+        /**
+         * @brief Respawn a player
+         * @param clientId Client ID to respawn
+         */
+        void respawnPlayer(uint32_t clientId);
+
+        /**
+         * @brief Check game over condition
+         */
+        void checkGameOver();
+
     private:
+        /**
+         * @brief State for tracking dead players waiting to respawn
+         */
+        struct RespawnState {
+            uint32_t clientId;
+            float timeUntilRespawn;
+            uint8_t playerSlot;
+
+            RespawnState(uint32_t id, float delay, uint8_t slot)
+                : clientId(id), timeUntilRespawn(delay), playerSlot(slot) {}
+        };
+
         // ECS Core
         ecs::Registry m_registry;
         ecs::EventBus m_eventBus;
@@ -156,6 +191,7 @@ namespace rtype::server {
         static constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;
         static constexpr float DEMO_SPAWN_INTERVAL = 2.0f; // Spawn demo bullets every 2 seconds
         static constexpr float LOG_INTERVAL = 5.0f; // Log status every 5 seconds
+        static constexpr float RESPAWN_DELAY = 3.0f; // Respawn delay in seconds
         static constexpr int SCREEN_WIDTH = 1280;
         static constexpr int SCREEN_HEIGHT = 720;
 
@@ -172,6 +208,10 @@ namespace rtype::server {
 
         // Event subscriptions
         ecs::EventBus::SubscriberId m_collisionSubId;
+
+        // Respawn system
+        std::vector<RespawnState> m_pendingRespawns;
+        std::atomic<bool> m_gameOver{false};
     };
 
 } // namespace rtype::server
