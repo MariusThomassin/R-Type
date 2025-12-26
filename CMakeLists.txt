@@ -156,6 +156,18 @@ add_custom_target(re
 )
 
 #--------------------------------------------------------------
+# Tests
+#--------------------------------------------------------------
+
+# Add a custom 'run_tests' target that builds and runs tests
+add_custom_target(run_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    DEPENDS rtype_tests
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Running tests..."
+)
+
+#--------------------------------------------------------------
 # Summary
 #--------------------------------------------------------------
 
