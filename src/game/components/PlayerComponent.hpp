@@ -32,7 +32,7 @@ namespace rtype::ecs {
             : playerId(id), lives(startLives) {}
 
         PlayerComponent(uint8_t playerSlot, int startLives)
-            : slot(playerSlot), playerId(playerSlot), lives(startLives) {}
+            : playerId(playerSlot), lives(startLives), slot(playerSlot) {}
 
         /**
          * @brief Add to player score
