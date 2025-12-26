@@ -12,8 +12,8 @@ using namespace rtype::ecs;
 TEST_CASE("NetworkIdManager allocates unique IDs", "[NetworkIdManager][basic]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity1(1);
-    ecs::Entity entity2(2);
+    rtype::ecs::Entity entity1(1);
+    rtype::ecs::Entity entity2(2);
 
     uint32_t netId1 = manager.allocate(entity1);
     uint32_t netId2 = manager.allocate(entity2);
@@ -26,7 +26,7 @@ TEST_CASE("NetworkIdManager allocates unique IDs", "[NetworkIdManager][basic]") 
 TEST_CASE("NetworkIdManager starts IDs from 1", "[NetworkIdManager][basic]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity(1);
+    rtype::ecs::Entity entity(1);
     uint32_t netId = manager.allocate(entity);
 
     REQUIRE(netId == 1);
@@ -35,7 +35,7 @@ TEST_CASE("NetworkIdManager starts IDs from 1", "[NetworkIdManager][basic]") {
 TEST_CASE("NetworkIdManager handles entity recycling", "[NetworkIdManager][recycling]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity(1);
+    rtype::ecs::Entity entity(1);
     uint32_t netId1 = manager.allocate(entity);
     REQUIRE(netId1 == 1);
 
@@ -51,7 +51,7 @@ TEST_CASE("NetworkIdManager handles entity recycling", "[NetworkIdManager][recyc
 TEST_CASE("NetworkIdManager removes entity correctly", "[NetworkIdManager][remove]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity(1);
+    rtype::ecs::Entity entity(1);
     manager.allocate(entity);
 
     REQUIRE(manager.hasNetworkId(entity));
@@ -65,7 +65,7 @@ TEST_CASE("NetworkIdManager removes entity correctly", "[NetworkIdManager][remov
 TEST_CASE("NetworkIdManager removes by network ID", "[NetworkIdManager][remove]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity(1);
+    rtype::ecs::Entity entity(1);
     uint32_t netId = manager.allocate(entity);
 
     REQUIRE(manager.hasNetworkId(entity));
@@ -73,13 +73,13 @@ TEST_CASE("NetworkIdManager removes by network ID", "[NetworkIdManager][remove]"
     manager.removeByNetworkId(netId);
 
     REQUIRE_FALSE(manager.hasNetworkId(entity));
-    REQUIRE(manager.getEntity(netId).id == ecs::NULL_ENTITY);
+    REQUIRE(manager.getEntity(netId).id == rtype::ecs::NULL_ENTITY);
 }
 
 TEST_CASE("NetworkIdManager getNetworkId returns 0 for unknown entity", "[NetworkIdManager][lookup]") {
     NetworkIdManager manager;
 
-    ecs::Entity unknownEntity(999);
+    rtype::ecs::Entity unknownEntity(999);
     uint32_t netId = manager.getNetworkId(unknownEntity);
 
     REQUIRE(netId == 0);
@@ -88,15 +88,15 @@ TEST_CASE("NetworkIdManager getNetworkId returns 0 for unknown entity", "[Networ
 TEST_CASE("NetworkIdManager getEntity returns NULL_ENTITY for unknown network ID", "[NetworkIdManager][lookup]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity = manager.getEntity(999);
+    rtype::ecs::Entity entity = manager.getEntity(999);
 
-    REQUIRE(entity.id == ecs::NULL_ENTITY);
+    REQUIRE(entity.id == rtype::ecs::NULL_ENTITY);
 }
 
 TEST_CASE("NetworkIdManager hasNetworkId returns false for untracked entity", "[NetworkIdManager][lookup]") {
     NetworkIdManager manager;
 
-    ecs::Entity unknownEntity(999);
+    rtype::ecs::Entity unknownEntity(999);
 
     REQUIRE_FALSE(manager.hasNetworkId(unknownEntity));
 }
@@ -104,7 +104,7 @@ TEST_CASE("NetworkIdManager hasNetworkId returns false for untracked entity", "[
 TEST_CASE("NetworkIdManager bidirectional mapping works", "[NetworkIdManager][mapping]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity(5);
+    rtype::ecs::Entity entity(5);
     uint32_t netId = manager.allocate(entity);
 
     REQUIRE(manager.getNetworkId(entity) == netId);
@@ -114,7 +114,7 @@ TEST_CASE("NetworkIdManager bidirectional mapping works", "[NetworkIdManager][ma
 TEST_CASE("NetworkIdManager tracks multiple entities correctly", "[NetworkIdManager][multiple]") {
     NetworkIdManager manager;
 
-    ecs::Entity entities[] = {ecs::Entity(1), ecs::Entity(2), ecs::Entity(3)};
+    rtype::ecs::Entity entities[] = {rtype::ecs::Entity(1), rtype::ecs::Entity(2), rtype::ecs::Entity(3)};
     uint32_t netIds[3];
 
     for (int i = 0; i < 3; ++i) {
@@ -134,12 +134,12 @@ TEST_CASE("NetworkIdManager getEntityCount is accurate", "[NetworkIdManager][cou
 
     REQUIRE(manager.getEntityCount() == 0);
 
-    ecs::Entity entity1(1);
+    rtype::ecs::Entity entity1(1);
     manager.allocate(entity1);
 
     REQUIRE(manager.getEntityCount() == 1);
 
-    ecs::Entity entity2(2);
+    rtype::ecs::Entity entity2(2);
     manager.allocate(entity2);
 
     REQUIRE(manager.getEntityCount() == 2);
@@ -152,8 +152,8 @@ TEST_CASE("NetworkIdManager getEntityCount is accurate", "[NetworkIdManager][cou
 TEST_CASE("NetworkIdManager clear resets all state", "[NetworkIdManager][reset]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity1(1);
-    ecs::Entity entity2(2);
+    rtype::ecs::Entity entity1(1);
+    rtype::ecs::Entity entity2(2);
     manager.allocate(entity1);
     manager.allocate(entity2);
 
@@ -169,7 +169,7 @@ TEST_CASE("NetworkIdManager clear resets all state", "[NetworkIdManager][reset]"
 TEST_CASE("NetworkIdManager increments IDs after clear", "[NetworkIdManager][reset]") {
     NetworkIdManager manager;
 
-    ecs::Entity entity(1);
+    rtype::ecs::Entity entity(1);
     uint32_t netId1 = manager.allocate(entity);
     manager.clear();
 
@@ -182,7 +182,7 @@ TEST_CASE("NetworkIdManager increments IDs after clear", "[NetworkIdManager][res
 TEST_CASE("NetworkIdManager removing unknown entity is safe", "[NetworkIdManager][safety]") {
     NetworkIdManager manager;
 
-    ecs::Entity unknownEntity(999);
+    rtype::ecs::Entity unknownEntity(999);
 
     // Should not crash
     REQUIRE_NOTHROW(manager.remove(unknownEntity));

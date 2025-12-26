@@ -8,6 +8,10 @@ add_executable(rtype_tests
     network/ProtocolTests.cpp
     server/NetworkIdManagerTests.cpp
     server/PlayerManagerTests.cpp
+    integration/FullGameLoopTests.cpp
+    # Server source files (needed for tests)
+    ${CMAKE_SOURCE_DIR}/src/server/NetworkManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/PlayerManager.cpp
 )
 
 # Include directories

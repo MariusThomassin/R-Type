@@ -10,18 +10,19 @@
 #include "engine/ecs/core/Registry.hpp"
 #include "engine/ecs/core/Entity.hpp"
 #include "engine/ecs/components/TransformComponent.hpp"
-#include "engine/ecs/components/PlayerComponent.hpp"
+#include "engine/ecs/components/VelocityComponent.hpp"
 #include "engine/ecs/components/HealthComponent.hpp"
+#include "engine/ecs/components/NetworkComponent.hpp"
+#include "game/components/PlayerComponent.hpp"
 
 using namespace rtype::server;
-using namespace rtype::ecs;
 
 // Helper to create test setup
 struct IntegrationTestSetup {
-    ecs::Registry registry;
-    NetworkManager networkManager;
-    NetworkIdManager networkIdManager;
-    PlayerManager playerManager;
+    rtype::ecs::Registry registry;
+    rtype::server::NetworkManager networkManager;
+    rtype::server::NetworkIdManager networkIdManager;
+    rtype::server::PlayerManager playerManager;
 
     IntegrationTestSetup()
         : networkManager(registry, 4242)
@@ -34,25 +35,25 @@ struct IntegrationTestSetup {
 
 TEST_CASE("Player lifecycle: spawn → move → remove", "[integration][lifecycle]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
 
     // Spawn player
     uint32_t clientId = 123;
-    ecs::Entity player = playerManager.spawnPlayer(clientId);
+    rtype::ecs::Entity player = playerManager.spawnPlayer(clientId);
 
-    REQUIRE(player.id != ecs::NULL_ENTITY);
+    REQUIRE(player.id != rtype::ecs::NULL_ENTITY);
     REQUIRE(playerManager.getPlayerCount() == 1);
 
     // Apply input (move player)
-    network::ClientInputMessage input;
+    rtype::network::ClientInputMessage input;
     input.sequenceNumber = 1;
-    input.inputFlags = network::INPUT_RIGHT;
+    input.inputFlags = rtype::network::INPUT_RIGHT;
     input.deltaTime = 0.016f;
     playerManager.applyInput(clientId, input);
 
     // Verify player moved
-    auto* velocity = registry.tryGetComponent<ecs::VelocityComponent>(player);
+    auto* velocity = registry.tryGetComponent<rtype::ecs::VelocityComponent>(player);
     REQUIRE(velocity != nullptr);
     REQUIRE(velocity->vx > 0.0f);
 
@@ -60,8 +61,8 @@ TEST_CASE("Player lifecycle: spawn → move → remove", "[integration][lifecycl
     playerManager.removePlayer(clientId);
 
     REQUIRE(playerManager.getPlayerCount() == 0);
-    ecs::Entity found = playerManager.getPlayerEntity(clientId);
-    REQUIRE(found.id == ecs::NULL_ENTITY);
+    rtype::ecs::Entity found = playerManager.getPlayerEntity(clientId);
+    REQUIRE(found.id == rtype::ecs::NULL_ENTITY);
 }
 
 // ============================================================
@@ -70,22 +71,22 @@ TEST_CASE("Player lifecycle: spawn → move → remove", "[integration][lifecycl
 
 TEST_CASE("Multiple players spawn in different slots", "[integration][multiplayer]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
 
     uint32_t clientIds[] = {100, 200, 300, 400};
-    ecs::Entity players[4];
+    rtype::ecs::Entity players[4];
 
     for (int i = 0; i < 4; ++i) {
         players[i] = playerManager.spawnPlayer(clientIds[i]);
-        REQUIRE(players[i].id != ecs::NULL_ENTITY);
+        REQUIRE(players[i].id != rtype::ecs::NULL_ENTITY);
     }
 
     REQUIRE(playerManager.getPlayerCount() == 4);
 
     // Verify each player has unique slot
     for (int i = 0; i < 4; ++i) {
-        auto* playerComp = registry.tryGetComponent<ecs::PlayerComponent>(players[i]);
+        auto* playerComp = registry.tryGetComponent<rtype::ecs::PlayerComponent>(players[i]);
         REQUIRE(playerComp != nullptr);
         REQUIRE(playerComp->slot == i);
     }
@@ -93,7 +94,7 @@ TEST_CASE("Multiple players spawn in different slots", "[integration][multiplaye
     // Verify each player has unique network ID
     std::set<uint32_t> networkIds;
     for (int i = 0; i < 4; ++i) {
-        auto* networkComp = registry.tryGetComponent<ecs::NetworkComponent>(players[i]);
+        auto* networkComp = registry.tryGetComponent<rtype::ecs::NetworkComponent>(players[i]);
         REQUIRE(networkComp != nullptr);
         REQUIRE(networkIds.insert(networkComp->networkId).second == true);
     }
@@ -105,20 +106,20 @@ TEST_CASE("Multiple players spawn in different slots", "[integration][multiplaye
 
 TEST_CASE("Player has all required components after spawn", "[integration][components]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
 
     uint32_t clientId = 123;
-    ecs::Entity player = playerManager.spawnPlayer(clientId);
+    rtype::ecs::Entity player = playerManager.spawnPlayer(clientId);
 
-    REQUIRE(player.id != ecs::NULL_ENTITY);
+    REQUIRE(player.id != rtype::ecs::NULL_ENTITY);
 
     // Verify all expected components exist
-    auto* transform = registry.tryGetComponent<ecs::TransformComponent>(player);
-    auto* velocity = registry.tryGetComponent<ecs::VelocityComponent>(player);
-    auto* playerComp = registry.tryGetComponent<ecs::PlayerComponent>(player);
-    auto* health = registry.tryGetComponent<ecs::HealthComponent>(player);
-    auto* network = registry.tryGetComponent<ecs::NetworkComponent>(player);
+    auto* transform = registry.tryGetComponent<rtype::ecs::TransformComponent>(player);
+    auto* velocity = registry.tryGetComponent<rtype::ecs::VelocityComponent>(player);
+    auto* playerComp = registry.tryGetComponent<rtype::ecs::PlayerComponent>(player);
+    auto* health = registry.tryGetComponent<rtype::ecs::HealthComponent>(player);
+    auto* network = registry.tryGetComponent<rtype::ecs::NetworkComponent>(player);
 
     REQUIRE(transform != nullptr);
     REQUIRE(velocity != nullptr);
@@ -140,16 +141,16 @@ TEST_CASE("Player has all required components after spawn", "[integration][compo
 
 TEST_CASE("NetworkIdManager integration with PlayerManager", "[integration][network]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     NetworkIdManager& networkIdManager = setup.networkIdManager;
     PlayerManager& playerManager = setup.playerManager;
 
     uint32_t clientId = 123;
-    ecs::Entity player = playerManager.spawnPlayer(clientId);
+    rtype::ecs::Entity player = playerManager.spawnPlayer(clientId);
 
-    REQUIRE(player.id != ecs::NULL_ENTITY);
+    REQUIRE(player.id != rtype::ecs::NULL_ENTITY);
 
-    auto* networkComp = registry.tryGetComponent<ecs::NetworkComponent>(player);
+    auto* networkComp = registry.tryGetComponent<rtype::ecs::NetworkComponent>(player);
     REQUIRE(networkComp != nullptr);
 
     // Verify NetworkIdManager has this entity
@@ -157,7 +158,7 @@ TEST_CASE("NetworkIdManager integration with PlayerManager", "[integration][netw
     REQUIRE(networkId == networkComp->networkId);
 
     // Verify reverse mapping
-    ecs::Entity found = networkIdManager.getEntity(networkId);
+    rtype::ecs::Entity found = networkIdManager.getEntity(networkId);
     REQUIRE(found.id == player.id);
 }
 
@@ -167,14 +168,14 @@ TEST_CASE("NetworkIdManager integration with PlayerManager", "[integration][netw
 
 TEST_CASE("Player death and lives integration", "[integration][death-system]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
 
     uint32_t clientId = 123;
-    ecs::Entity player = playerManager.spawnPlayer(clientId);
+    rtype::ecs::Entity player = playerManager.spawnPlayer(clientId);
 
-    auto* playerComp = registry.tryGetComponent<ecs::PlayerComponent>(player);
-    auto* health = registry.tryGetComponent<ecs::HealthComponent>(player);
+    auto* playerComp = registry.tryGetComponent<rtype::ecs::PlayerComponent>(player);
+    auto* health = registry.tryGetComponent<rtype::ecs::HealthComponent>(player);
 
     REQUIRE(playerComp != nullptr);
     REQUIRE(health != nullptr);
@@ -195,13 +196,13 @@ TEST_CASE("Player death and lives integration", "[integration][death-system]") {
 
 TEST_CASE("Player with 0 lives cannot respawn", "[integration][death-system]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
 
     uint32_t clientId = 123;
-    ecs::Entity player = playerManager.spawnPlayer(clientId);
+    rtype::ecs::Entity player = playerManager.spawnPlayer(clientId);
 
-    auto* playerComp = registry.tryGetComponent<ecs::PlayerComponent>(player);
+    auto* playerComp = registry.tryGetComponent<rtype::ecs::PlayerComponent>(player);
     REQUIRE(playerComp != nullptr);
 
     // Lose all lives
@@ -220,14 +221,14 @@ TEST_CASE("Player with 0 lives cannot respawn", "[integration][death-system]") {
 
 TEST_CASE("Player position clamps during update", "[integration][update]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
 
     uint32_t clientId = 123;
     playerManager.spawnPlayer(clientId);
 
-    ecs::Entity player = playerManager.getPlayerEntity(clientId);
-    auto* transform = registry.tryGetComponent<ecs::TransformComponent>(player);
+    rtype::ecs::Entity player = playerManager.getPlayerEntity(clientId);
+    auto* transform = registry.tryGetComponent<rtype::ecs::TransformComponent>(player);
 
     REQUIRE(transform != nullptr);
 
@@ -250,31 +251,31 @@ TEST_CASE("Player position clamps during update", "[integration][update]") {
 
 TEST_CASE("Simple 2-player game flow", "[integration][full-game]") {
     IntegrationTestSetup setup;
-    ecs::Registry& registry = setup.registry;
+    rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
 
     // Player 1 joins
     uint32_t clientId1 = 100;
-    ecs::Entity player1 = playerManager.spawnPlayer(clientId1);
-    REQUIRE(player1.id != ecs::NULL_ENTITY);
+    rtype::ecs::Entity player1 = playerManager.spawnPlayer(clientId1);
+    REQUIRE(player1.id != rtype::ecs::NULL_ENTITY);
 
     // Player 2 joins
     uint32_t clientId2 = 200;
-    ecs::Entity player2 = playerManager.spawnPlayer(clientId2);
-    REQUIRE(player2.id != ecs::NULL_ENTITY);
+    rtype::ecs::Entity player2 = playerManager.spawnPlayer(clientId2);
+    REQUIRE(player2.id != rtype::ecs::NULL_ENTITY);
 
     REQUIRE(playerManager.getPlayerCount() == 2);
 
     // Both players move
-    network::ClientInputMessage input1;
+    rtype::network::ClientInputMessage input1;
     input1.sequenceNumber = 1;
-    input1.inputFlags = network::INPUT_RIGHT;
+    input1.inputFlags = rtype::network::INPUT_RIGHT;
     input1.deltaTime = 0.016f;
     playerManager.applyInput(clientId1, input1);
 
-    network::ClientInputMessage input2;
+    rtype::network::ClientInputMessage input2;
     input2.sequenceNumber = 1;
-    input2.inputFlags = network::INPUT_UP;
+    input2.inputFlags = rtype::network::INPUT_UP;
     input2.deltaTime = 0.016f;
     playerManager.applyInput(clientId2, input2);
 
@@ -282,8 +283,8 @@ TEST_CASE("Simple 2-player game flow", "[integration][full-game]") {
     playerManager.update(0.016f);
 
     // Verify positions
-    auto* transform1 = registry.tryGetComponent<ecs::TransformComponent>(player1);
-    auto* transform2 = registry.tryGetComponent<ecs::TransformComponent>(player2);
+    auto* transform1 = registry.tryGetComponent<rtype::ecs::TransformComponent>(player1);
+    auto* transform2 = registry.tryGetComponent<rtype::ecs::TransformComponent>(player2);
 
     REQUIRE(transform1 != nullptr);
     REQUIRE(transform2 != nullptr);
@@ -302,14 +303,14 @@ TEST_CASE("Spawn and remove multiple players in sequence", "[integration][stress
 
     for (int i = 0; i < 10; ++i) {
         uint32_t clientId = 1000 + i;
-        ecs::Entity player = playerManager.spawnPlayer(clientId);
+        rtype::ecs::Entity player = playerManager.spawnPlayer(clientId);
 
         if (i < 4) {
             // First 4 should succeed
-            REQUIRE(player.id != ecs::NULL_ENTITY);
+            REQUIRE(player.id != rtype::ecs::NULL_ENTITY);
         } else {
             // Rest should fail (game full)
-            REQUIRE(player.id == ecs::NULL_ENTITY);
+            REQUIRE(player.id == rtype::ecs::NULL_ENTITY);
         }
     }
 
@@ -324,6 +325,6 @@ TEST_CASE("Spawn and remove multiple players in sequence", "[integration][stress
     REQUIRE(playerManager.getPlayerCount() == 0);
 
     // Can spawn again
-    ecs::Entity player = playerManager.spawnPlayer(2000);
-    REQUIRE(player.id != ecs::NULL_ENTITY);
+    rtype::ecs::Entity player = playerManager.spawnPlayer(2000);
+    REQUIRE(player.id != rtype::ecs::NULL_ENTITY);
 }
