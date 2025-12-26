@@ -513,7 +513,7 @@ namespace rtype::server {
 
         // Spawn new player entity
         ecs::Entity newPlayer = m_playerManager->spawnPlayer(clientId);
-        if (newPlayer.getId() == ecs::NULL_ENTITY) {
+        if (newPlayer.id == ecs::NULL_ENTITY) {
             std::cout << "[GameServer] Failed to respawn player for client " << clientId << std::endl;
             return;
         }
