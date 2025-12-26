@@ -259,6 +259,8 @@ namespace rtype::ecs {
 
     void PatternSystem::createBullet(float x, float y, float velX, float velY,
                                     const PatternWave& wave, PatternSpawnerComponent& spawner) {
+        (void)spawner;  // Currently unused but needed for interface
+
         Entity bullet = m_registry->createEntity();
 
         TransformComponent transform(x, y);
