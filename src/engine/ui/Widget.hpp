@@ -193,6 +193,12 @@ namespace rtype::ui {
             virtual bool onMouseWheel(float delta);
 
             /**
+             * @brief Mouse button release event (from ECS MouseButtonReleasedEvent)
+             * @return True if event was handled (consumed)
+             */
+            virtual bool onMouseRelease();
+
+            /**
              * @brief Key press event (from ECS KeyPressedEvent)
              * @param key The key code of the pressed key
              * @return true if event was consumed
