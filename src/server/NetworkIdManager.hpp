@@ -8,6 +8,7 @@
 #include "engine/ecs/core/Entity.hpp"
 #include <unordered_map>
 #include <cstdint>
+#include <iostream>
 
 namespace rtype::server {
 

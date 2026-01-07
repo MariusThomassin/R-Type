@@ -8,9 +8,12 @@
 #include "engine/ecs/components/NetworkComponent.hpp"
 #include "engine/ecs/components/HealthComponent.hpp"
 #include "engine/ecs/components/ColliderComponent.hpp"
+#include "engine/ecs/components/LifetimeComponent.hpp"
 #include "game/components/PlayerComponent.hpp"
 #include "game/components/WeaponComponent.hpp"
 #include "game/components/WeaponConstants.hpp"
+#include "game/components/ProjectileComponent.hpp"
+#include "game/components/bullets/TrajectoryComponent.hpp"
 #include <iostream>
 #include <algorithm>
 
@@ -107,9 +110,16 @@ namespace rtype::server {
     }
 
     void PlayerManager::applyInput(uint32_t clientId, const network::ClientInputMessage& input) {
+        // Debug log for SHOOT input
+        if (input.inputFlags & network::INPUT_SHOOT) {
+            std::cout << "[PlayerManager] Received INPUT_SHOOT from client " << clientId
+                      << " (flags=0x" << std::hex << (int)input.inputFlags << std::dec << ")" << std::endl;
+        }
+
         // Find player entity
         auto it = m_clientIdToPlayerEntity.find(clientId);
         if (it == m_clientIdToPlayerEntity.end()) {
+            std::cout << "[PlayerManager] WARNING: Player not found for client " << clientId << std::endl;
             return;  // Player not found
         }
 
@@ -154,7 +164,21 @@ namespace rtype::server {
             velocity->vy *= factor;
         }
 
-        // TODO: Handle INPUT_SHOOT later
+        // Handle shooting (INPUT_SHOOT flag = 0x10)
+        if (input.inputFlags & network::INPUT_SHOOT) {
+            auto* weapon = m_registry.tryGetComponent<ecs::WeaponComponent>(player);
+            auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(player);
+
+            if (weapon && transform) {
+                // Check weapon cooldown using game time
+                if (weapon->isReady(m_gameTime)) {
+                    weapon->lastFiredTime = m_gameTime;
+
+                    // Spawn projectile
+                    spawnPlayerProjectile(player, clientId, *transform, *weapon);
+                }
+            }
+        }
     }
 
     void PlayerManager::removePlayer(uint32_t clientId) {
@@ -188,7 +212,7 @@ namespace rtype::server {
     }
 
     void PlayerManager::update(float dt) {
-        (void)dt;  // Not used for now
+        m_gameTime += dt;
 
         // Clamp all players to screen bounds
         for (const auto& [clientId, player] : m_clientIdToPlayerEntity) {
@@ -245,6 +269,71 @@ namespace rtype::server {
 
         transform->x = std::clamp(transform->x, MARGIN, SCREEN_WIDTH - MARGIN);
         transform->y = std::clamp(transform->y, MARGIN, SCREEN_HEIGHT - MARGIN);
+    }
+
+    void PlayerManager::spawnPlayerProjectile(ecs::Entity player, uint32_t clientId,
+                                              const ecs::TransformComponent& transform,
+                                              const ecs::WeaponComponent& weapon) {
+        // Create projectile entity
+        ecs::Entity projectile = m_registry.createEntity();
+
+        // Position: spawn in front of player ship
+        float offsetX = 40.0f;  // Spawn ahead of ship
+        float projectileX = transform.x + offsetX;
+        float projectileY = transform.y;
+
+        m_registry.addComponent(projectile, ecs::TransformComponent(projectileX, projectileY, 0.0f));
+
+        // Velocity: player bullets travel to the right
+        float projectileSpeed = weapon.projectileSpeed;
+        m_registry.addComponent(projectile, ecs::VelocityComponent(projectileSpeed, 0.0f, projectileSpeed * 1.5f));
+
+        // Projectile component (isPlayer = true)
+        m_registry.addComponent(projectile, ecs::ProjectileComponent(player, weapon.damage, true));
+
+        // Collider for collision detection
+        ecs::ColliderComponent collider;
+        collider.width = 16.0f;
+        collider.height = 16.0f;
+        collider.layer = ecs::CollisionLayer::PlayerShot;
+        collider.mask = static_cast<ecs::CollisionLayer>(
+            static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
+            static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
+            static_cast<uint32_t>(ecs::CollisionLayer::Wall)
+        );
+        m_registry.addComponent(projectile, collider);
+
+        // Lifetime (3 seconds)
+        m_registry.addComponent(projectile, ecs::LifetimeComponent(3.0f));
+
+        // Network component - allocate network ID
+        uint32_t networkId = m_networkIdManager.allocate(projectile);
+        m_registry.addComponent(projectile, ecs::NetworkComponent(networkId, false));
+
+        // Broadcast ENTITY_SPAWN to all clients
+        network::EntitySpawnMessage spawnMsg{};
+        spawnMsg.networkId = networkId;
+        spawnMsg.entityType = network::EntityType::PROJECTILE;
+        spawnMsg.x = projectileX;
+        spawnMsg.y = projectileY;
+        spawnMsg.rotation = 0.0f;
+        spawnMsg.vx = projectileSpeed;
+        spawnMsg.vy = 0.0f;
+        spawnMsg.trajectoryType = static_cast<uint8_t>(ecs::TrajectoryType::Linear);
+        spawnMsg.trajectoryParam1 = 0.0f;
+        spawnMsg.trajectoryParam2 = 0.0f;
+        spawnMsg.spinSpeed = 0.0f;
+        spawnMsg.maxLifetime = 3.0f;
+        spawnMsg.colliderWidth = 16.0f;
+        spawnMsg.colliderHeight = 16.0f;
+        spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot);
+        spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
+                                 static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
+                                 static_cast<uint32_t>(ecs::CollisionLayer::Wall);
+
+        m_networkManager.broadcastEntitySpawn(spawnMsg);
+
+        std::cout << "[PlayerManager] Player " << clientId << " fired projectile [networkId=" << networkId << "]" << std::endl;
     }
 
 } // namespace rtype::server

@@ -259,12 +259,27 @@ namespace rtype::client {
 
         // Entity type specific components
         if (message.entityType == network::EntityType::PROJECTILE) {
+            // Determine if this is a player projectile based on collision layer
+            bool isPlayerProjectile = (message.collisionLayer == static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot));
+
             // Projectile
-            m_registry.addComponent(entity, ecs::ProjectileComponent(ecs::NULL_ENTITY, 10, false));
+            m_registry.addComponent(entity, ecs::ProjectileComponent(ecs::NULL_ENTITY, 10, isPlayerProjectile));
 
             // Spritesheet (for rendering)
             ecs::SpritesheetComponent sprite;
-            sprite.setBullet(ecs::BulletType::Ball, ecs::BulletColor::Red);
+            if (isPlayerProjectile) {
+                // Player bullets: cyan rice bullets pointing right
+                sprite.setBullet(ecs::BulletType::Rice, ecs::BulletColor::Cyan);
+                sprite.rotation = -90.0f;  // Point to the right
+                sprite.tintR = 80;
+                sprite.tintG = 240;
+                sprite.tintB = 255;
+                sprite.layer = 100;  // Render on top
+            } else {
+                // Enemy bullets: red balls
+                sprite.setBullet(ecs::BulletType::Ball, ecs::BulletColor::Red);
+                sprite.layer = 99;
+            }
             m_registry.addComponent(entity, sprite);
 
             // Trajectory

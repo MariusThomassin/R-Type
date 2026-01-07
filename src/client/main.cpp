@@ -92,7 +92,25 @@ void clampPlayerToScreen(Registry& registry) {
     );
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    // ==================== Parse Command-Line Arguments ====================
+    std::string serverIp = "127.0.0.1";  // Default: localhost
+    int serverPort = 4242;                // Default: 4242
+
+    if (argc >= 2) {
+        serverIp = argv[1];
+    }
+    if (argc >= 3) {
+        try {
+            serverPort = std::stoi(argv[2]);
+        } catch (const std::exception& e) {
+            std::cerr << "[Main] Invalid port number: " << argv[2] << ", using default 4242" << std::endl;
+            serverPort = 4242;
+        }
+    }
+
+    std::cout << "[Main] Connecting to server: " << serverIp << ":" << serverPort << std::endl;
+
     // ==================== Raylib Initialization ====================
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "R-Type");
     ClearWindowState(FLAG_WINDOW_RESIZABLE);  // Fixed window size to prevent FPS drops on resize
@@ -119,9 +137,10 @@ int main() {
     // ==================== Network Setup ====================
     rtype::client::NetworkClient networkClient(registry);
 
-    // Connect to server (localhost for now)
-    if (!networkClient.connect("127.0.0.1", 4242)) {
-        std::cerr << "[Main] Failed to connect to server, continuing in offline mode" << std::endl;
+    // Connect to server with command-line arguments
+    if (!networkClient.connect(serverIp, serverPort)) {
+        std::cerr << "[Main] Failed to connect to " << serverIp << ":" << serverPort
+                  << ", continuing in offline mode" << std::endl;
     }
 
     // ==================== Menu Panel Setup ====================

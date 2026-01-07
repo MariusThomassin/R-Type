@@ -28,7 +28,10 @@ namespace rtype::network {
         ENTITY_DESTROY = 13,     // Destroy entity
         SERVER_SNAPSHOT = 14,    // Full world state snapshot
         PLAYER_SPAWN = 15,       // Spawn player entity
-        PLAYER_HIT = 16          // Player took damage
+        PLAYER_HIT = 16,         // Player took damage
+        PLAYER_DEATH = 17,       // Player died (will respawn)
+        PLAYER_RESPAWN = 18,     // Player respawned
+        GAME_OVER = 19           // Game over (all players dead)
     };
 
     /**
@@ -192,6 +195,32 @@ namespace rtype::network {
         float hitX, hitY;       // Impact position (for visual effect)
     };
 
+    /**
+     * @brief PLAYER_DEATH: Player died (will respawn after delay)
+     */
+    struct PlayerDeathMessage {
+        uint32_t networkId;
+        uint8_t remainingLives;  // Lives left after death
+        float deathX, deathY;    // Death position
+    };
+
+    /**
+     * @brief PLAYER_RESPAWN: Player respawned
+     */
+    struct PlayerRespawnMessage {
+        uint32_t networkId;
+        uint8_t playerSlot;
+        float x, y;
+        float health;
+    };
+
+    /**
+     * @brief GAME_OVER: All players are dead
+     */
+    struct GameOverMessage {
+        uint8_t survivorCount;  // Number of players still alive (0 for game over)
+    };
+
     // ============================================================
     // Serialization utilities
     // ============================================================
@@ -273,6 +302,9 @@ namespace rtype::network {
             case MessageType::SERVER_SNAPSHOT: return "SERVER_SNAPSHOT";
             case MessageType::PLAYER_SPAWN: return "PLAYER_SPAWN";
             case MessageType::PLAYER_HIT: return "PLAYER_HIT";
+            case MessageType::PLAYER_DEATH: return "PLAYER_DEATH";
+            case MessageType::PLAYER_RESPAWN: return "PLAYER_RESPAWN";
+            case MessageType::GAME_OVER: return "GAME_OVER";
             default: return "UNKNOWN";
         }
     }

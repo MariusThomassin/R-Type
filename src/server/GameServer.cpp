@@ -203,11 +203,19 @@ namespace rtype::server {
         m_demoSpawnTimer += dt;
         m_logTimer += dt;
 
+        // Don't update game if game over
+        if (m_gameOver.load()) {
+            return;
+        }
+
         // Update network (send state updates at 20 Hz)
         m_networkManager->update(dt);
 
         // Update player manager (clamp positions, etc.)
         m_playerManager->update(dt);
+
+        // Update pending respawns
+        updateRespawns(dt);
 
         // Spawn demo projectiles periodically (only if game has started)
         if (m_gameStarted.load() && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
@@ -428,7 +436,128 @@ namespace rtype::server {
         // Destroy the projectile
         m_registry.destroyEntity(projectileEntityId);
 
-        // TODO: If health <= 0, handle player death (not implemented yet)
+        // Handle player death
+        if (health->currentHealth <= 0) {
+            handlePlayerDeath(playerEntityId);
+        }
+    }
+
+    void GameServer::handlePlayerDeath(ecs::EntityId playerEntityId) {
+        auto* player = m_registry.tryGetComponent<ecs::PlayerComponent>(playerEntityId);
+        auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(playerEntityId);
+        auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(playerEntityId);
+        auto* collider = m_registry.tryGetComponent<ecs::ColliderComponent>(playerEntityId);
+
+        if (!player || !transform || !network) {
+            return;
+        }
+
+        // Lose a life
+        bool hasLivesRemaining = player->loseLife();
+
+        std::cout << "[GameServer] Player died! NetworkID=" << network->networkId
+                  << " Lives remaining: " << player->lives << std::endl;
+
+        // Remove collider to prevent further collisions while dead
+        if (collider) {
+            m_registry.removeComponent<ecs::ColliderComponent>(playerEntityId);
+        }
+
+        // Broadcast PLAYER_DEATH message
+        network::PlayerDeathMessage deathMsg;
+        deathMsg.networkId = network->networkId;
+        deathMsg.remainingLives = static_cast<uint8_t>(player->lives);
+        deathMsg.deathX = transform->x;
+        deathMsg.deathY = transform->y;
+
+        auto buffer = network::serializeMessage(network::MessageType::PLAYER_DEATH, deathMsg);
+        m_networkManager->broadcast(buffer);
+
+        if (hasLivesRemaining) {
+            // Add to respawn queue
+            uint32_t clientId = player->networkClientId;
+            m_pendingRespawns.emplace_back(clientId, RESPAWN_DELAY, player->slot);
+            std::cout << "[GameServer] Player will respawn in " << RESPAWN_DELAY << " seconds" << std::endl;
+        } else {
+            std::cout << "[GameServer] Player has no lives remaining!" << std::endl;
+            // Remove from player manager (disconnects the player effectively)
+            m_playerManager->removePlayer(player->networkClientId);
+            checkGameOver();
+        }
+    }
+
+    void GameServer::updateRespawns(float dt) {
+        if (m_pendingRespawns.empty()) {
+            return;
+        }
+
+        // Update timers
+        for (auto& respawn : m_pendingRespawns) {
+            respawn.timeUntilRespawn -= dt;
+        }
+
+        // Respawn players whose timer has expired
+        auto it = m_pendingRespawns.begin();
+        while (it != m_pendingRespawns.end()) {
+            if (it->timeUntilRespawn <= 0.0f) {
+                respawnPlayer(it->clientId);
+                it = m_pendingRespawns.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    void GameServer::respawnPlayer(uint32_t clientId) {
+        std::cout << "[GameServer] Respawning player for client " << clientId << std::endl;
+
+        // Spawn new player entity
+        ecs::Entity newPlayer = m_playerManager->spawnPlayer(clientId);
+        if (newPlayer.id == ecs::NULL_ENTITY) {
+            std::cout << "[GameServer] Failed to respawn player for client " << clientId << std::endl;
+            return;
+        }
+
+        // Get components
+        auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(newPlayer);
+        auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(newPlayer);
+        auto* playerComp = m_registry.tryGetComponent<ecs::PlayerComponent>(newPlayer);
+
+        if (!network || !transform || !playerComp) {
+            return;
+        }
+
+        // Broadcast PLAYER_RESPAWN message
+        network::PlayerRespawnMessage respawnMsg;
+        respawnMsg.networkId = network->networkId;
+        respawnMsg.playerSlot = playerComp->slot;
+        respawnMsg.x = transform->x;
+        respawnMsg.y = transform->y;
+        respawnMsg.health = 100.0f;
+
+        auto buffer = network::serializeMessage(network::MessageType::PLAYER_RESPAWN, respawnMsg);
+        m_networkManager->broadcast(buffer);
+
+        std::cout << "[GameServer] Player respawned at (" << transform->x << ", " << transform->y << ")" << std::endl;
+    }
+
+    void GameServer::checkGameOver() {
+        if (m_gameOver.load()) {
+            return;
+        }
+
+        size_t playerCount = m_playerManager->getPlayerCount();
+        if (playerCount == 0) {
+            m_gameOver.store(true);
+            std::cout << "[GameServer] GAME OVER! All players are dead." << std::endl;
+
+            // Broadcast GAME_OVER message
+            network::GameOverMessage gameOverMsg;
+            gameOverMsg.survivorCount = 0;
+
+            auto buffer = network::serializeMessage(network::MessageType::GAME_OVER, gameOverMsg);
+            m_networkManager->broadcast(buffer);
+        }
     }
 
 } // namespace rtype::server
