@@ -12,6 +12,7 @@
 #include "../../engine/ecs/components/SpriteComponent.hpp"
 #include "../components/SpritesheetComponent.hpp"
 #include "../components/PlayerShipComponent.hpp"
+#include "../components/PlayerComponent.hpp"
 #include "../components/BackgroundComponent.hpp"
 #include "../components/ProjectileComponent.hpp"
 #include "../../engine/ui/UIManager.hpp"
@@ -27,7 +28,9 @@
 // Game state for conditional rendering
 enum class GameState {
     MENU,
-    PLAYING
+    PLAYING,
+    PAUSED,
+    SETTINGS
 };
 
 namespace rtype::ui {
@@ -304,13 +307,67 @@ namespace rtype::ecs {
              * @brief Draw the game UI elements
              */
             void drawUI() {
-                // Show game UI only when playing
-                if (m_gameState && *m_gameState == GameState::PLAYING) {
+                // Show game UI only when playing or paused
+                if (m_gameState && (*m_gameState == GameState::PLAYING || *m_gameState == GameState::PAUSED)) {
+                    // Get player score from PlayerComponent
+                    int playerScore = 0;
+                    m_registry->forEach<PlayerComponent>(
+                        [this, &playerScore](EntityId e) {
+                            const auto& player = m_registry->getComponent<PlayerComponent>(e);
+                            if (player.isLocal) {
+                                playerScore = player.score;
+                            }
+                        }
+                    );
+
+                    // Score display
                     DrawText("SCORE", 20, 15, 20, {150, 150, 150, 255});
-                    DrawText("00000", 20, 40, 28, WHITE);
+                    char scoreText[16];
+                    snprintf(scoreText, sizeof(scoreText), "%08d", playerScore);
+                    DrawText(scoreText, 20, 40, 28, WHITE);
+                    
+                    // Lives display
+                    int playerLives = 0;
+                    m_registry->forEach<PlayerComponent>(
+                        [this, &playerLives](EntityId e) {
+                            const auto& player = m_registry->getComponent<PlayerComponent>(e);
+                            if (player.isLocal) {
+                                playerLives = player.lives;
+                            }
+                        }
+                    );
+                    DrawText("LIVES", 180, 15, 20, {150, 150, 150, 255});
+                    char livesText[8];
+                    snprintf(livesText, sizeof(livesText), "%d", playerLives);
+                    DrawText(livesText, 180, 40, 28, WHITE);
+
                     DrawText("R-TYPE", m_screenWidth - 90, 15, 20, {100, 100, 255, 255});
                     DrawFPS(m_screenWidth - 80, m_screenHeight - 25);
-                    DrawText("[O] Debug  [G] Bullets  [Space] Shoot", 10, m_screenHeight - 25, 14, {80, 80, 80, 255});
+                    DrawText("[O] Debug  [G] Bullets  [Space] Shoot  [ESC] Pause", 10, m_screenHeight - 25, 14, {80, 80, 80, 255});
+                }
+
+                // Draw pause overlay
+                if (m_gameState && *m_gameState == GameState::PAUSED) {
+                    // Dim background
+                    DrawRectangle(0, 0, m_screenWidth, m_screenHeight, {0, 0, 0, 150});
+                    
+                    // Pause menu box
+                    int boxWidth = 300;
+                    int boxHeight = 280;
+                    int boxX = (m_screenWidth - boxWidth) / 2;
+                    int boxY = (m_screenHeight - boxHeight) / 2;
+                    
+                    DrawRectangle(boxX, boxY, boxWidth, boxHeight, {20, 20, 40, 240});
+                    DrawRectangleLines(boxX, boxY, boxWidth, boxHeight, {100, 100, 255, 255});
+                    
+                    // Title
+                    DrawText("PAUSED", boxX + 90, boxY + 20, 32, WHITE);
+                    
+                    // Instructions (basic - full menu handled by UI system)
+                    DrawText("[ESC] Resume", boxX + 70, boxY + 80, 20, {200, 200, 200, 255});
+                    DrawText("[S] Settings", boxX + 70, boxY + 120, 20, {200, 200, 200, 255});
+                    DrawText("[M] Main Menu", boxX + 70, boxY + 160, 20, {200, 200, 200, 255});
+                    DrawText("[Q] Quit Game", boxX + 70, boxY + 200, 20, {200, 200, 200, 255});
                 }
                 
                 // Show menu UI only when in menu state

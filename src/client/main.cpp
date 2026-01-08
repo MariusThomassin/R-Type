@@ -382,10 +382,27 @@ int main(int argc, char* argv[]) {
             titleGlow2->setTextColor(UIColor(255, 30, 30, glowAlpha2));
         }
         
-        // Allow ESC to return to menu from game
-        if (gameState == GameState::PLAYING && IsKeyPressed(KEY_ESCAPE)) {
-            std::cout << "Returning to menu..." << std::endl;
-            gameState = GameState::MENU;
+        // Handle pause toggle with ESC key
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            if (gameState == GameState::PLAYING) {
+                std::cout << "Game paused..." << std::endl;
+                gameState = GameState::PAUSED;
+            } else if (gameState == GameState::PAUSED) {
+                std::cout << "Game resumed..." << std::endl;
+                gameState = GameState::PLAYING;
+            }
+        }
+        
+        // Handle pause menu key shortcuts
+        if (gameState == GameState::PAUSED) {
+            if (IsKeyPressed(KEY_M)) {
+                std::cout << "Returning to menu..." << std::endl;
+                gameState = GameState::MENU;
+            }
+            if (IsKeyPressed(KEY_Q)) {
+                std::cout << "Quitting game..." << std::endl;
+                shouldExit = true;
+            }
         }
 
         // Update network (process received messages)

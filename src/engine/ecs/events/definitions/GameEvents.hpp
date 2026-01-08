@@ -94,6 +94,7 @@ namespace rtype::ecs::events {
         EntityId enemy;
         EntityId killer;
         int pointValue;
+        float x, y;  // Death position for powerup spawning
     };
 
     /**
@@ -172,6 +173,25 @@ namespace rtype::ecs::events {
     struct DanmakuTrigger {
         float x, y;
         int patternId;
+    };
+
+    // ==================== Powerup Events ====================
+
+    /**
+     * @brief Powerup collected by player
+     */
+    struct PowerupCollected {
+        int powerupEntityId;
+        int playerId;
+        int powerupType;
+    };
+
+    /**
+     * @brief Powerup effect expired
+     */
+    struct PowerupExpired {
+        int playerId;
+        int powerupType;
     };
 
 } // namespace rtype::ecs::events

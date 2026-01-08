@@ -20,6 +20,8 @@ namespace rtype::network {
         CLIENT_INPUT = 1,        // Player input
         CLIENT_DISCONNECT = 2,   // Clean disconnect
         PLAYER_READY = 3,        // Player clicked Play button and is ready
+        CHAT_MESSAGE = 4,        // Chat message from player
+        PAUSE_REQUEST = 5,       // Request to pause/unpause
 
         // Server → Client
         SERVER_WELCOME = 10,     // Connection response (assigns clientId)
@@ -31,7 +33,10 @@ namespace rtype::network {
         PLAYER_HIT = 16,         // Player took damage
         PLAYER_DEATH = 17,       // Player died (will respawn)
         PLAYER_RESPAWN = 18,     // Player respawned
-        GAME_OVER = 19           // Game over (all players dead)
+        GAME_OVER = 19,          // Game over (all players dead)
+        CHAT_BROADCAST = 20,     // Chat message broadcast to all
+        PAUSE_STATE = 21,        // Server pause state change
+        SCORE_UPDATE = 22        // Score update for a player
     };
 
     /**
@@ -102,6 +107,22 @@ namespace rtype::network {
      */
     struct PlayerReadyMessage {
         uint32_t clientId;          // Client ID that is ready
+    };
+
+    /**
+     * @brief CHAT_MESSAGE: Chat message from client
+     */
+    struct ChatMessagePacket {
+        uint32_t clientId;          // Sender client ID
+        char message[128];          // Message text (null-terminated)
+    };
+
+    /**
+     * @brief PAUSE_REQUEST: Client requests pause state change
+     */
+    struct PauseRequestMessage {
+        uint32_t clientId;          // Requesting client
+        bool pause;                 // true = pause, false = unpause
     };
 
     // ============================================================
@@ -221,6 +242,32 @@ namespace rtype::network {
         uint8_t survivorCount;  // Number of players still alive (0 for game over)
     };
 
+    /**
+     * @brief CHAT_BROADCAST: Chat message broadcast to all clients
+     */
+    struct ChatBroadcastMessage {
+        uint32_t senderId;          // Original sender client ID
+        char senderName[32];        // Sender display name
+        char message[128];          // Message text (null-terminated)
+    };
+
+    /**
+     * @brief PAUSE_STATE: Server broadcasts pause state change
+     */
+    struct PauseStateMessage {
+        bool isPaused;              // Current pause state
+        uint32_t requesterId;       // Client who triggered the pause
+    };
+
+    /**
+     * @brief SCORE_UPDATE: Server broadcasts score change
+     */
+    struct ScoreUpdateMessage {
+        uint32_t clientId;          // Client whose score changed
+        int32_t newScore;           // New total score
+        int32_t delta;              // Points added
+    };
+
     // ============================================================
     // Serialization utilities
     // ============================================================
@@ -295,6 +342,9 @@ namespace rtype::network {
             case MessageType::CLIENT_HELLO: return "CLIENT_HELLO";
             case MessageType::CLIENT_INPUT: return "CLIENT_INPUT";
             case MessageType::CLIENT_DISCONNECT: return "CLIENT_DISCONNECT";
+            case MessageType::PLAYER_READY: return "PLAYER_READY";
+            case MessageType::CHAT_MESSAGE: return "CHAT_MESSAGE";
+            case MessageType::PAUSE_REQUEST: return "PAUSE_REQUEST";
             case MessageType::SERVER_WELCOME: return "SERVER_WELCOME";
             case MessageType::ENTITY_SPAWN: return "ENTITY_SPAWN";
             case MessageType::ENTITY_STATE: return "ENTITY_STATE";
@@ -305,6 +355,9 @@ namespace rtype::network {
             case MessageType::PLAYER_DEATH: return "PLAYER_DEATH";
             case MessageType::PLAYER_RESPAWN: return "PLAYER_RESPAWN";
             case MessageType::GAME_OVER: return "GAME_OVER";
+            case MessageType::CHAT_BROADCAST: return "CHAT_BROADCAST";
+            case MessageType::PAUSE_STATE: return "PAUSE_STATE";
+            case MessageType::SCORE_UPDATE: return "SCORE_UPDATE";
             default: return "UNKNOWN";
         }
     }
