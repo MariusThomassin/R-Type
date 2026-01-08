@@ -22,7 +22,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=cmake)](.)
 [![C++17](https://img.shields.io/badge/C++-17-00599C?style=for-the-badge&logo=c%2B%2B)](.)
 [![Cross-Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-blue?style=for-the-badge)](.)
-[![ECS](https://img.shields.io/badge/Architecture-ECS-ff69b4?style=for-the-badge)](doc/ECS_Architecture.puml)
+[![ECS](https://img.shields.io/badge/Architecture-ECS-ff69b4?style=for-the-badge)](doc/architecture/ECS_Architecture.puml)
 
 </div>
 
@@ -163,7 +163,7 @@ cmake --build build -j$(sysctl -n hw.ncpu)
 
 ### 🏛️ ARCHITECTURE
 
-<a href="doc/ECS_Architecture.puml">
+<a href="doc/architecture/ECS_Architecture.puml">
   <b>📐 ECS Blueprint</b>
 </a>
 
@@ -174,7 +174,7 @@ cmake --build build -j$(sysctl -n hw.ncpu)
 
 ### 📖 ECS GUIDE
 
-<a href="doc/ECS_Documentation.md">
+<a href="doc/architecture/ECS_Documentation.md">
   <b>🧠 Engine Manual</b>
 </a>
 
@@ -208,6 +208,55 @@ cmake --build build -j$(sysctl -n hw.ncpu)
 
 <table>
 <tr>
+<td align="center" width="25%">
+
+### 📡 NETWORK RFC
+
+<a href="doc/network/RFC_R-Type_Protocol.md">
+  <b>📜 Protocol Spec</b>
+</a>
+
+`RFC Document`
+
+</td>
+<td align="center" width="25%">
+
+### 🔄 SEQUENCE DIAGRAM
+
+<a href="doc/network/Network_Sequence_Diagram.png">
+  <b>📊 Message Flow</b>
+</a>
+
+`PlantUML`
+
+</td>
+<td align="center" width="25%">
+
+### 🔌 DETAILED FLOW
+
+<a href="doc/network/Network_Detailed_Flow.png">
+  <b>🔍 Internal Flow</b>
+</a>
+
+`Technical`
+
+</td>
+<td align="center" width="25%">
+
+### 📨 MESSAGE TYPES
+
+<a href="doc/network/Network_Message_Types.png">
+  <b>📦 All Messages</b>
+</a>
+
+`Overview`
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
 <td align="center" width="33%">
 
 ### 🏗️ BUILD: CMAKE
@@ -232,13 +281,13 @@ cmake --build build -j$(sysctl -n hw.ncpu)
 </td>
 <td align="center" width="33%">
 
-### 📜 MAIN DOCS
+### � DEPLOYMENT
 
-<a href="doc/">
-  <b>📚 Full Archive</b>
+<a href="doc/DEPLOYMENT.md">
+  <b>🚀 Deploy Guide</b>
 </a>
 
-`All Files`
+`Production`
 
 </td>
 </tr>

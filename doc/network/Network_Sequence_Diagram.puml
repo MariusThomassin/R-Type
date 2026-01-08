@@ -1,0 +1,154 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+
+title R-Type Network Protocol - Sequence Diagram
+
+actor "Player 1" as P1
+participant "Client 1\n(NetworkClient)" as C1 #LightBlue
+participant "Server\n(GameServer)" as S #LightGreen
+participant "Client 2\n(NetworkClient)" as C2 #LightBlue
+actor "Player 2" as P2
+
+== Connection Phase ==
+
+P1 -> C1 : Launch Game
+activate C1
+C1 -> S : **CLIENT_HELLO**\n(protocolVersion=1, playerName)
+activate S
+S --> C1 : **SERVER_WELCOME**\n(clientId=1, serverTime)
+S --> C1 : **SERVER_SNAPSHOT**\n(entityCount, entities[])
+note right of S : Client 1 connected\nAssigned ID: 1
+
+P2 -> C2 : Launch Game
+activate C2
+C2 -> S : **CLIENT_HELLO**\n(protocolVersion=1, playerName)
+S --> C2 : **SERVER_WELCOME**\n(clientId=2, serverTime)
+S --> C2 : **SERVER_SNAPSHOT**\n(entityCount, entities[])
+note right of S : Client 2 connected\nAssigned ID: 2
+
+== Game Start Phase ==
+
+P1 -> C1 : Click Play
+C1 -> S : **PLAYER_READY**\n(clientId=1)
+note right of S : 1 player ready\nWaiting for 2nd player...
+
+P2 -> C2 : Click Play
+C2 -> S : **PLAYER_READY**\n(clientId=2)
+note right of S #LightYellow : 2+ players ready\nGAME STARTS
+
+S --> C1 : **PLAYER_SPAWN**\n(networkId=1, clientId=1,\nslot=0, x=100, y=180)
+S --> C2 : **PLAYER_SPAWN**\n(networkId=1, clientId=1,\nslot=0, x=100, y=180)
+S --> C1 : **PLAYER_SPAWN**\n(networkId=2, clientId=2,\nslot=1, x=100, y=360)
+S --> C2 : **PLAYER_SPAWN**\n(networkId=2, clientId=2,\nslot=1, x=100, y=360)
+
+== Gameplay Loop ==
+
+group Game Loop [60 Hz Server Tick]
+    
+    |||
+    note over S : Server Tick N
+    
+    P1 -> C1 : Press Arrow Keys + Shoot
+    C1 -> S : **CLIENT_INPUT**\n(seq=1, flags=0x1F, dt)
+    note right of S : Process input\nUP+DOWN+LEFT+RIGHT+SHOOT
+    
+    P2 -> C2 : Press Arrow Keys
+    C2 -> S : **CLIENT_INPUT**\n(seq=1, flags=0x09, dt)
+    note right of S : Process input\nUP+RIGHT
+    
+    S -> S : Update Physics\n(60 Hz simulation)
+    S -> S : Spawn Projectile\n(from Player 1 shooting)
+    
+    S --> C1 : **ENTITY_SPAWN**\n(networkId=100, type=PROJECTILE)
+    S --> C2 : **ENTITY_SPAWN**\n(networkId=100, type=PROJECTILE)
+    
+    |||
+    note over S : Network Update (20 Hz)
+    
+    S --> C1 : **ENTITY_STATE**\n(networkId=1, x, y, vx, vy)
+    S --> C2 : **ENTITY_STATE**\n(networkId=1, x, y, vx, vy)
+    S --> C1 : **ENTITY_STATE**\n(networkId=2, x, y, vx, vy)
+    S --> C2 : **ENTITY_STATE**\n(networkId=2, x, y, vx, vy)
+    S --> C1 : **ENTITY_STATE**\n(networkId=100, x, y, vx, vy)
+    S --> C2 : **ENTITY_STATE**\n(networkId=100, x, y, vx, vy)
+
+end
+
+== Collision and Damage ==
+
+group Player Takes Damage
+
+    S -> S : Detect Collision\n(Enemy hits Player 1)
+    
+    S --> C1 : **PLAYER_HIT**\n(networkId=1, newHealth=50)
+    S --> C2 : **PLAYER_HIT**\n(networkId=1, newHealth=50)
+    
+    note over C1 : Display damage effect
+
+end
+
+== Player Death and Respawn ==
+
+group Player Death Sequence
+
+    S -> S : Player 1 health <= 0
+    
+    S --> C1 : **PLAYER_DEATH**\n(networkId=1, lives=2)
+    S --> C2 : **PLAYER_DEATH**\n(networkId=1, lives=2)
+    
+    note over C1 : Show death animation
+    
+    ... 3 seconds respawn delay ...
+    
+    S -> S : Respawn Timer Complete
+    
+    S --> C1 : **PLAYER_RESPAWN**\n(networkId=1, slot=0, health=100)
+    S --> C2 : **PLAYER_RESPAWN**\n(networkId=1, slot=0, health=100)
+    
+    note over C1 : Player 1 respawned
+
+end
+
+== Entity Destruction ==
+
+group Projectile Destroyed
+
+    S -> S : Projectile expires
+
+    S --> C1 : **ENTITY_DESTROY**\n(networkId=100)
+    S --> C2 : **ENTITY_DESTROY**\n(networkId=100)
+
+end
+
+== Game Over ==
+
+group Game Over Sequence
+
+    S -> S : All players dead
+    
+    S --> C1 : **GAME_OVER**\n(survivorCount=0)
+    S --> C2 : **GAME_OVER**\n(survivorCount=0)
+    
+    note over C1, C2 #Pink : Display Game Over screen
+
+end
+
+== Clean Disconnection ==
+
+P2 -> C2 : Quit Game
+C2 -> S : **CLIENT_DISCONNECT**\n(clientId=2)
+S -> S : Remove Player 2
+
+S --> C1 : **ENTITY_DESTROY**\n(networkId=2)
+note right of S : Broadcast Player 2\nremoval to others
+
+deactivate C2
+
+P1 -> C1 : Quit Game
+C1 -> S : **CLIENT_DISCONNECT**\n(clientId=1)
+
+deactivate C1
+deactivate S
+
+@enduml
