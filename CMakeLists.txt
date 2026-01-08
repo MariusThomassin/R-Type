@@ -67,6 +67,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(catch2)
 
+# nlohmann/json for configuration and serialization
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    TIMEOUT 60
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 #--------------------------------------------------------------
 # Default build type (if not using multi-config generator)
 #--------------------------------------------------------------

@@ -13,6 +13,7 @@
 #include "Types.hpp"
 
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <set>
 #include <unordered_map>
@@ -21,6 +22,10 @@
 #include <functional>
 
 namespace rtype::ecs {
+
+    // Forward declarations for command system
+    class CommandBuffer;
+    class Transaction;
 
     /**
      * @brief Central registry managing all entities and their components
@@ -95,6 +100,36 @@ namespace rtype::ecs {
              * @return Count of entities
              */
             std::size_t getEntityCount() const;
+
+            // ==================== Deferred Operations ====================
+
+            /**
+             * @brief Queue an entity for deferred destruction
+             * @param entity The entity to destroy
+             * 
+             * Entity will be destroyed when flushDeferred() is called.
+             * Safe to call during iteration.
+             */
+            void destroyEntityDeferred(EntityId entity);
+
+            /**
+             * @brief Queue multiple entities for deferred destruction
+             * @param entities Vector of entity IDs to destroy
+             */
+            void destroyEntitiesDeferred(const std::vector<EntityId>& entities);
+
+            /**
+             * @brief Execute all deferred operations
+             * @return Number of operations executed
+             * 
+             * Call once per frame, typically at end of update cycle.
+             */
+            std::size_t flushDeferred();
+
+            /**
+             * @brief Get count of pending deferred operations
+             */
+            std::size_t getDeferredCount() const;
 
             // ==================== Component Management ====================
 
@@ -526,5 +561,15 @@ namespace rtype::ecs {
              * @brief Map of component type IDs to their storage arrays
              */
             std::unordered_map<ComponentTypeId, std::shared_ptr<IComponentArray>> m_componentArrays;
+
+            /**
+             * @brief Queue of entities pending deferred destruction
+             */
+            std::vector<EntityId> m_deferredDestroyQueue;
+
+            /**
+             * @brief Mutex for deferred operations queue
+             */
+            mutable std::mutex m_deferredMutex;
         };
 } // namespace rtype::ecs

@@ -8,6 +8,12 @@ set(ECS_ENGINE_SOURCES
     ecs/core/Registry.cpp
     ecs/core/EventBus.cpp
     ecs/core/SystemManager.cpp
+    ecs/core/Command.cpp
+    ecs/core/Serialization.cpp
+    
+    # Core engine utilities
+    core/ConfigManager.cpp
+    core/AssetManager.cpp
     
     # ECS Systems
     ecs/systems/MovementSystem.cpp
@@ -28,6 +34,7 @@ set(GAME_UTILS_SOURCES
 # Create static library for the ECS engine
 add_library(ecs_engine STATIC ${ECS_ENGINE_SOURCES} ${GAME_UTILS_SOURCES})
 target_include_directories(ecs_engine PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(ecs_engine PUBLIC nlohmann_json::nlohmann_json)
 
 # Compile with same flags
 if(MSVC)
