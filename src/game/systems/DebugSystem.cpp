@@ -18,6 +18,12 @@ namespace rtype::ecs {
         m_tabs.push_back(std::make_unique<debug::BulletsTab>());
         m_tabs.push_back(std::make_unique<debug::TexturesTab>());
         m_tabs.push_back(std::make_unique<debug::PerformanceTab>());
+        
+        // EngineTab for new engine subsystems
+        auto engineTab = std::make_unique<debug::EngineTab>(&eventBus);
+        m_engineTab = engineTab.get();
+        m_tabs.push_back(std::move(engineTab));
+        
         m_tabs.push_back(std::make_unique<debug::UILibraryTab>());
         
         // ModesTab needs EventBus reference
@@ -129,6 +135,14 @@ namespace rtype::ecs {
             if (modesTab) {
                 modesTab->setStressTestState(active, complete, intensity, progress, reportFilename);
             }
+        }
+    }
+
+    void DebugSystem::updateEngineStats(size_t spatialEntities, size_t spatialCells,
+                                        size_t collisionPairs, size_t deferredCount) {
+        if (m_engineTab) {
+            m_engineTab->setSpatialHashStats(spatialEntities, spatialCells, collisionPairs);
+            m_engineTab->setDeferredCount(deferredCount);
         }
     }
 

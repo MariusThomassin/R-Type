@@ -20,6 +20,7 @@
 #include "debug/PerformanceTab.hpp"
 #include "debug/ModesTab.hpp"
 #include "debug/UILibraryTab.hpp"
+#include "debug/EngineTab.hpp"
 
 #include <raylib.h>
 #include <vector>
@@ -95,6 +96,16 @@ namespace rtype::ecs {
              */
             void updateStressTestState(bool active, bool complete, int intensity, float progress, const std::string& reportFilename);
 
+            /**
+             * @brief Update engine subsystem stats in EngineTab
+             * @param spatialEntities Number of entities in spatial hash
+             * @param spatialCells Number of active cells
+             * @param collisionPairs Number of collision pairs checked
+             * @param deferredCount Number of deferred entity deletions
+             */
+            void updateEngineStats(size_t spatialEntities, size_t spatialCells, 
+                                   size_t collisionPairs, size_t deferredCount);
+
         private:
             /**
              * @brief Subscribe to input events
@@ -137,6 +148,11 @@ namespace rtype::ecs {
              * @brief Special reference to ModesTab for state updates
              */
             std::unique_ptr<debug::ModesTab> m_modesTab;
+
+            /**
+             * @brief Pointer to EngineTab for updating engine stats
+             */
+            debug::EngineTab* m_engineTab = nullptr;
 
             /**
              * @brief Index of ModesTab in m_tabs vector
