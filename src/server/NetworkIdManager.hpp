@@ -124,11 +124,12 @@ namespace rtype::server {
 
         /**
          * @brief Clear all mappings (for server reset)
+         * Note: m_nextId is NOT reset to ensure network IDs are never reused
          */
         void clear() {
             m_entityToNetworkId.clear();
             m_networkIdToEntity.clear();
-            m_nextId = 1;
+            // Don't reset m_nextId - network IDs should never be reused
         }
 
     private:

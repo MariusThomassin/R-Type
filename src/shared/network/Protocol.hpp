@@ -295,6 +295,7 @@ namespace rtype::network {
             case MessageType::CLIENT_HELLO: return "CLIENT_HELLO";
             case MessageType::CLIENT_INPUT: return "CLIENT_INPUT";
             case MessageType::CLIENT_DISCONNECT: return "CLIENT_DISCONNECT";
+            case MessageType::PLAYER_READY: return "PLAYER_READY";
             case MessageType::SERVER_WELCOME: return "SERVER_WELCOME";
             case MessageType::ENTITY_SPAWN: return "ENTITY_SPAWN";
             case MessageType::ENTITY_STATE: return "ENTITY_STATE";
