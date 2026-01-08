@@ -90,7 +90,7 @@ void LobbyWidget::createButtons() {
 
     // Back button
     backButton_ = std::make_shared<ButtonWidget>("BACK TO MENU");
-    backButton_->setPosition(contentBounds.width - 100.0f, 500);
+    backButton_->setPosition(25.0f, 580.0f);
     backButton_->setSize(200.0f, 50.0f);
     backButton_->setBackgroundColor(UIColor(100, 100, 100, 200)); // Gray
     backButton_->setBorderColor(UIColor(150, 150, 150, 255));
@@ -106,7 +106,7 @@ void LobbyWidget::createButtons() {
 
     // Start game button (for host)
     startGameButton_ = std::make_shared<ButtonWidget>("START GAME");
-    startGameButton_->setPosition(contentBounds.width - 250.0f, contentBounds.height - 80.0f);
+    startGameButton_->setPosition(contentBounds.width - 215.0f, 580.0f);
     startGameButton_->setSize(200.0f, 50.0f);
     startGameButton_->setBackgroundColor(UIColor(0, 150, 0, 200)); // Green
     startGameButton_->setBorderColor(UIColor(0, 255, 0, 255));
