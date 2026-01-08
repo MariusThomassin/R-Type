@@ -369,11 +369,9 @@ int main(int argc, char* argv[]) {
         std::cout << "Returning to main menu from multiplayer..." << std::endl;
     };
 
-    multiplayerCallbacks.onJoinServer = [&gameState](const std::string& ip, int port) {
-        // TODO: Implement server joining logic
-        std::cout << "Attempting to join server at " << ip << ":" << port << std::endl;
-        // For now, just transition to playing state
-        // gameState = GameState::PLAYING;
+    multiplayerCallbacks.onJoinServer = [&gameState, &showingMultiplayer, &showingLobby, &lobbyWidget, &networkClient](const std::string& ip, int port) {
+        // TODO: User will implement this callback
+        std::cout << "Join server callback called with " << ip << ":" << port << std::endl;
     };
 
     multiplayerCallbacks.onCreateRoom = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const rtype::ui::RoomSettings& settings) {

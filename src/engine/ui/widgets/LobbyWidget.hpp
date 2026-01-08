@@ -100,6 +100,7 @@ private:
     std::shared_ptr<PanelWidget> lobbyPanel_;
     std::shared_ptr<TextWidget> lobbyTitle_;
     std::shared_ptr<TextWidget> roomNameText_;
+    std::shared_ptr<TextWidget> connectionInfoText_;
     std::shared_ptr<TextWidget> playersLabel_;
     std::shared_ptr<TextWidget> playersList_;
     std::shared_ptr<ButtonWidget> backButton_;

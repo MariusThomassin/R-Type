@@ -145,7 +145,10 @@ private:
     std::shared_ptr<InputFieldWidget> ipInput_;
     std::shared_ptr<TextWidget> portLabel_;
     std::shared_ptr<InputFieldWidget> portInput_;
+    std::shared_ptr<TextWidget> roomNameJoinLabel_;
+    std::shared_ptr<InputFieldWidget> roomNameJoinInput_;
     std::shared_ptr<ButtonWidget> joinServerButton_;
+    std::shared_ptr<ButtonWidget> joinRoomButton_;
     
     // Room list components
     std::shared_ptr<PanelWidget> roomListPanel_;

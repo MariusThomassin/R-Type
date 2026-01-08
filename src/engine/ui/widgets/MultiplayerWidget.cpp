@@ -102,7 +102,7 @@ void MultiplayerWidget::createJoinInterface() {
     // Join panel
     joinPanel_ = std::make_shared<PanelWidget>();
     joinPanel_->setPosition(30.0f, 160.0f);
-    joinPanel_->setSize(contentBounds.width - 60.0f, 300.0f);
+    joinPanel_->setSize(contentBounds.width - 60.0f, 340.0f);
     joinPanel_->setBackgroundColor(UIColor(5, 15, 30, 150));
     joinPanel_->setBorderColor(UIColor(50, 100, 150, 255));
     joinPanel_->setBorderWidth(1.0f);
@@ -146,12 +146,27 @@ void MultiplayerWidget::createJoinInterface() {
     portInput_->setVisible(true);
     joinPanel_->addChild(portInput_);
 
-    // Join button
+    // Room name input for direct room joining
+    roomNameJoinLabel_ = std::make_shared<TextWidget>("Room Name:", config_.textFontSize);
+    roomNameJoinLabel_->setPosition(20.0f, 190.0f);
+    roomNameJoinLabel_->setSize(120.0f, 30.0f);
+    roomNameJoinLabel_->setBackgroundColor(UIColor::Transparent());
+    roomNameJoinLabel_->setTextColor(UIColor(180, 200, 255, 255));
+    joinPanel_->addChild(roomNameJoinLabel_);
+
+    roomNameJoinInput_ = std::make_shared<InputFieldWidget>("Enter room name");
+    roomNameJoinInput_->setPosition(150.0f, 185.0f);
+    roomNameJoinInput_->setSize(250.0f, 40.0f);
+    roomNameJoinInput_->setText("");
+    roomNameJoinInput_->setVisible(true);
+    joinPanel_->addChild(roomNameJoinInput_);
+
+    // Join by server button
     joinServerButton_ = std::make_shared<ButtonWidget>("JOIN SERVER");
-    joinServerButton_->setPosition(contentBounds.width - 270.0f, 235.0f);
-    joinServerButton_->setSize(200.0f, 50.0f);
-    joinServerButton_->setBackgroundColor(UIColor(0, 150, 0, 200));
-    joinServerButton_->setBorderColor(UIColor(0, 255, 0, 255));
+    joinServerButton_->setPosition(150.0f, 280.0f);
+    joinServerButton_->setSize(150.0f, 40.0f);
+    joinServerButton_->setBackgroundColor(UIColor(0, 120, 180, 200));
+    joinServerButton_->setBorderColor(UIColor(0, 150, 220, 255));
     joinServerButton_->setBorderWidth(2.0f);
     joinServerButton_->setTextColor(UIColor::White());
     joinServerButton_->setOnClick([this]() {
@@ -170,10 +185,34 @@ void MultiplayerWidget::createJoinInterface() {
     });
     joinPanel_->addChild(joinServerButton_);
 
+    // Join by room name button
+    joinRoomButton_ = std::make_shared<ButtonWidget>("JOIN ROOM");
+    joinRoomButton_->setPosition(320.0f, 280.0f);
+    joinRoomButton_->setSize(150.0f, 40.0f);
+    joinRoomButton_->setBackgroundColor(UIColor(0, 150, 0, 200));
+    joinRoomButton_->setBorderColor(UIColor(0, 255, 0, 255));
+    joinRoomButton_->setBorderWidth(2.0f);
+    joinRoomButton_->setTextColor(UIColor::White());
+    joinRoomButton_->setOnClick([this]() {
+        std::string roomName = roomNameJoinInput_->getText();
+        
+        if (roomName.empty()) {
+            std::cout << "Please enter a room name" << std::endl;
+            return;
+        }
+        
+        std::cout << "Joining room: " << roomName << std::endl;
+        // For now, use default server settings when joining by room name
+        if (callbacks_.onJoinServer) {
+            callbacks_.onJoinServer(config_.defaultIP, config_.defaultPort);
+        }
+    });
+    joinPanel_->addChild(joinRoomButton_);
+
     // Room list panel (right side)
     roomListPanel_ = std::make_shared<PanelWidget>();
-    roomListPanel_->setPosition(450.0f, 60.0f);
-    roomListPanel_->setSize(450.0f, 220.0f);
+    roomListPanel_->setPosition(480.0f, 60.0f);
+    roomListPanel_->setSize(420.0f, 260.0f);
     roomListPanel_->setBackgroundColor(UIColor(2, 8, 15, 180));
     roomListPanel_->setBorderColor(UIColor(80, 120, 180, 255));
     roomListPanel_->setBorderWidth(1.0f);
@@ -357,7 +396,7 @@ void MultiplayerWidget::createNavigation() {
 
     // Back button
     joinBackButton_ = std::make_shared<ButtonWidget>("BACK TO MENU");
-    joinBackButton_->setPosition(15.0f, 235.0f);
+    joinBackButton_->setPosition(contentBounds.width - 270.0f, 270.0f);
     joinBackButton_->setSize(200.0f, 50.0f);
     joinBackButton_->setBackgroundColor(UIColor(100, 100, 100, 200));
     joinBackButton_->setBorderColor(UIColor(150, 150, 150, 255));

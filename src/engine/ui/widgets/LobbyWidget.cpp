@@ -60,6 +60,14 @@ void LobbyWidget::createTitle() {
     roomNameText_->setBackgroundColor(UIColor::Transparent());
     roomNameText_->setTextColor(UIColor(200, 220, 255, 255)); // Lighter blue
     lobbyPanel_->addChild(roomNameText_);
+
+    // Connection info (IP:Port for sharing)
+    connectionInfoText_ = std::make_shared<TextWidget>("Share this to join: 127.0.0.1:4242", config_.textFontSize - 2);
+    connectionInfoText_->setPosition(50.0f, 120.0f);
+    connectionInfoText_->setSize(600.0f, 30.0f);
+    connectionInfoText_->setBackgroundColor(UIColor::Transparent());
+    connectionInfoText_->setTextColor(UIColor(150, 200, 150, 255)); // Light green
+    lobbyPanel_->addChild(connectionInfoText_);
 }
 
 void LobbyWidget::createContent() {
@@ -67,7 +75,7 @@ void LobbyWidget::createContent() {
 
     // Players section label
     playersLabel_ = std::make_shared<TextWidget>("Players:", config_.textFontSize);
-    playersLabel_->setPosition(50.0f, 140.0f);
+    playersLabel_->setPosition(50.0f, 160.0f);
     playersLabel_->setSize(200.0f, 30.0f);
     playersLabel_->setBackgroundColor(UIColor::Transparent());
     playersLabel_->setTextColor(UIColor(180, 200, 255, 255));
@@ -76,7 +84,7 @@ void LobbyWidget::createContent() {
     // Placeholder players list
     std::string playersText = "• Player 1 (You) - Host\n• Waiting for players...\n• Empty slot\n• Empty slot";
     playersList_ = std::make_shared<TextWidget>(playersText, config_.textFontSize - 2);
-    playersList_->setPosition(70.0f, 180.0f);
+    playersList_->setPosition(70.0f, 200.0f);
     playersList_->setSize(600.0f, 200.0f);
     playersList_->setBackgroundColor(UIColor(5, 10, 20, 100)); // Semi-transparent dark background
     playersList_->setBorderColor(UIColor(50, 80, 120, 255));
