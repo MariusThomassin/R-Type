@@ -33,7 +33,7 @@ struct IntegrationTestSetup {
 // Basic Player Lifecycle Integration
 // ============================================================
 
-TEST_CASE("Player lifecycle: spawn → move → remove", "[integration][lifecycle]") {
+TEST_CASE("Player lifecycle: spawn, move, remove", "[integration][lifecycle]") {
     IntegrationTestSetup setup;
     rtype::ecs::Registry& registry = setup.registry;
     PlayerManager& playerManager = setup.playerManager;
