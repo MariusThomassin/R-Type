@@ -71,7 +71,7 @@ namespace rtype::client {
         /**
          * @brief Check if connected to server
          */
-        bool isConnected() const { return m_connected; }
+        bool isConnected() const { return m_connected && m_welcomeReceived; }
 
         /**
          * @brief Get assigned client ID
@@ -161,6 +161,7 @@ namespace rtype::client {
 
         // Connection state
         bool m_connected;
+        bool m_welcomeReceived;  // true if we've received SERVER_WELCOME from server
         uint32_t m_clientId;
 
         // Network ID mapping (networkId → local Entity)

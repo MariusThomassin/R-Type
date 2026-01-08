@@ -25,6 +25,7 @@ struct MainMenuConfig {
  */
 struct MainMenuCallbacks {
     std::function<void()> onPlay;
+    std::function<void()> onMultiplayer;
     std::function<void()> onSettings;
     std::function<void()> onExit;
 };
@@ -103,6 +104,7 @@ private:
     std::shared_ptr<TextWidget> titleGlow2_;
     std::shared_ptr<TextWidget> subtitle_;
     std::shared_ptr<ButtonWidget> playButton_;
+    std::shared_ptr<ButtonWidget> multiplayerButton_;
     std::shared_ptr<ButtonWidget> settingsButton_;
     std::shared_ptr<ButtonWidget> exitButton_;
 

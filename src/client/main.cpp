@@ -22,6 +22,8 @@
 #include "../engine/ui/widgets/PanelWidget.hpp"
 #include "../engine/ui/widgets/SettingsWidget.hpp"
 #include "../engine/ui/widgets/MainMenuWidget.hpp"
+#include "../engine/ui/widgets/LobbyWidget.hpp"
+#include "../engine/ui/widgets/MultiplayerWidget.hpp"
 #include "../engine/graphics/RenderUtils.hpp"
 #include "NetworkClient.hpp"
 
@@ -220,6 +222,8 @@ int main(int argc, char* argv[]) {
     
     // ==================== Settings Panel ====================
     bool showingSettingsPanel = false;
+    bool showingLobby = false;
+    bool showingMultiplayer = false;
     
     // ==================== ECS Setup ====================
     Registry registry;
@@ -299,6 +303,12 @@ int main(int argc, char* argv[]) {
         gameState = GameState::PLAYING;
     };
 
+    menuCallbacks.onMultiplayer = [&gameState, &showingMultiplayer]() {
+        gameState = GameState::MULTIPLAYER;
+        showingMultiplayer = true;
+        std::cout << "Opening multiplayer menu..." << std::endl;
+    };
+
     menuCallbacks.onSettings = [&showingSettingsPanel, &settingsWidget, &mainMenuWidget]() {
         showingSettingsPanel = true;
         settingsWidget->show();
@@ -326,14 +336,122 @@ int main(int argc, char* argv[]) {
     };
     settingsWidget->setCallbacks(callbacks);
 
+    // ==================== Multiplayer Widget Setup ====================
+    
+    // Create multiplayer widget
+    rtype::ui::MultiplayerConfig multiplayerConfig;
+    multiplayerConfig.title = "MULTIPLAYER";
+    multiplayerConfig.defaultIP = "127.0.0.1";
+    multiplayerConfig.defaultPort = 4242;
+
+    auto multiplayerWidget = std::make_shared<rtype::ui::MultiplayerWidget>(multiplayerConfig);
+    multiplayerWidget->setPosition(SCREEN_WIDTH / 2.0f - 400, SCREEN_HEIGHT / 2.0f - 300);
+    multiplayerWidget->setVisible(false); // Start hidden
+
+    // ==================== Lobby Widget Setup ====================
+    
+    // Create lobby widget
+    rtype::ui::LobbyConfig lobbyConfig;
+    lobbyConfig.title = "LOBBY";
+    lobbyConfig.roomName = "Room #1";
+
+    auto lobbyWidget = std::make_shared<rtype::ui::LobbyWidget>(lobbyConfig);
+    lobbyWidget->setPosition(SCREEN_WIDTH / 2.0f - 400, SCREEN_HEIGHT / 2.0f - 300);
+    lobbyWidget->setVisible(false); // Start hidden
+
+    // Set up callbacks for multiplayer events
+    rtype::ui::MultiplayerCallbacks multiplayerCallbacks;
+    multiplayerCallbacks.onBack = [&gameState, &showingMultiplayer, &mainMenuWidget, &multiplayerWidget]() {
+        gameState = GameState::MENU;
+        showingMultiplayer = false;
+        multiplayerWidget->hide();
+        mainMenuWidget->show();
+        std::cout << "Returning to main menu from multiplayer..." << std::endl;
+    };
+
+    multiplayerCallbacks.onJoinServer = [&gameState](const std::string& ip, int port) {
+        // TODO: Implement server joining logic
+        std::cout << "Attempting to join server at " << ip << ":" << port << std::endl;
+        // For now, just transition to playing state
+        // gameState = GameState::PLAYING;
+    };
+
+    multiplayerCallbacks.onCreateRoom = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget]() {
+        gameState = GameState::LOBBY;
+        showingMultiplayer = false;
+        showingLobby = true;
+        multiplayerWidget->hide();
+        lobbyWidget->show();
+        std::cout << "Creating room and entering lobby..." << std::endl;
+    };
+
+    // Network connectivity check
+    multiplayerCallbacks.checkNetworkConnection = [&networkClient]() -> bool {
+        return networkClient.isConnected();
+    };
+
+    multiplayerCallbacks.onNetworkError = [](const std::string& errorMessage) {
+        std::cerr << "Network Error: " << errorMessage << std::endl;
+    };
+
+    multiplayerWidget->setCallbacks(multiplayerCallbacks);
+    uiManager.addWidget(multiplayerWidget);
+    multiplayerWidget->initialize();
+
+    // Set up callbacks for lobby events
+    rtype::ui::LobbyCallbacks lobbyCallbacks;
+    lobbyCallbacks.onBack = [&gameState, &showingLobby, &showingMultiplayer, &multiplayerWidget, &lobbyWidget]() {
+        gameState = GameState::MULTIPLAYER;
+        showingLobby = false;
+        showingMultiplayer = true;
+        lobbyWidget->hide();
+        multiplayerWidget->show();
+        std::cout << "Returning to multiplayer menu from lobby..." << std::endl;
+    };
+
+    lobbyCallbacks.onStartGame = [&gameState, &showingLobby, &lobbyWidget]() {
+        gameState = GameState::PLAYING;
+        showingLobby = false;
+        lobbyWidget->hide();
+        std::cout << "Starting game from lobby..." << std::endl;
+    };
+
+    lobbyWidget->setCallbacks(lobbyCallbacks);
+    uiManager.addWidget(lobbyWidget);
+    lobbyWidget->initialize(); // Initialize after adding to UI manager
+
+    // Update main menu's onMultiplayer callback to show multiplayer widget
+    menuCallbacks.onMultiplayer = [&gameState, &showingMultiplayer, &mainMenuWidget, &multiplayerWidget]() {
+        gameState = GameState::MULTIPLAYER;
+        showingMultiplayer = true;
+        mainMenuWidget->hide();
+        multiplayerWidget->show();
+        std::cout << "Opening multiplayer menu..." << std::endl;
+    };
+    mainMenuWidget->setCallbacks(menuCallbacks); // Update callbacks
+
+    // Update settings close callback to handle all states
+    callbacks.onClose = [&showingSettingsPanel, &gameState, &mainMenuWidget, &multiplayerWidget, &lobbyWidget]() {
+        showingSettingsPanel = false;
+        if (gameState == GameState::MENU) {
+            mainMenuWidget->show();
+        } else if (gameState == GameState::MULTIPLAYER) {
+            multiplayerWidget->show();
+        } else if (gameState == GameState::LOBBY) {
+            lobbyWidget->show();
+        }
+        std::cout << "Settings panel closed." << std::endl;
+    };
+    settingsWidget->setCallbacks(callbacks);
+
     auto* inputSystem = systems.addSystem<InputSystem>(eventBus, 350.0f, &networkClient);
-    systems.addSystem<MovementSystem>();
     auto* bulletSystem = systems.addSystem<BulletSystem>(eventBus);
     bulletSystem->setScreenSize(SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* patternSystem = systems.addSystem<PatternSystem>();
     patternSystem->setScreenSize(SCREEN_WIDTH, SCREEN_HEIGHT);
     systems.addSystem<TrajectorySystem>();
     systems.addSystem<SpinSystem>();
+    systems.addSystem<MovementSystem>();  // Add MovementSystem
     auto* showoffSystem = systems.addSystem<ShowoffSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* stressTestSystem = systems.addSystem<StressTestSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* renderSystem = systems.addSystem<RenderSystem>(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -343,13 +461,12 @@ int main(int argc, char* argv[]) {
     debugSystem->init();
 
     renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, debugSystem, &gameState, &uiManager]() {
-        // Render UI only in menu state (MainMenuWidget handles its own background)
-        if (gameState == GameState::MENU) {
+        // Render UI in menu, multiplayer, and lobby states
+        if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY) {
             uiManager.render();
         }
         
         // Game state overlays
-        debugSystem->draw();
         debugSystem->draw();
         
         // Draw showoff mode indicator
@@ -436,8 +553,8 @@ int main(int argc, char* argv[]) {
         // Update background music
         updateMusic();
 
-        // Update UI only in menu state
-        if (gameState == GameState::MENU) {
+        // Update UI in menu, multiplayer, and lobby states
+        if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY) {
             uiManager.update(frameTime);
         }
         

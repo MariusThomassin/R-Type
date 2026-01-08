@@ -50,6 +50,10 @@ set(MODERN_UI_SOURCES
     ui/widgets/SliderWidget.cpp
     ui/widgets/SettingsWidget.cpp
     ui/widgets/MainMenuWidget.cpp
+    ui/widgets/LobbyWidget.cpp
+    ui/widgets/InputFieldWidget.cpp
+    ui/widgets/MultiplayerWidget.cpp
+    ui/widgets/ErrorMessageWidget.cpp
 )
 
 add_library(rtype_ui_library STATIC ${MODERN_UI_SOURCES})

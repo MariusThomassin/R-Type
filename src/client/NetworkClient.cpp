@@ -26,6 +26,7 @@ namespace rtype::client {
         , m_socket(m_ioContext)
         , m_running(false)
         , m_connected(false)
+        , m_welcomeReceived(false)
         , m_clientId(0)
         , m_inputSequence(0)
     {
@@ -84,6 +85,7 @@ namespace rtype::client {
 
         m_running = false;
         m_connected = false;
+        m_welcomeReceived = false;
 
         // Close socket to interrupt blocking receive
         asio::error_code ec;
@@ -222,6 +224,7 @@ namespace rtype::client {
 
     void NetworkClient::handleServerWelcome(const network::ServerWelcomeMessage& message) {
         m_clientId = message.clientId;
+        m_welcomeReceived = true;  // Mark as truly connected
         std::cout << "[NetworkClient] Connected! Assigned clientId=" << m_clientId
                  << " (protocol v" << message.protocolVersion << ")" << std::endl;
 
