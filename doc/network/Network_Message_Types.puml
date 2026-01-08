@@ -1,0 +1,126 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam roundCorner 15
+
+title R-Type Network Protocol - Message Types Overview
+
+package "Client to Server Messages" #E3F2FD {
+    
+    rectangle "CLIENT_HELLO\n(0x00)" as CH #BBDEFB
+    note bottom of CH
+    Purpose: Initial connection
+    Size: 36 bytes
+    - protocolVersion (uint32)
+    - playerName[32] (char)
+    end note
+    
+    rectangle "CLIENT_INPUT\n(0x01)" as CI #BBDEFB
+    note bottom of CI
+    Purpose: Send player input
+    Size: 9 bytes
+    - sequenceNumber (uint32)
+    - inputFlags (uint8)
+    - deltaTime (float)
+    end note
+    
+    rectangle "CLIENT_DISCONNECT\n(0x02)" as CD #BBDEFB
+    note bottom of CD
+    Purpose: Clean disconnect
+    Size: 4 bytes
+    - clientId (uint32)
+    end note
+    
+    rectangle "PLAYER_READY\n(0x03)" as PR #BBDEFB
+    note bottom of PR
+    Purpose: Ready to play
+    Size: 4 bytes
+    - clientId (uint32)
+    end note
+}
+
+package "Server to Client Messages" #E8F5E9 {
+    
+    rectangle "SERVER_WELCOME\n(0x0A)" as SW #C8E6C9
+    note bottom of SW
+    Purpose: Connection ack
+    Size: 12 bytes
+    - clientId (uint32)
+    - protocolVersion (uint32)
+    - serverTime (float)
+    end note
+    
+    rectangle "ENTITY_SPAWN\n(0x0B)" as ES #C8E6C9
+    note bottom of ES
+    Purpose: Spawn entity
+    Size: 57 bytes
+    - networkId, entityType
+    - x, y, rotation
+    - vx, vy
+    - trajectory params
+    - collider info
+    end note
+    
+    rectangle "ENTITY_STATE\n(0x0C)" as EST #C8E6C9
+    note bottom of EST
+    Purpose: Update position
+    Size: 24 bytes
+    - networkId (uint32)
+    - x, y (float)
+    - vx, vy (float)
+    - rotation (float)
+    end note
+    
+    rectangle "ENTITY_DESTROY\n(0x0D)" as ED #C8E6C9
+    note bottom of ED
+    Purpose: Remove entity
+    Size: 4 bytes
+    - networkId (uint32)
+    end note
+}
+
+package "Player Events" #FFF3E0 {
+    
+    rectangle "PLAYER_SPAWN\n(0x0F)" as PS #FFE0B2
+    note bottom of PS
+    Purpose: Spawn player
+    Size: 21 bytes
+    - networkId, clientId
+    - playerSlot (0-3)
+    - x, y, health
+    end note
+    
+    rectangle "PLAYER_HIT\n(0x10)" as PH #FFE0B2
+    note bottom of PH
+    Purpose: Player damaged
+    Size: 16 bytes
+    - networkId (uint32)
+    - newHealth (float)
+    - hitX, hitY (float)
+    end note
+    
+    rectangle "PLAYER_DEATH\n(0x11)" as PDT #FFE0B2
+    note bottom of PDT
+    Purpose: Player died
+    Size: 13 bytes
+    - networkId (uint32)
+    - remainingLives (uint8)
+    - deathX, deathY (float)
+    end note
+    
+    rectangle "PLAYER_RESPAWN\n(0x12)" as PRS #FFE0B2
+    note bottom of PRS
+    Purpose: Player respawn
+    Size: 17 bytes
+    - networkId, slot
+    - x, y, health
+    end note
+    
+    rectangle "GAME_OVER\n(0x13)" as GO #FFCDD2
+    note bottom of GO
+    Purpose: Game ended
+    Size: 1 byte
+    - survivorCount (uint8)
+    end note
+}
+
+@enduml
