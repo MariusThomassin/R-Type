@@ -28,6 +28,9 @@
 
 namespace rtype::ecs {
 
+    // Forward declaration for windowed debug system
+    class WindowedDebugSystem;
+
     /**
      * @brief Debug overlay system with event-based input
      * 
@@ -81,6 +84,12 @@ namespace rtype::ecs {
             bool isEnabled() const { return m_enabled; }
 
             /**
+             * @brief Set the enabled state
+             * @param enabled New enabled state
+             */
+            void setEnabled(bool enabled) { m_enabled = enabled; }
+
+            /**
              * @brief Get the execution phase of this system
              * @return The phase determining update order
              */
@@ -105,6 +114,10 @@ namespace rtype::ecs {
              */
             void updateEngineStats(size_t spatialEntities, size_t spatialCells, 
                                    size_t collisionPairs, size_t deferredCount);
+
+            // === Windowed debug system toggle ===
+            void setWindowedDebugSystem(WindowedDebugSystem* windowed) { m_windowedDebugSystem = windowed; }
+            void switchToWindowed();
 
         private:
             /**
@@ -216,5 +229,10 @@ namespace rtype::ecs {
              * @brief Mouse wheel event subscription ID
              */
             EventBus::SubscriberId m_mouseWheelSub;
+            
+            /**
+             * @brief Reference to windowed debug system for switching
+             */
+            WindowedDebugSystem* m_windowedDebugSystem = nullptr;
         };
 } // namespace rtype::ecs

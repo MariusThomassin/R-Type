@@ -257,7 +257,11 @@ namespace rtype::ui {
             /**
              * @brief Render the widget and its children
              */
-            void render() const;
+            /**
+             * @brief Render the widget and its children
+             * Can be overridden for custom rendering behavior (e.g., clipping)
+             */
+            virtual void render() const;
 
             /**
              * @brief Update the widget (override for custom behavior)

@@ -90,7 +90,14 @@ namespace rtype::ecs {
              * @param dt Delta time since last update
              */
             void update(float dt) override {
-                if (!m_registry) return;
+                if (!m_registry) {
+                    static bool loggedNull = false;
+                    if (!loggedNull) {
+                        std::cerr << "[RenderSystem] ERROR: m_registry is null!" << std::endl;
+                        loggedNull = true;
+                    }
+                    return;
+                }
 
                 m_animTime += dt;
 
@@ -148,6 +155,17 @@ namespace rtype::ecs {
 
                 m_lastEntityCount = entities.size();
 
+                // Log entity collection for debugging
+                static size_t logCounter = 0;
+                static bool hasLogged = false;
+                if (++logCounter % 60 == 0) {
+                    std::cout << "[RenderSystem] Collected " << entities.size() << " entities to render (registry size: " << m_registry->getEntityCount() << ")" << std::endl;
+                    if (entities.size() > 0 && !hasLogged) {
+                        std::cout << "[RenderSystem] First time seeing entities! Registry might have been empty before." << std::endl;
+                        hasLogged = true;
+                    }
+                }
+
                 // Sort using cached layer values (O(n log n) but with fast comparisons)
                 std::sort(entities.begin(), entities.end(), [](const RenderItem& a, const RenderItem& b) {
                     return a.layer < b.layer;
@@ -156,16 +174,28 @@ namespace rtype::ecs {
                 for (const RenderItem& item : entities) {
                     EntityId e = item.entity;
                     const auto& transform = m_registry->getComponent<TransformComponent>(e);
-                    
+
                     if (m_registry->hasComponent<PlayerShipComponent>(e)) {
                         auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
-                        if (ship.isRenderable()) {
+                        if (!ship.isRenderable()) {
+                            static bool loggedShip = false;
+                            if (!loggedShip) {
+                                std::cerr << "[RenderSystem] PlayerShip entity " << e << " has isVisible=false" << std::endl;
+                                loggedShip = true;
+                            }
+                        } else {
                             ship.updateAnimation(dt);
                             ship.render(transform, ctx);
                         }
                     } else if (m_registry->hasComponent<SpritesheetComponent>(e)) {
                         auto& sheet = m_registry->getComponent<SpritesheetComponent>(e);
-                        if (sheet.isRenderable()) {
+                        if (!sheet.isRenderable()) {
+                            static bool loggedSheet = false;
+                            if (!loggedSheet) {
+                                std::cerr << "[RenderSystem] Spritesheet entity " << e << " has isVisible=false" << std::endl;
+                                loggedSheet = true;
+                            }
+                        } else {
                             sheet.updateAnimation(dt);
                             sheet.render(transform, ctx);
                         }

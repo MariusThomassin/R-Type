@@ -14,6 +14,7 @@
 #include "../engine/ecs/core/SystemManager.hpp"
 #include "../game/Components.hpp"
 #include "../game/Systems.hpp"
+#include "../game/systems/WindowedDebugSystem.hpp"
 #include "../game/systems/DebugSystem.hpp"
 #include "../engine/ui/UIManager.hpp"
 #include "../engine/ui/widgets/ButtonWidget.hpp"
@@ -250,12 +251,22 @@ int main(int argc, char* argv[]) {
     auto* showoffSystem = systems.addSystem<ShowoffSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* stressTestSystem = systems.addSystem<StressTestSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* renderSystem = systems.addSystem<RenderSystem>(SCREEN_WIDTH, SCREEN_HEIGHT);
-    auto* debugSystem = systems.addSystem<DebugSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     
-    debugSystem->setTextures(renderSystem->getTextures());
-    debugSystem->init();
+    // Both debug systems available - can toggle between them
+    auto* windowedDebugSystem = systems.addSystem<WindowedDebugSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
+    auto* classicDebugSystem = systems.addSystem<DebugSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     
-    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, debugSystem, &gameState, &uiManager, &glowTime]() {
+    // Set up both debug systems
+    windowedDebugSystem->setTextures(renderSystem->getTextures());
+    windowedDebugSystem->init();
+    classicDebugSystem->setTextures(renderSystem->getTextures());
+    classicDebugSystem->init();
+    
+    // Link systems so they can switch between each other
+    windowedDebugSystem->setClassicDebugSystem(classicDebugSystem);
+    classicDebugSystem->setWindowedDebugSystem(windowedDebugSystem);
+    
+    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, windowedDebugSystem, classicDebugSystem, &gameState, &uiManager, &glowTime]() {
         // Render UI and menu background only in menu state
         if (gameState == GameState::MENU) {
             // Draw animated star field background
@@ -278,9 +289,9 @@ int main(int argc, char* argv[]) {
             uiManager.render();
         }
         
-        // Game state overlays
-        debugSystem->draw();
-        debugSystem->draw();
+        // Game state overlays - draw active debug system
+        windowedDebugSystem->draw();
+        classicDebugSystem->draw();
         
         // Draw showoff mode indicator
         if (showoffSystem->isActive()) {
@@ -350,9 +361,10 @@ int main(int argc, char* argv[]) {
     Entity background = createBackground(registry, SCREEN_WIDTH, SCREEN_HEIGHT);
     (void)background;
 
-    // NOTE: Player is now created by the server and spawned via network
-    // Entity player = createPlayer(registry, 1);
-    // (void)player;
+    // Create a local player for testing (when not connected to server)
+    // In production, player is created by the server via network
+    Entity player = createPlayer(registry, 1);
+    (void)player;
 
     // ==================== Game Loop (Fixed Timestep) ====================
     float accumulator = 0.0f;
@@ -412,7 +424,8 @@ int main(int argc, char* argv[]) {
             // Update game systems based on game state
             if (gameState == GameState::PLAYING) {
                 inputSystem->update(FIXED_TIMESTEP);
-                debugSystem->update(FIXED_TIMESTEP);
+                windowedDebugSystem->update(FIXED_TIMESTEP);
+                classicDebugSystem->update(FIXED_TIMESTEP);
                 showoffSystem->update(FIXED_TIMESTEP);
                 stressTestSystem->update(FIXED_TIMESTEP);
                 patternSystem->update(FIXED_TIMESTEP);
@@ -425,14 +438,29 @@ int main(int argc, char* argv[]) {
             accumulator -= FIXED_TIMESTEP;
         }
 
-        debugSystem->updateShowoffState(
+        // Update both debug systems with showoff/stress test state
+        windowedDebugSystem->updateShowoffState(
             showoffSystem->isActive(),
             showoffSystem->getCurrentPatternName(),
             showoffSystem->getCurrentPhase(),
             showoffSystem->getTotalPhases(),
             showoffSystem->getPhaseProgress()
         );
-        debugSystem->updateStressTestState(
+        windowedDebugSystem->updateStressTestState(
+            stressTestSystem->isActive(),
+            stressTestSystem->isComplete(),
+            stressTestSystem->getIntensity(),
+            stressTestSystem->getPhaseProgress(),
+            stressTestSystem->getReportFilename()
+        );
+        classicDebugSystem->updateShowoffState(
+            showoffSystem->isActive(),
+            showoffSystem->getCurrentPatternName(),
+            showoffSystem->getCurrentPhase(),
+            showoffSystem->getTotalPhases(),
+            showoffSystem->getPhaseProgress()
+        );
+        classicDebugSystem->updateStressTestState(
             stressTestSystem->isActive(),
             stressTestSystem->isComplete(),
             stressTestSystem->getIntensity(),

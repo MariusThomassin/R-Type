@@ -50,10 +50,12 @@ set(MODERN_UI_SOURCES
     ui/UIColor.cpp
     ui/UIManager.cpp
     ui/Widget.cpp
+    ui/WindowManager.cpp
     ui/widgets/ButtonWidget.cpp
     ui/widgets/TextWidget.cpp
     ui/widgets/ProgressBarWidget.cpp
     ui/widgets/PanelWidget.cpp
+    ui/widgets/WindowWidget.cpp
 )
 
 add_library(rtype_ui_library STATIC ${MODERN_UI_SOURCES})
