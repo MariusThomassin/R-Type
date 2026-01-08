@@ -92,6 +92,22 @@ namespace rtype::client {
          */
         void sendPlayerReady();
 
+        /**
+         * @brief Create a room on the server
+         *
+         * @param roomName Name of the room to create
+         * @param maxPlayers Maximum players allowed
+         * @param hasPassword Whether the room requires a password
+         */
+        void createRoom(const std::string& roomName, int maxPlayers = 4, bool hasPassword = false);
+
+        /**
+         * @brief Request list of available rooms from server
+         *
+         * @return Vector of room information (empty if not implemented on server)
+         */
+        std::vector<std::string> requestRoomList();
+
     private:
         /**
          * @brief Reception loop (runs in separate thread)

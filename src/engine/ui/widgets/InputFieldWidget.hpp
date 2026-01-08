@@ -66,6 +66,16 @@ public:
     bool onMouseClick() override;
 
     /**
+     * @brief Handle gaining focus
+     */
+    void onFocus() override;
+
+    /**
+     * @brief Handle losing focus
+     */
+    void onBlur() override;
+
+    /**
      * @brief Update the widget (handle text input)
      * @param deltaTime Time since last update
      */

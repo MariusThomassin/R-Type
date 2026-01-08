@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Widget.hpp"
+#include "../UIColor.hpp"
 #include "PanelWidget.hpp"
 #include "ButtonWidget.hpp"
 #include "TextWidget.hpp"
@@ -83,6 +84,12 @@ public:
      * @param name New room name
      */
     void setRoomName(const std::string& name);
+
+    /**
+     * @brief Set the lobby background color
+     * @param color New background color
+     */
+    void setBackgroundColor(const UIColor& color);
 
 private:
     // Configuration

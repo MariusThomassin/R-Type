@@ -125,7 +125,7 @@ void InputFieldWidget::renderSelf() const {
 }
 
 bool InputFieldWidget::onMouseClick() {
-    focused_ = true;
+    // Don't set focused_ here - let the UIManager handle focus via onFocus()
     return true; // Consume the event
 }
 
@@ -182,6 +182,15 @@ void InputFieldWidget::processKeyboardInput() {
     if (IsKeyPressed(KEY_TAB)) {
         focused_ = false;
     }
+}
+
+void InputFieldWidget::onFocus() {
+    focused_ = true;
+    cursorBlink_ = 0.0f; // Reset cursor blink when gaining focus
+}
+
+void InputFieldWidget::onBlur() {
+    focused_ = false;
 }
 
 } // namespace rtype::ui

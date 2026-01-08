@@ -10,8 +10,8 @@ LobbyWidget::LobbyWidget(const LobbyConfig& config)
     , config_(config)
     , initialized_(false)
 {
-    // Set default size and position
-    setSize(800.0f, 600.0f);
+    // Set larger size to match multiplayer widget
+    setSize(1200.0f, 650.0f);
 }
 
 void LobbyWidget::setCallbacks(const LobbyCallbacks& callbacks) {
@@ -31,7 +31,7 @@ void LobbyWidget::initialize() {
 
 void LobbyWidget::createLobbyPanel() {
     lobbyPanel_ = std::make_shared<PanelWidget>();
-    lobbyPanel_->setPosition(0.0f, 0.0f); // Relative to this widget
+    lobbyPanel_->setPosition(-200.0f, -25.0f);
     auto transform = getTransform();
     lobbyPanel_->setSize(transform.width, transform.height);
     lobbyPanel_->setBackgroundColor(UIColor(10, 20, 40, 220)); // Dark blue background
@@ -90,7 +90,7 @@ void LobbyWidget::createButtons() {
 
     // Back button
     backButton_ = std::make_shared<ButtonWidget>("BACK TO MENU");
-    backButton_->setPosition(50.0f, contentBounds.height - 80.0f);
+    backButton_->setPosition(contentBounds.width - 100.0f, 500);
     backButton_->setSize(200.0f, 50.0f);
     backButton_->setBackgroundColor(UIColor(100, 100, 100, 200)); // Gray
     backButton_->setBorderColor(UIColor(150, 150, 150, 255));
@@ -149,6 +149,12 @@ void LobbyWidget::setRoomName(const std::string& name) {
     config_.roomName = name;
     if (roomNameText_) {
         roomNameText_->setText("Room: " + name);
+    }
+}
+
+void LobbyWidget::setBackgroundColor(const UIColor& color) {
+    if (lobbyPanel_) {
+        lobbyPanel_->setBackgroundColor(color);
     }
 }
 

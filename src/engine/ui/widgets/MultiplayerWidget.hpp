@@ -34,12 +34,36 @@ enum class MultiplayerTab {
 /**
  * @brief Callback functions for multiplayer events
  */
+/**
+ * @brief Room customization settings
+ */
+struct RoomSettings {
+    std::string name = "My Room";
+    std::string password = "";
+    UIColor backgroundColor = UIColor(10, 20, 40, 220);
+};
+
+/**
+ * @brief Information about an available room
+ */
+struct RoomInfo {
+    std::string name;
+    int currentPlayers;
+    int maxPlayers;
+    bool isPasswordProtected;
+    bool isFull() const { return currentPlayers >= maxPlayers; }
+};
+
+/**
+ * @brief Callback functions for multiplayer events
+ */
 struct MultiplayerCallbacks {
     std::function<void()> onBack;
     std::function<void(const std::string& ip, int port)> onJoinServer;
-    std::function<void()> onCreateRoom;
+    std::function<void(const RoomSettings& settings)> onCreateRoom;
     std::function<bool()> checkNetworkConnection;  // Returns true if connected to server
     std::function<void(const std::string&)> onNetworkError;  // Called when network error occurs
+    std::function<std::vector<RoomInfo>()> onGetRoomList;  // Fetch available rooms from server
 };
 
 /**
@@ -96,6 +120,11 @@ public:
      */
     void switchTab(MultiplayerTab tab);
 
+    /**
+     * @brief Refresh the room list with current server data
+     */
+    void refreshRoomList();
+
 private:
     // Configuration
     MultiplayerConfig config_;
@@ -118,13 +147,29 @@ private:
     std::shared_ptr<InputFieldWidget> portInput_;
     std::shared_ptr<ButtonWidget> joinServerButton_;
     
+    // Room list components
+    std::shared_ptr<PanelWidget> roomListPanel_;
+    std::shared_ptr<TextWidget> roomListTitle_;
+    std::shared_ptr<TextWidget> roomListContent_;
+    
     // Create tab components
     std::shared_ptr<PanelWidget> createPanel_;
     std::shared_ptr<TextWidget> createInstructionsText_;
+    
+    // Room customization components
+    std::shared_ptr<TextWidget> roomNameLabel_;
+    std::shared_ptr<InputFieldWidget> roomNameInput_;
+    std::shared_ptr<TextWidget> passwordLabel_;
+    std::shared_ptr<InputFieldWidget> passwordInput_;
+    std::shared_ptr<TextWidget> colorLabel_;
+    std::shared_ptr<PanelWidget> colorPreview_;
+    std::vector<std::shared_ptr<ButtonWidget>> colorButtons_;
+    
     std::shared_ptr<ButtonWidget> createRoomButton_;
     
     // Navigation
-    std::shared_ptr<ButtonWidget> backButton_;
+    std::shared_ptr<ButtonWidget> joinBackButton_;
+    std::shared_ptr<ButtonWidget> createBackButton_;
     
     // Error handling
     std::shared_ptr<ErrorMessageWidget> errorMessageWidget_;
@@ -132,6 +177,7 @@ private:
     // State
     bool initialized_;
     MultiplayerTab currentTab_;
+    RoomSettings currentRoomSettings_;
 
     /**
      * @brief Create the main panel and title

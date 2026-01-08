@@ -417,6 +417,44 @@ namespace rtype::client {
         std::cout << "[NetworkClient] Sent PLAYER_READY to server (clientId=" << m_clientId << ")" << std::endl;
     }
 
+    void NetworkClient::createRoom(const std::string& roomName, int maxPlayers, bool hasPassword) {
+        if (!m_connected) {
+            std::cerr << "[NetworkClient] Cannot create room - not connected!" << std::endl;
+            return;
+        }
+
+        // For now, just log the room creation since the server doesn't have room management yet
+        // TODO: Implement actual room creation protocol when server supports it
+        std::cout << "[NetworkClient] Requesting room creation: '" << roomName 
+                  << "' (max players: " << maxPlayers << ", password: " << (hasPassword ? "yes" : "no") << ")" << std::endl;
+        
+        // This would send a CREATE_ROOM message to the server when implemented
+        // network::CreateRoomMessage msg;
+        // msg.clientId = m_clientId;
+        // msg.roomName = roomName;
+        // msg.maxPlayers = maxPlayers;
+        // msg.hasPassword = hasPassword;
+        // auto buffer = network::serializeMessage(network::MessageType::CREATE_ROOM, msg);
+        // sendToServer(buffer);
+    }
+
+    std::vector<std::string> NetworkClient::requestRoomList() {
+        std::vector<std::string> rooms;
+        
+        if (!m_connected) {
+            std::cerr << "[NetworkClient] Cannot request room list - not connected!" << std::endl;
+            return rooms;
+        }
+
+        std::cout << "[NetworkClient] Requesting room list from server..." << std::endl;
+        
+        // TODO: Implement actual room list request when server supports it
+        // This would send a GET_ROOM_LIST message and wait for response
+        // For now, return empty list since server doesn't have room management
+        
+        return rooms;
+    }
+
     void NetworkClient::handlePlayerSpawn(const network::PlayerSpawnMessage& message) {
         std::cout << "[NetworkClient] Received PLAYER_SPAWN (networkId=" << message.networkId
                   << ", clientId=" << message.clientId << ", slot=" << (int)message.playerSlot << ")" << std::endl;

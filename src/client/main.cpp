@@ -376,13 +376,24 @@ int main(int argc, char* argv[]) {
         // gameState = GameState::PLAYING;
     };
 
-    multiplayerCallbacks.onCreateRoom = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget]() {
+    multiplayerCallbacks.onCreateRoom = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const rtype::ui::RoomSettings& settings) {
+        // First, try to create the room on the server
+        if (networkClient.isConnected()) {
+            networkClient.createRoom(settings.name, 4, !settings.password.empty());
+        }
+        
         gameState = GameState::LOBBY;
         showingMultiplayer = false;
         showingLobby = true;
         multiplayerWidget->hide();
+        
+        // Apply room settings to lobby
+        lobbyWidget->setRoomName(settings.name);
+        lobbyWidget->setBackgroundColor(settings.backgroundColor);
+        // TODO: Apply password settings to lobby
+        
         lobbyWidget->show();
-        std::cout << "Creating room and entering lobby..." << std::endl;
+        std::cout << "Creating room '" << settings.name << "' and entering lobby..." << std::endl;
     };
 
     // Network connectivity check
@@ -392,6 +403,27 @@ int main(int argc, char* argv[]) {
 
     multiplayerCallbacks.onNetworkError = [](const std::string& errorMessage) {
         std::cerr << "Network Error: " << errorMessage << std::endl;
+    };
+
+    // Room list fetcher - uses NetworkClient to communicate with server
+    multiplayerCallbacks.onGetRoomList = [&networkClient]() -> std::vector<rtype::ui::RoomInfo> {
+        std::vector<rtype::ui::RoomInfo> rooms;
+        
+        // Only return rooms if connected to server
+        if (!networkClient.isConnected()) {
+            return rooms; // Empty list if not connected
+        }
+        
+        // Use NetworkClient to request room list from server
+        auto roomNames = networkClient.requestRoomList();
+        
+        // Convert server response to RoomInfo objects
+        // TODO: When server implements proper room management, this will return real data
+        for (const auto& roomName : roomNames) {
+            rooms.push_back({roomName, 1, 4, false}); // Default values for now
+        }
+        
+        return rooms;
     };
 
     multiplayerWidget->setCallbacks(multiplayerCallbacks);
