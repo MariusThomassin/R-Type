@@ -43,13 +43,14 @@ namespace rtype::ecs {
 
         /**
          * @brief Lose a life
-         * @return true if player has lives remaining
+         * @return true if player had a life to lose, false if already at 0
          */
         bool loseLife() {
             if (lives > 0) {
                 lives--;
+                return true;
             }
-            return lives > 0;
+            return false;
         }
 
         std::string getTypeName() const override {
