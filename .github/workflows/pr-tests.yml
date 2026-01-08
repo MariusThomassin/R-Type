@@ -1,0 +1,65 @@
+name: PR Tests on Dev
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.27.0'
+      
+      - name: Setup build environment (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libasound2-dev
+      
+      - name: Setup build environment (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install glfw
+          cmake --version
+      
+      - name: Setup build environment (Windows)
+        if: runner.os == 'Windows'
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Build project
+        id: build
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --verbose
+      
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure --verbose
+
+      - name: Success message
+        if: success()
+        run: |
+          echo "✅ Build successful on ${{ matrix.os }}! PR ready to be merged."
+      
+      - name: Failure message
+        if: failure()
+        run: |
+          echo "❌ Build failed on ${{ matrix.os }}! Please fix before merging."
+          exit 1

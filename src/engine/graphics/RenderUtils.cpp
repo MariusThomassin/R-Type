@@ -75,7 +75,6 @@ namespace rtype::ecs {
 
         // Calculate X position based on alignment
         float textX = abs_t.x + padding;
-        float availableWidth = abs_t.width - 2 * padding;
 
         switch (align) {
             case TextAlign::Center:
@@ -91,7 +90,6 @@ namespace rtype::ecs {
 
         // Calculate Y position based on vertical alignment
         float textY = abs_t.y + padding;
-        float availableHeight = abs_t.height - 2 * padding;
 
         switch (verticalAlign) {
             case VerticalAlign::Middle:
@@ -110,8 +108,9 @@ namespace rtype::ecs {
 
     void RenderUtils::drawUiRectOutline(const rtype::ui::UITransform& abs_t, float border_width, const rtype::ui::UIColor& color)
     {
+        Rectangle rect = {abs_t.x, abs_t.y, abs_t.width, abs_t.height};
         DrawRectangleLinesEx(
-            (Rectangle){abs_t.x, abs_t.y, abs_t.width, abs_t.height}, 
+            rect, 
             border_width,
             toRaylibColor(color)
         );

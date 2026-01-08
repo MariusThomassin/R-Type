@@ -11,28 +11,38 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #--------------------------------------------------------------
 # Dependencies (FetchContent)
 #--------------------------------------------------------------
-
 include(FetchContent)
-
-# Raylib (fetched from GitHub)
-FetchContent_Declare(
-    raylib
-    GIT_REPOSITORY https://github.com/raysan5/raylib.git
-    GIT_TAG 5.0
-    GIT_SHALLOW TRUE
-)
 
 # Don't build raylib examples
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(raylib)
+# Fix CMake policy issues with newer CMake versions
+if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+endif()
 
-# Asio (standalone, header-only networking library)
+# Set FetchContent properties to avoid hanging
+set(FETCHCONTENT_QUIET OFF)
+set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE ALWAYS)
+
+# Try to find system raylib first, then fetch if not found
+find_package(raylib QUIET)
+if(NOT raylib_FOUND)
+    message(STATUS "System raylib not found, downloading...")
+    FetchContent_Declare(
+        raylib
+        URL https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz
+        TIMEOUT 60
+    )
+    FetchContent_MakeAvailable(raylib)
+endif()
+
+# For Asio, use header-only download
 FetchContent_Declare(
     asio
-    GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
-    GIT_TAG asio-1-29-0
-    GIT_SHALLOW TRUE
+    URL https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-28-0.tar.gz  
+    TIMEOUT 60
 )
 FetchContent_MakeAvailable(asio)
 
@@ -40,6 +50,14 @@ FetchContent_MakeAvailable(asio)
 add_library(asio_lib INTERFACE)
 target_include_directories(asio_lib INTERFACE ${asio_SOURCE_DIR}/asio/include)
 target_compile_definitions(asio_lib INTERFACE ASIO_STANDALONE)
+
+# Catch2 for testing (header-only library)
+FetchContent_Declare(
+    catch2
+    URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.5.0.tar.gz
+    TIMEOUT 60
+)
+FetchContent_MakeAvailable(catch2)
 
 #--------------------------------------------------------------
 # Default build type (if not using multi-config generator)
@@ -72,9 +90,18 @@ endforeach()
 # Build engine library first (contains ecs_engine and rtype_ui_library)
 add_subdirectory(src/engine)
 
+# Build shared library (network protocol)
+add_subdirectory(src/shared)
+
 # Then build server and client executables
 add_subdirectory(src/server)
 add_subdirectory(src/client)
+
+#--------------------------------------------------------------
+# Testing
+#--------------------------------------------------------------
+enable_testing()
+add_subdirectory(tests)
 
 #--------------------------------------------------------------
 # Custom Rules
@@ -118,6 +145,18 @@ add_custom_target(re
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target clean
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
     COMMENT "Rebuilding project..."
+)
+
+#--------------------------------------------------------------
+# Tests
+#--------------------------------------------------------------
+
+# Add a custom 'run_tests' target that builds and runs tests
+add_custom_target(run_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    DEPENDS rtype_tests
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Running tests..."
 )
 
 #--------------------------------------------------------------

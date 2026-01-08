@@ -19,6 +19,9 @@ namespace rtype::ecs {
         int score = 0;          // Current score
         int lives = 3;          // Remaining lives
         bool isLocal = true;    // Is this the local player?
+        uint32_t networkClientId = 0;  // Network client ID (for server-side tracking)
+
+        uint8_t slot = 0;       // Network slot (0-3) - used for spawn position
 
         PlayerComponent() = default;
 
@@ -27,6 +30,9 @@ namespace rtype::ecs {
 
         PlayerComponent(int id, int startLives)
             : playerId(id), lives(startLives) {}
+
+        PlayerComponent(uint8_t playerSlot, int startLives)
+            : playerId(playerSlot), lives(startLives), slot(playerSlot) {}
 
         /**
          * @brief Add to player score
