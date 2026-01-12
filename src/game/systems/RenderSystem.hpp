@@ -28,6 +28,8 @@
 // Game state for conditional rendering
 enum class GameState {
     MENU,
+    MULTIPLAYER,
+    LOBBY,
     PLAYING,
     PAUSED,
     SETTINGS

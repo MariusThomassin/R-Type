@@ -71,7 +71,7 @@ namespace rtype::client {
         /**
          * @brief Check if connected to server
          */
-        bool isConnected() const { return m_connected; }
+        bool isConnected() const { return m_connected && m_welcomeReceived; }
 
         /**
          * @brief Get assigned client ID
@@ -91,6 +91,22 @@ namespace rtype::client {
          * Called when the player clicks Play button
          */
         void sendPlayerReady();
+
+        /**
+         * @brief Create a room on the server
+         *
+         * @param roomName Name of the room to create
+         * @param maxPlayers Maximum players allowed
+         * @param hasPassword Whether the room requires a password
+         */
+        void createRoom(const std::string& roomName, int maxPlayers = 4, bool hasPassword = false);
+
+        /**
+         * @brief Request list of available rooms from server
+         *
+         * @return Vector of room information (empty if not implemented on server)
+         */
+        std::vector<std::string> requestRoomList();
 
     private:
         /**
@@ -161,6 +177,7 @@ namespace rtype::client {
 
         // Connection state
         bool m_connected;
+        bool m_welcomeReceived;  // true if we've received SERVER_WELCOME from server
         uint32_t m_clientId;
 
         // Network ID mapping (networkId → local Entity)
