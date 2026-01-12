@@ -1,0 +1,236 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+
+title R-Type Protocol - Detailed Message Flow
+
+participant "Client" as C #LightBlue
+participant "NetworkClient" as NC #SkyBlue
+participant "UDP Socket" as UDP #LightGray
+participant "NetworkManager" as NM #LightGreen
+participant "GameServer" as GS #Green
+participant "PlayerManager" as PM #DarkGreen
+database "ECS Registry" as ECS #Yellow
+
+== 1. Connection Handshake ==
+
+C -> NC : connect(serverIp, port)
+activate NC
+
+NC -> NC : Create UDP Socket
+NC -> UDP : Bind to ephemeral port
+NC -> NC : Start receive thread
+
+NC -> UDP : sendTo(CLIENT_HELLO)
+note right
+CLIENT_HELLO
+- Header (5 bytes)
+  - type: 0x00
+  - payloadSize: 36
+- Payload (36 bytes)
+  - protocolVersion: 1
+  - playerName[32]
+end note
+
+UDP -> NM : receiveFrom()
+activate NM
+NM -> NM : deserializeHeader()
+NM -> NM : handleClientHello()
+NM -> NM : Assign clientId = nextId++
+NM -> NM : Store ClientInfo(id, endpoint)
+
+NM -> UDP : sendTo(SERVER_WELCOME)
+note left
+SERVER_WELCOME
+- Header (5 bytes)
+  - type: 0x0A
+  - payloadSize: 12
+- Payload (12 bytes)
+  - clientId: 1
+  - protocolVersion: 1
+  - serverTime: 0.0
+end note
+
+UDP -> NC : recv()
+NC -> NC : handleServerWelcome()
+NC -> NC : m_clientId = 1
+NC -> NC : m_connected = true
+
+NM -> GS : onClientConnected(clientId=1)
+deactivate NM
+
+== 2. Input Processing ==
+
+C -> NC : sendInput(input)
+activate NC
+
+NC -> NC : serializeMessage()
+note right
+CLIENT_INPUT
+- Header (5 bytes)
+  - type: 0x01
+  - payloadSize: 9
+- Payload (9 bytes)
+  - sequenceNumber: 42
+  - inputFlags: 0x15
+    (UP + LEFT + SHOOT)
+  - deltaTime: 0.0166
+end note
+
+NC -> UDP : sendTo(CLIENT_INPUT)
+deactivate NC
+
+UDP -> NM : receiveFrom()
+activate NM
+NM -> NM : deserializeHeader()
+NM -> NM : handleClientInput()
+NM -> PM : applyInput(clientId, input)
+activate PM
+
+PM -> ECS : getPlayerEntity(clientId)
+ECS --> PM : Entity playerEntity
+
+PM -> ECS : getComponent<TransformComponent>()
+PM -> PM : Apply movement:\nif (UP) velocity.y -= speed\nif (LEFT) velocity.x -= speed
+
+PM -> PM : if (SHOOT) checkFireWeapon()
+PM -> ECS : Create projectile entity
+ECS --> PM : Entity bulletEntity
+
+PM -> NM : broadcastEntitySpawn(bullet)
+deactivate PM
+deactivate NM
+
+== 3. Entity State Broadcasting ==
+
+GS -> GS : tick(dt = 1/60)
+activate GS
+
+GS -> ECS : forEach entity with\nTransform + Velocity
+loop For each entity
+    GS -> NM : broadcastEntityState(entity)
+    activate NM
+    
+    NM -> NM : serializeMessage()
+    note right
+    ENTITY_STATE
+    - Header (5 bytes)
+      - type: 0x0C
+      - payloadSize: 24
+    - Payload (24 bytes)
+      - networkId: N
+      - x, y: position
+      - vx, vy: velocity
+      - rotation: angle
+    end note
+    
+    NM -> NM : broadcast(buffer)
+    loop For each connected client
+        NM -> UDP : sendTo(client.endpoint)
+    end
+    deactivate NM
+end
+
+deactivate GS
+
+UDP -> NC : recv()
+activate NC
+NC -> NC : handleEntityState()
+NC -> ECS : Update entity transform
+deactivate NC
+
+== 4. Collision Handling ==
+
+GS -> GS : CollisionSystem update
+activate GS
+
+GS -> ECS : Check collisions\n(Player vs Projectile)
+GS -> GS : onCollision event fired
+
+GS -> GS : handlePlayerCollision()
+GS -> ECS : Reduce player health
+GS -> NM : broadcastPlayerHit(player)
+activate NM
+
+NM -> NM : serializeMessage()
+note right
+PLAYER_HIT
+- Header (5 bytes)
+  - type: 0x10
+  - payloadSize: 16
+- Payload (16 bytes)
+  - networkId: N
+  - newHealth: 50.0
+  - hitX: 150.5
+  - hitY: 200.3
+end note
+
+NM -> NM : broadcast(buffer)
+deactivate NM
+deactivate GS
+
+UDP -> NC : recv()
+activate NC
+NC -> NC : handlePlayerHit()
+NC -> C : Trigger hit effect animation
+deactivate NC
+
+== 5. Player Death Sequence ==
+
+GS -> GS : Player health <= 0
+activate GS
+
+GS -> GS : handlePlayerDeath(entity)
+GS -> ECS : Get player networkId
+GS -> NM : broadcastPlayerDeath()
+activate NM
+
+note right
+PLAYER_DEATH
+- Header (5 bytes)
+  - type: 0x11
+  - payloadSize: 13
+- Payload (13 bytes)
+  - networkId: N
+  - remainingLives: 2
+  - deathX: 200.0
+  - deathY: 300.0
+end note
+
+NM -> NM : broadcast(buffer)
+deactivate NM
+
+GS -> GS : Add to m_pendingRespawns\n(delay = 3 seconds)
+deactivate GS
+
+... After 3 seconds ...
+
+GS -> GS : updateRespawns(dt)
+activate GS
+GS -> GS : respawnPlayer(clientId)
+GS -> PM : spawnPlayer(clientId)
+activate PM
+
+PM -> ECS : Create new player entity
+PM -> ECS : Add components\n(Transform, Sprite, Collider, etc.)
+PM -> NM : broadcastPlayerRespawn()
+activate NM
+
+note right
+PLAYER_RESPAWN
+- Header (5 bytes)
+  - type: 0x12
+  - payloadSize: 17
+- Payload (17 bytes)
+  - networkId: N
+  - playerSlot: 0
+  - x: 100.0
+  - y: 180.0
+  - health: 100.0
+end note
+
+NM -> NM : broadcast(buffer)
+deactivate NM
+deactivate PM
+deactivate GS
+
+@enduml
