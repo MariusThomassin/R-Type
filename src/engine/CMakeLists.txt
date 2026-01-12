@@ -64,6 +64,8 @@ set(MODERN_UI_SOURCES
     ui/widgets/MultiplayerWidget.cpp
     ui/widgets/ErrorMessageWidget.cpp
     ui/widgets/HUDWidget.cpp
+    ui/widgets/KeyBindingWidget.cpp
+    ecs/events/InputUtils.cpp
 )
 
 add_library(rtype_ui_library STATIC ${MODERN_UI_SOURCES})

@@ -1,90 +1,80 @@
 {
-    "video": {
-        "fullscreen": false,
-        "vsync": true,
-        "resolutionWidth": 1280,
-        "resolutionHeight": 720
+  "video": {
+    "fullscreen": false,
+    "vsync": true,
+    "resolutionWidth": 1280,
+    "resolutionHeight": 720
+  },
+  "audio": {
+    "masterVolume": 80,
+    "sfxVolume": 100,
+    "musicVolume": 70
+  },
+  "gameplay": {
+    "difficulty": 1,
+    "friendlyFire": false,
+    "screenShake": true
+  },
+  "bindings": {
+    "confirm": {
+      "keyboardKey": 257,
+      "gamepadButton": 0,
+      "gamepadAxis": -1,
+      "axisDirection": 1
     },
-    "audio": {
-        "masterVolume": 80,
-        "sfxVolume": 100,
-        "musicVolume": 70
+    "pause": {
+      "keyboardKey": 256,
+      "gamepadButton": 7,
+      "gamepadAxis": -1,
+      "axisDirection": 1
     },
-    "gameplay": {
-        "difficulty": 1,
-        "friendlyFire": false,
-        "screenShake": true
+    "bomb": {
+      "keyboardKey": 66,
+      "gamepadButton": 1,
+      "gamepadAxis": -1,
+      "axisDirection": 1
     },
-    "bindings": {
-        "up": {
-            "action": "up",
-            "keyboardKey": 87,
-            "gamepadButton": 11,
-            "gamepadAxis": 1,
-            "axisDirection": -1.0
-        },
-        "down": {
-            "action": "down",
-            "keyboardKey": 83,
-            "gamepadButton": 13,
-            "gamepadAxis": 1,
-            "axisDirection": 1.0
-        },
-        "left": {
-            "action": "left",
-            "keyboardKey": 65,
-            "gamepadButton": 14,
-            "gamepadAxis": 0,
-            "axisDirection": -1.0
-        },
-        "right": {
-            "action": "right",
-            "keyboardKey": 68,
-            "gamepadButton": 12,
-            "gamepadAxis": 0,
-            "axisDirection": 1.0
-        },
-        "shoot": {
-            "action": "shoot",
-            "keyboardKey": 32,
-            "gamepadButton": 0,
-            "gamepadAxis": -1,
-            "axisDirection": 1.0
-        },
-        "bomb": {
-            "action": "bomb",
-            "keyboardKey": 66,
-            "gamepadButton": 1,
-            "gamepadAxis": -1,
-            "axisDirection": 1.0
-        },
-        "orbSwitch": {
-            "action": "orbSwitch",
-            "keyboardKey": 9,
-            "gamepadButton": 5,
-            "gamepadAxis": -1,
-            "axisDirection": 1.0
-        },
-        "pause": {
-            "action": "pause",
-            "keyboardKey": 256,
-            "gamepadButton": 7,
-            "gamepadAxis": -1,
-            "axisDirection": 1.0
-        },
-        "confirm": {
-            "action": "confirm",
-            "keyboardKey": 257,
-            "gamepadButton": 0,
-            "gamepadAxis": -1,
-            "axisDirection": 1.0
-        },
-        "cancel": {
-            "action": "cancel",
-            "keyboardKey": 256,
-            "gamepadButton": 1,
-            "gamepadAxis": -1,
-            "axisDirection": 1.0
-        }
+    "shoot": {
+      "keyboardKey": 32,
+      "gamepadButton": 0,
+      "gamepadAxis": -1,
+      "axisDirection": 1
+    },
+    "right": {
+      "keyboardKey": 68,
+      "gamepadButton": 12,
+      "gamepadAxis": 0,
+      "axisDirection": 1
+    },
+    "left": {
+      "keyboardKey": 65,
+      "gamepadButton": 14,
+      "gamepadAxis": 0,
+      "axisDirection": -1
+    },
+    "cancel": {
+      "keyboardKey": 256,
+      "gamepadButton": 1,
+      "gamepadAxis": -1,
+      "axisDirection": 1
+    },
+    "down": {
+      "keyboardKey": 83,
+      "gamepadButton": 13,
+      "gamepadAxis": 1,
+      "axisDirection": 1
+    },
+    "orbSwitch": {
+      "keyboardKey": 9,
+      "gamepadButton": 5,
+      "gamepadAxis": -1,
+      "axisDirection": 1
+    },
+    "up": {
+      "keyboardKey": 87,
+      "gamepadButton": 11,
+      "gamepadAxis": 1,
+      "axisDirection": -1
     }
+  }
 }
