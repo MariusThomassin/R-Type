@@ -15,8 +15,8 @@ namespace rtype::ui {
         , autoCloseTimer_(0.0f)
     {
         // Set full screen size for modal overlay
-        setSize(1280.0f, 720.0f);
-        setPosition(0.0f, 0.0f);
+        setSize(1200.0f, 650.0f);
+        setPosition(-240.0f, 0.0f);
     }
 
     void ErrorMessageWidget::setCallbacks(const ErrorMessageCallbacks& callbacks) {
