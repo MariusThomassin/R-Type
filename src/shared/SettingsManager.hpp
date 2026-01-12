@@ -261,23 +261,48 @@ namespace rtype {
                 size_t actionPos = bindingsStr.find("\"" + action + "\"");
                 if (actionPos == std::string::npos) continue;
 
-                // Find the action's object
-                size_t objStart = bindingsStr.find('{', actionPos);
-                if (objStart == std::string::npos) continue;
+                size_t colonPos = bindingsStr.find(':', actionPos);
+                if (colonPos == std::string::npos) continue;
 
-                size_t objEnd = bindingsStr.find('}', objStart);
-                if (objEnd == std::string::npos) continue;
+                // Skip whitespace after colon
+                size_t valueStart = colonPos + 1;
+                while (valueStart < bindingsStr.size() && 
+                       (bindingsStr[valueStart] == ' ' || bindingsStr[valueStart] == '\t' || bindingsStr[valueStart] == '\n')) {
+                    valueStart++;
+                }
 
-                std::string actionBlock = bindingsStr.substr(objStart, objEnd - objStart + 1);
+                if (valueStart >= bindingsStr.size()) continue;
 
-                // Parse the binding fields
-                int keyboardKey = extractInt(actionBlock, "keyboardKey", m_bindings[action].keyboardKey);
-                int gamepadButton = extractInt(actionBlock, "gamepadButton", m_bindings[action].gamepadButton);
-                int gamepadAxis = extractInt(actionBlock, "gamepadAxis", m_bindings[action].gamepadAxis);
-                float axisDirection = static_cast<float>(extractInt(actionBlock, "axisDirection", 
-                    static_cast<int>(m_bindings[action].axisDirection)));
+                if (bindingsStr[valueStart] == '{') {
+                    // New format: object with multiple fields
+                    size_t objEnd = bindingsStr.find('}', valueStart);
+                    if (objEnd == std::string::npos) continue;
 
-                m_bindings[action] = KeyBinding(action, keyboardKey, gamepadButton, gamepadAxis, axisDirection);
+                    std::string actionBlock = bindingsStr.substr(valueStart, objEnd - valueStart + 1);
+
+                    // Parse the binding fields
+                    int keyboardKey = extractInt(actionBlock, "keyboardKey", m_bindings[action].keyboardKey);
+                    int gamepadButton = extractInt(actionBlock, "gamepadButton", m_bindings[action].gamepadButton);
+                    int gamepadAxis = extractInt(actionBlock, "gamepadAxis", m_bindings[action].gamepadAxis);
+                    float axisDirection = extractFloat(actionBlock, "axisDirection", m_bindings[action].axisDirection);
+
+                    m_bindings[action] = KeyBinding(action, keyboardKey, gamepadButton, gamepadAxis, axisDirection);
+                } else {
+                    // Old format: just a number (keyboardKey only)
+                    size_t valueEnd = valueStart;
+                    while (valueEnd < bindingsStr.size() && bindingsStr[valueEnd] >= '0' && bindingsStr[valueEnd] <= '9') {
+                        valueEnd++;
+                    }
+                    
+                    if (valueEnd > valueStart) {
+                        int keyboardKey = std::stoi(bindingsStr.substr(valueStart, valueEnd - valueStart));
+                        // Keep existing gamepad bindings for backward compatibility
+                        m_bindings[action] = KeyBinding(action, keyboardKey, 
+                                                        m_bindings[action].gamepadButton, 
+                                                        m_bindings[action].gamepadAxis, 
+                                                        m_bindings[action].axisDirection);
+                    }
+                }
             }
         }
 
@@ -342,6 +367,47 @@ namespace rtype {
             return def;
         }
 
+        float extractFloat(const std::string& json, const std::string& key, float def = 0.0f) {
+            std::string searchKey = "\"" + key + "\"";
+            size_t pos = json.find(searchKey);
+            if (pos == std::string::npos) return def;
+
+            pos = json.find(':', pos);
+            if (pos == std::string::npos) return def;
+
+            pos++;
+            while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+
+            bool negative = false;
+            if (pos < json.size() && json[pos] == '-') {
+                negative = true;
+                pos++;
+            }
+
+            float value = 0.0f;
+            float fraction = 0.0f;
+            float divisor = 1.0f;
+            bool hasDigit = false;
+            bool inFraction = false;
+
+            while (pos < json.size() && ((json[pos] >= '0' && json[pos] <= '9') || json[pos] == '.')) {
+                if (json[pos] == '.') {
+                    inFraction = true;
+                } else {
+                    hasDigit = true;
+                    if (inFraction) {
+                        divisor *= 10.0f;
+                        fraction = fraction + (json[pos] - '0') / divisor;
+                    } else {
+                        value = value * 10.0f + (json[pos] - '0');
+                    }
+                }
+                pos++;
+            }
+
+            return hasDigit ? (negative ? -(value + fraction) : (value + fraction)) : def;
+        }
+
         std::string toJson() const {
             std::ostringstream oss;
             oss << "{\n";
@@ -372,7 +438,12 @@ namespace rtype {
             oss << "  \"bindings\": {\n";
             size_t count = 0;
             for (const auto& [action, binding] : m_bindings) {
-                oss << "    \"" << action << "\": " << binding.keyboardKey;
+                oss << "    \"" << action << "\": {\n";
+                oss << "      \"keyboardKey\": " << binding.keyboardKey << ",\n";
+                oss << "      \"gamepadButton\": " << binding.gamepadButton << ",\n";
+                oss << "      \"gamepadAxis\": " << binding.gamepadAxis << ",\n";
+                oss << "      \"axisDirection\": " << binding.axisDirection << "\n";
+                oss << "    }";
                 if (++count < m_bindings.size()) oss << ",";
                 oss << "\n";
             }

@@ -27,6 +27,7 @@
 #include "../engine/ui/widgets/MultiplayerWidget.hpp"
 #include "../engine/graphics/RenderUtils.hpp"
 #include "../shared/SettingsManager.hpp"
+#include "../engine/ecs/events/InputUtils.hpp"
 #include "NetworkClient.hpp"
 
 using namespace rtype::ecs;
@@ -203,6 +204,7 @@ int main(int argc, char* argv[]) {
     // ==================== Raylib Initialization ====================
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "R-Type");
     ClearWindowState(FLAG_WINDOW_RESIZABLE);  // Fixed window size to prevent FPS drops on resize
+    SetExitKey(KEY_NULL); // Disable default ESC key behavior - we handle ESC ourselves
     
     // ==================== Audio Initialization ====================
     InitAudioDevice();  // Explicitly initialize audio device
@@ -257,6 +259,7 @@ int main(int argc, char* argv[]) {
     initialConfig.musicEnabled = true;
     initialConfig.musicVolume = 75.0f;
     initialConfig.effectsVolume = 75.0f;  // Initial effects volume
+    initialConfig.settingsManager = &settingsManager; // Pass the settings manager for key bindings
 
     // ==================== Button Click Sound Setup ====================
     // Set a default click sound for all buttons
@@ -277,7 +280,7 @@ int main(int argc, char* argv[]) {
     initializeMusic();
     
     auto settingsWidget = std::make_shared<rtype::ui::SettingsWidget>(initialConfig);
-    settingsWidget->setPosition(SCREEN_WIDTH / 2.0f - 300, SCREEN_HEIGHT / 2.0f - 250);
+    settingsWidget->setPosition(SCREEN_WIDTH / 2.0f - 400, SCREEN_HEIGHT / 2.0f - 275); // Match multiplayer positioning
     
     // Set up callbacks for settings events
     rtype::ui::SettingsCallbacks callbacks;
@@ -293,6 +296,16 @@ int main(int argc, char* argv[]) {
         std::cout << "Effects volume changed to: " << static_cast<int>(volume) << "%" << std::endl;
         // Update button click sound volume to match effects volume settings
         rtype::ui::ButtonWidget::setSoundVolume(volume / 100.0f);  // Convert percentage to 0.0-1.0 range
+    };
+    callbacks.onKeyBindingChange = [&settingsManager](const std::string& action, rtype::ecs::events::KeyCode newKey) {
+        std::cout << "Key binding changed for " << action << " to " 
+                  << rtype::ecs::events::InputUtils::keyCodeToString(newKey) << std::endl;
+        // Save settings when key bindings change
+        if (!settingsManager.save()) {
+            std::cout << "Warning: Failed to save settings to file" << std::endl;
+        } else {
+            std::cout << "Settings saved successfully" << std::endl;
+        }
     };
     // Create settings widget first without close callback
     uiManager.addWidget(settingsWidget);
@@ -473,13 +486,20 @@ int main(int argc, char* argv[]) {
 
     // Update settings close callback to handle all states
     callbacks.onClose = [&showingSettingsPanel, &gameState, &mainMenuWidget, &multiplayerWidget, &lobbyWidget]() {
+        std::cout << "Closing settings panel..." << std::endl;
         showingSettingsPanel = false;
+        
+        // Only show appropriate widgets, don't hide others
         if (gameState == GameState::MENU) {
             mainMenuWidget->show();
         } else if (gameState == GameState::MULTIPLAYER) {
             multiplayerWidget->show();
         } else if (gameState == GameState::LOBBY) {
             lobbyWidget->show();
+        } else if (gameState == GameState::PAUSED) {
+            // When closing settings from pause menu, return to paused state
+            // No widgets need to be shown in pause state
+            std::cout << "Returning to pause menu from settings..." << std::endl;
         }
         std::cout << "Settings panel closed." << std::endl;
     };
@@ -511,9 +531,10 @@ int main(int argc, char* argv[]) {
     windowedDebugSystem->setClassicDebugSystem(classicDebugSystem);
     classicDebugSystem->setWindowedDebugSystem(windowedDebugSystem);
     
-    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, windowedDebugSystem, classicDebugSystem, &gameState, &uiManager]() {
-        // Render UI in menu, multiplayer, and lobby states
-        if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY) {
+    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, windowedDebugSystem, classicDebugSystem, &gameState, &uiManager, &showingSettingsPanel]() {
+        // Render UI in menu, multiplayer, lobby states, and paused when showing settings
+        if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY || 
+            (gameState == GameState::PAUSED && showingSettingsPanel)) {
             uiManager.render();
         }
         
@@ -606,17 +627,35 @@ int main(int argc, char* argv[]) {
         // Update background music
         updateMusic();
 
-        // Update UI in menu, multiplayer, and lobby states
-        if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY) {
+        // Update UI in menu, multiplayer, lobby states, and paused when showing settings
+        if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY || 
+            (gameState == GameState::PAUSED && showingSettingsPanel)) {
             uiManager.update(frameTime);
         }
         
-        // Handle pause toggle with ESC key
+        // Poll for key presses and send to UI system
+        int key = GetKeyPressed();
+        while (key != 0) {
+            // Convert raylib key to our KeyCode
+            rtype::ecs::events::KeyCode keyCode = rtype::ecs::events::InputUtils::raylibToKeyCode(key);
+            
+            // Create and dispatch key press event to UI system
+            rtype::ecs::events::KeyPressedEvent keyEvent{keyCode};
+            eventBus.emit(keyEvent);
+            
+            // Get next key in queue
+            key = GetKeyPressed();
+        }
+        
+        // Handle pause toggle with ESC key - but not when settings panel is capturing input
         if (IsKeyPressed(KEY_ESCAPE)) {
-            if (gameState == GameState::PLAYING) {
+            // Don't handle ESC for pause if settings panel is visible and waiting for key input
+            bool settingsWaitingForInput = showingSettingsPanel && settingsWidget->isVisible() && settingsWidget->isWaitingForKeyInput();
+            
+            if (!settingsWaitingForInput && gameState == GameState::PLAYING) {
                 std::cout << "Game paused..." << std::endl;
                 gameState = GameState::PAUSED;
-            } else if (gameState == GameState::PAUSED) {
+            } else if (!settingsWaitingForInput && gameState == GameState::PAUSED) {
                 std::cout << "Game resumed..." << std::endl;
                 gameState = GameState::PLAYING;
             }
