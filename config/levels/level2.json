@@ -1,0 +1,90 @@
+{
+  "name": "Deep Space",
+  "difficulty": 2,
+  "waveDelay": 2.0,
+  "waves": [
+    {
+      "delayBefore": 1.0,
+      "spawnInterval": 0.5,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "shooter", "x": 1300, "y": 150, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250},
+        {"type": "shooter", "x": 1300, "y": 300, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250},
+        {"type": "shooter", "x": 1300, "y": 450, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250},
+        {"type": "shooter", "x": 1300, "y": 600, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250}
+      ]
+    },
+    {
+      "delayBefore": 2.0,
+      "spawnInterval": 0.3,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "fast", "x": 1300, "y": 100, "vx": -250, "vy": 30, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 200, "vx": -250, "vy": -30, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 300, "vx": -250, "vy": 30, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 400, "vx": -250, "vy": -30, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 500, "vx": -250, "vy": 30, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 600, "vx": -250, "vy": -30, "health": 1, "scoreValue": 200}
+      ]
+    },
+    {
+      "delayBefore": 2.5,
+      "spawnInterval": 0.4,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "dive_bomber", "x": 1300, "y": 100, "vx": -80, "vy": 0, "health": 2, "scoreValue": 300},
+        {"type": "basic", "x": 1300, "y": 250, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "dive_bomber", "x": 1300, "y": 400, "vx": -80, "vy": 0, "health": 2, "scoreValue": 300},
+        {"type": "basic", "x": 1300, "y": 550, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "dive_bomber", "x": 1300, "y": 650, "vx": -80, "vy": 0, "health": 2, "scoreValue": 300}
+      ]
+    },
+    {
+      "delayBefore": 2.0,
+      "spawnInterval": 0.6,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "circular", "x": 1300, "y": 180, "vx": -70, "vy": 0, "health": 2, "scoreValue": 275},
+        {"type": "circular", "x": 1300, "y": 360, "vx": -70, "vy": 0, "health": 2, "scoreValue": 275},
+        {"type": "circular", "x": 1300, "y": 540, "vx": -70, "vy": 0, "health": 2, "scoreValue": 275},
+        {"type": "shooter", "x": 1300, "y": 270, "vx": -60, "vy": 0, "health": 3, "scoreValue": 300},
+        {"type": "shooter", "x": 1300, "y": 450, "vx": -60, "vy": 0, "health": 3, "scoreValue": 300}
+      ]
+    },
+    {
+      "delayBefore": 3.0,
+      "spawnInterval": 0.2,
+      "simultaneous": true,
+      "enemies": [
+        {"type": "sine_wave", "x": 1300, "y": 100, "vx": -150, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "sine_wave", "x": 1300, "y": 200, "vx": -150, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "sine_wave", "x": 1300, "y": 300, "vx": -150, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "sine_wave", "x": 1300, "y": 400, "vx": -150, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "sine_wave", "x": 1300, "y": 500, "vx": -150, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "sine_wave", "x": 1300, "y": 600, "vx": -150, "vy": 0, "health": 1, "scoreValue": 150}
+      ]
+    },
+    {
+      "delayBefore": 2.5,
+      "spawnInterval": 0.5,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "tank", "x": 1300, "y": 200, "vx": -50, "vy": 0, "health": 6, "scoreValue": 600},
+        {"type": "follow", "x": 1300, "y": 360, "vx": -100, "vy": 0, "health": 2, "scoreValue": 350},
+        {"type": "tank", "x": 1300, "y": 520, "vx": -50, "vy": 0, "health": 6, "scoreValue": 600}
+      ]
+    },
+    {
+      "delayBefore": 3.0,
+      "spawnInterval": 0.4,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "shooter", "x": 1300, "y": 150, "vx": -80, "vy": 0, "health": 3, "scoreValue": 300},
+        {"type": "fast", "x": 1300, "y": 250, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "follow", "x": 1300, "y": 360, "vx": -90, "vy": 0, "health": 2, "scoreValue": 350},
+        {"type": "fast", "x": 1300, "y": 470, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "shooter", "x": 1300, "y": 570, "vx": -80, "vy": 0, "health": 3, "scoreValue": 300}
+      ]
+    }
+  ]
+}

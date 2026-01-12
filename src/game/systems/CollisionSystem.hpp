@@ -1,7 +1,7 @@
 /*
 ** R-Type ECS - CollisionSystem
 ** Handles AABB collision detection between entities
-** Uses ColliderComponent with layer-based filtering
+** Uses spatial hash grid for O(N) broad-phase detection
 */
 
 #pragma once
@@ -9,6 +9,7 @@
 #include "engine/ecs/core/ISystem.hpp"
 #include "engine/ecs/core/Registry.hpp"
 #include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/core/SpatialHash.hpp"
 #include "engine/ecs/components/TransformComponent.hpp"
 #include "engine/ecs/components/ColliderComponent.hpp"
 #include "engine/ecs/components/CollisionUtils.hpp"
@@ -37,6 +38,7 @@ namespace rtype::ecs {
      * Features:
      * - AABB (Axis-Aligned Bounding Box) collision detection
      * - Layer-based filtering (Player, Enemy, PlayerShot, EnemyShot)
+     * - Spatial hash grid for O(N) broad-phase detection
      * - Trigger detection (no physics resolution)
      * - Emits CollisionEvent and ProjectileHitEvent via EventBus
      *
@@ -47,8 +49,9 @@ namespace rtype::ecs {
         /**
          * @brief Construct a new Collision System object
          * @param eventBus Reference to EventBus for collision events
+         * @param cellSize Size of spatial hash cells (default 64, ~largest entity)
          */
-        explicit CollisionSystem(EventBus& eventBus);
+        explicit CollisionSystem(EventBus& eventBus, float cellSize = 64.0f);
 
         /**
          * @brief Destroy the Collision System object
@@ -75,6 +78,22 @@ namespace rtype::ecs {
          */
         void setEnabled(bool enabled) {
             m_enabled = enabled;
+        }
+
+        /**
+         * @brief Get collision statistics for debugging
+         * @return Pair of (entities checked, actual collision pairs)
+         */
+        std::pair<std::size_t, std::size_t> getStats() const {
+            return {m_spatialHash.getEntityCount(), m_collisions.size()};
+        }
+
+        /**
+         * @brief Set spatial hash cell size
+         * @param size Cell size in world units
+         */
+        void setCellSize(float size) {
+            m_spatialHash.setCellSize(size);
         }
 
     private:
@@ -115,6 +134,11 @@ namespace rtype::ecs {
          */
         void handleProjectileCollision(EntityId projectile, EntityId target);
 
+        /**
+         * @brief Build AABB from transform and collider components
+         */
+        AABB buildAABB(const TransformComponent& transform, const ColliderComponent& collider) const;
+
     private:
         /**
          * @brief Reference to EventBus for emitting collision events
@@ -122,12 +146,17 @@ namespace rtype::ecs {
         EventBus& m_eventBus;
 
         /**
+         * @brief Spatial hash grid for broad-phase detection
+         */
+        SpatialHash m_spatialHash;
+
+        /**
          * @brief Whether collision detection is enabled
          */
         bool m_enabled = true;
 
         /**
-         * @brief Collision pairs detected this frame (for debug)
+         * @brief Collision pairs detected this frame (for debug/stats)
          */
         std::vector<std::pair<EntityId, EntityId>> m_collisions;
     };

@@ -5,6 +5,7 @@
 */
 
 #include "DebugSystem.hpp"
+#include "WindowedDebugSystem.hpp"
 
 namespace rtype::ecs {
 
@@ -18,7 +19,18 @@ namespace rtype::ecs {
         m_tabs.push_back(std::make_unique<debug::BulletsTab>());
         m_tabs.push_back(std::make_unique<debug::TexturesTab>());
         m_tabs.push_back(std::make_unique<debug::PerformanceTab>());
+        
+        // EngineTab for new engine subsystems
+        auto engineTab = std::make_unique<debug::EngineTab>(&eventBus);
+        m_engineTab = engineTab.get();
+        m_tabs.push_back(std::move(engineTab));
+        
         m_tabs.push_back(std::make_unique<debug::UILibraryTab>());
+        
+        // FeaturesTestTab for testing new gameplay features
+        auto featuresTab = std::make_unique<debug::FeaturesTestTab>();
+        featuresTab->setEventBus(&eventBus);
+        m_tabs.push_back(std::move(featuresTab));
         
         // ModesTab needs EventBus reference
         m_modesTab = std::make_unique<debug::ModesTab>(eventBus);
@@ -94,6 +106,20 @@ namespace rtype::ecs {
         DrawRectangle(0, 0, m_screenWidth, 50, {30, 30, 50, 255});
         DrawText("DEBUG MODE", 20, 15, 24, {255, 255, 100, 255});
 
+        // "Windowed Mode" button 
+        const char* windowedLabel = "Windowed Mode";
+        int windowedW = MeasureText(windowedLabel, 12) + 16;
+        int windowedX = m_screenWidth - 150;
+        bool windowedHover = m_mouseX >= windowedX && m_mouseX < windowedX + windowedW &&
+                            m_mouseY >= 12 && m_mouseY < 12 + 26;
+        DrawRectangle(windowedX, 12, windowedW, 26, windowedHover ? Color{60, 100, 150, 255} : Color{50, 70, 100, 255});
+        DrawRectangleLines(windowedX, 12, windowedW, 26, {80, 120, 170, 255});
+        DrawText(windowedLabel, windowedX + 8, 18, 12, windowedHover ? WHITE : Color{200, 200, 200, 255});
+        
+        if (windowedHover && m_mouseLeftPressed) {
+            switchToWindowed();
+        }
+
         // Close button
         int closeX = m_screenWidth - 45;
         bool closeHover = m_mouseX >= closeX && m_mouseX < closeX + 35 &&
@@ -129,6 +155,14 @@ namespace rtype::ecs {
             if (modesTab) {
                 modesTab->setStressTestState(active, complete, intensity, progress, reportFilename);
             }
+        }
+    }
+
+    void DebugSystem::updateEngineStats(size_t spatialEntities, size_t spatialCells,
+                                        size_t collisionPairs, size_t deferredCount) {
+        if (m_engineTab) {
+            m_engineTab->setSpatialHashStats(spatialEntities, spatialCells, collisionPairs);
+            m_engineTab->setDeferredCount(deferredCount);
         }
     }
 
@@ -231,6 +265,13 @@ namespace rtype::ecs {
             DrawText(name, x + 12, 63, 14, text);
             
             x += width + 4;
+        }
+    }
+
+    void DebugSystem::switchToWindowed() {
+        if (m_windowedDebugSystem) {
+            m_enabled = false;
+            m_windowedDebugSystem->setEnabled(true);
         }
     }
 

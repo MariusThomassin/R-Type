@@ -97,9 +97,25 @@ void MainMenuWidget::createButtons() {
     });
     menuPanel_->addChild(playButton_);
 
+    // Multiplayer button
+    multiplayerButton_ = std::make_shared<ButtonWidget>("MULTIPLAYER");
+    multiplayerButton_->setPosition(contentBounds.width / 2.0f - 120, 270.0f);
+    multiplayerButton_->setSize(240.0f, 50.0f);
+    multiplayerButton_->setBackgroundColor(UIColor(0, 100, 200, 200)); // Blue
+    multiplayerButton_->setBorderColor(UIColor(0, 150, 255, 255)); // Light blue border
+    multiplayerButton_->setBorderWidth(2.0f);
+    multiplayerButton_->setTextColor(UIColor::White());
+    multiplayerButton_->setOnClick([this]() {
+        std::cout << "Multiplayer button clicked!" << std::endl;
+        if (callbacks_.onMultiplayer) {
+            callbacks_.onMultiplayer();
+        }
+    });
+    menuPanel_->addChild(multiplayerButton_);
+
     // Settings button
     settingsButton_ = std::make_shared<ButtonWidget>("SETTINGS");
-    settingsButton_->setPosition(contentBounds.width / 2.0f - 120, 280.0f);
+    settingsButton_->setPosition(contentBounds.width / 2.0f - 120, 330.0f);
     settingsButton_->setSize(240.0f, 50.0f);
     settingsButton_->setBackgroundColor(UIColor(100, 100, 100, 200)); // Semi-transparent gray
     settingsButton_->setBorderColor(UIColor(150, 150, 150, 255)); // Light gray border
@@ -115,7 +131,7 @@ void MainMenuWidget::createButtons() {
 
     // Exit button
     exitButton_ = std::make_shared<ButtonWidget>("EXIT");
-    exitButton_->setPosition(contentBounds.width / 2.0f - 120, 350.0f);
+    exitButton_->setPosition(contentBounds.width / 2.0f - 120, 390.0f);
     exitButton_->setSize(240.0f, 50.0f);
     exitButton_->setBackgroundColor(UIColor(150, 0, 0, 200)); // Semi-transparent red
     exitButton_->setBorderColor(UIColor(255, 0, 0, 255)); // Bright red border

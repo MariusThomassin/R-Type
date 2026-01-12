@@ -1,19 +1,27 @@
 /*
 ** R-Type ECS - Performance Debug Tab
-** Shows frame timing and performance metrics
+** Shows frame timing and performance metrics using UI widget library
 */
 
 #pragma once
 
 #include "DebugTab.hpp"
+#include "engine/ui/widgets/TextWidget.hpp"
+#include "engine/ui/UIColor.hpp"
+#include <raylib.h>
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace rtype::ecs::debug {
 
     class PerformanceTab : public IDebugTab {
     public:
+        PerformanceTab() {
+            initWidgets();
+        }
+
         const char* getName() const override { return "Performance"; }
 
         void update(float dt) override {
@@ -24,23 +32,20 @@ namespace rtype::ecs::debug {
             if (m_frameTimes.size() > 120) {
                 m_frameTimes.erase(m_frameTimes.begin());
             }
-        }
 
-        void draw(int y) override {
-            DrawText("Performance Metrics", 30, y, 20, WHITE); y += 35;
-
+            // Update text widgets
             char buf[128];
             snprintf(buf, sizeof(buf), "FPS: %d", GetFPS());
-            DrawText(buf, 30, y, 20, {100, 255, 100, 255}); y += 30;
+            m_fpsText->setText(buf);
 
             snprintf(buf, sizeof(buf), "Frame Time: %.3f ms", m_frameTime * 1000);
-            DrawText(buf, 30, y, 16, WHITE); y += 24;
+            m_frameTimeText->setText(buf);
 
             float avg = 0;
             for (float ft : m_frameTimes) avg += ft;
             if (!m_frameTimes.empty()) avg /= m_frameTimes.size();
             snprintf(buf, sizeof(buf), "Avg (120 frames): %.3f ms", avg * 1000);
-            DrawText(buf, 30, y, 16, WHITE); y += 24;
+            m_avgText->setText(buf);
 
             float minFt = 999, maxFt = 0;
             for (float ft : m_frameTimes) {
@@ -48,14 +53,73 @@ namespace rtype::ecs::debug {
                 maxFt = std::max(maxFt, ft);
             }
             snprintf(buf, sizeof(buf), "Min: %.2f ms  Max: %.2f ms", minFt * 1000, maxFt * 1000);
-            DrawText(buf, 30, y, 14, {150, 150, 150, 255}); y += 30;
+            m_minMaxText->setText(buf);
+        }
 
+        void draw(int y) override {
+            const int x = 30;
+
+            // Title
+            m_titleText->setPosition(static_cast<float>(x), static_cast<float>(y));
+            m_titleText->renderSelf();
+            y += 35;
+
+            // FPS (large)
+            m_fpsText->setPosition(static_cast<float>(x), static_cast<float>(y));
+            m_fpsText->renderSelf();
+            y += 30;
+
+            // Frame time
+            m_frameTimeText->setPosition(static_cast<float>(x), static_cast<float>(y));
+            m_frameTimeText->renderSelf();
+            y += 24;
+
+            // Average
+            m_avgText->setPosition(static_cast<float>(x), static_cast<float>(y));
+            m_avgText->renderSelf();
+            y += 24;
+
+            // Min/Max
+            m_minMaxText->setPosition(static_cast<float>(x), static_cast<float>(y));
+            m_minMaxText->renderSelf();
+            y += 30;
+
+            // Graph (custom drawing - keeping manual as it's visualization-specific)
             drawFrameGraph(y);
         }
 
     private:
         float m_frameTime = 0.0f;
         std::vector<float> m_frameTimes;
+
+        // Text widgets
+        std::shared_ptr<ui::TextWidget> m_titleText;
+        std::shared_ptr<ui::TextWidget> m_fpsText;
+        std::shared_ptr<ui::TextWidget> m_frameTimeText;
+        std::shared_ptr<ui::TextWidget> m_avgText;
+        std::shared_ptr<ui::TextWidget> m_minMaxText;
+
+        void initWidgets() {
+            m_titleText = std::make_shared<ui::TextWidget>("Performance Metrics", 20);
+            m_titleText->setTextColor(ui::UIColor::White());
+            m_titleText->setBackgroundColor(ui::UIColor::Transparent());
+
+            m_fpsText = std::make_shared<ui::TextWidget>("FPS: 0", 20);
+            m_fpsText->setTextColor(ui::UIColor(100, 255, 100, 255));
+            m_fpsText->setBackgroundColor(ui::UIColor::Transparent());
+
+            m_frameTimeText = std::make_shared<ui::TextWidget>("Frame Time: 0.000 ms", 16);
+            m_frameTimeText->setTextColor(ui::UIColor::White());
+            m_frameTimeText->setBackgroundColor(ui::UIColor::Transparent());
+
+            m_avgText = std::make_shared<ui::TextWidget>("Avg (120 frames): 0.000 ms", 16);
+            m_avgText->setTextColor(ui::UIColor::White());
+            m_avgText->setBackgroundColor(ui::UIColor::Transparent());
+
+            m_minMaxText = std::make_shared<ui::TextWidget>("Min: 0.00 ms  Max: 0.00 ms", 14);
+            m_minMaxText->setTextColor(ui::UIColor(150, 150, 150, 255));
+            m_minMaxText->setBackgroundColor(ui::UIColor::Transparent());
+        }
 
         void drawFrameGraph(int y) {
             DrawText("Frame Time Graph:", 30, y, 14, {150, 150, 150, 255}); y += 22;

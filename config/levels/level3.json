@@ -1,0 +1,104 @@
+{
+  "name": "Bydo Core",
+  "difficulty": 3,
+  "waveDelay": 1.5,
+  "waves": [
+    {
+      "delayBefore": 0.5,
+      "spawnInterval": 0.3,
+      "simultaneous": true,
+      "enemies": [
+        {"type": "fast", "x": 1300, "y": 100, "vx": -280, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 200, "vx": -280, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 300, "vx": -280, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 400, "vx": -280, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 500, "vx": -280, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 600, "vx": -280, "vy": 0, "health": 1, "scoreValue": 200}
+      ]
+    },
+    {
+      "delayBefore": 1.5,
+      "spawnInterval": 0.4,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "shooter", "x": 1300, "y": 120, "vx": -100, "vy": 0, "health": 3, "scoreValue": 350},
+        {"type": "shooter", "x": 1300, "y": 240, "vx": -100, "vy": 0, "health": 3, "scoreValue": 350},
+        {"type": "tank", "x": 1300, "y": 360, "vx": -60, "vy": 0, "health": 8, "scoreValue": 700},
+        {"type": "shooter", "x": 1300, "y": 480, "vx": -100, "vy": 0, "health": 3, "scoreValue": 350},
+        {"type": "shooter", "x": 1300, "y": 600, "vx": -100, "vy": 0, "health": 3, "scoreValue": 350}
+      ]
+    },
+    {
+      "delayBefore": 2.0,
+      "spawnInterval": 0.25,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "dive_bomber", "x": 1300, "y": 80, "vx": -100, "vy": 0, "health": 2, "scoreValue": 300},
+        {"type": "dive_bomber", "x": 1300, "y": 180, "vx": -100, "vy": 0, "health": 2, "scoreValue": 300},
+        {"type": "follow", "x": 1300, "y": 280, "vx": -120, "vy": 0, "health": 3, "scoreValue": 400},
+        {"type": "follow", "x": 1300, "y": 380, "vx": -120, "vy": 0, "health": 3, "scoreValue": 400},
+        {"type": "dive_bomber", "x": 1300, "y": 480, "vx": -100, "vy": 0, "health": 2, "scoreValue": 300},
+        {"type": "dive_bomber", "x": 1300, "y": 580, "vx": -100, "vy": 0, "health": 2, "scoreValue": 300}
+      ]
+    },
+    {
+      "delayBefore": 1.5,
+      "spawnInterval": 0.3,
+      "simultaneous": true,
+      "enemies": [
+        {"type": "circular", "x": 1300, "y": 150, "vx": -90, "vy": 0, "health": 3, "scoreValue": 350},
+        {"type": "circular", "x": 1300, "y": 300, "vx": -90, "vy": 0, "health": 3, "scoreValue": 350},
+        {"type": "circular", "x": 1300, "y": 450, "vx": -90, "vy": 0, "health": 3, "scoreValue": 350},
+        {"type": "circular", "x": 1300, "y": 600, "vx": -90, "vy": 0, "health": 3, "scoreValue": 350}
+      ]
+    },
+    {
+      "delayBefore": 2.0,
+      "spawnInterval": 0.5,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "tank", "x": 1300, "y": 180, "vx": -50, "vy": 0, "health": 10, "scoreValue": 800},
+        {"type": "shooter", "x": 1300, "y": 280, "vx": -80, "vy": 0, "health": 4, "scoreValue": 400},
+        {"type": "follow", "x": 1300, "y": 360, "vx": -110, "vy": 0, "health": 3, "scoreValue": 400},
+        {"type": "shooter", "x": 1300, "y": 440, "vx": -80, "vy": 0, "health": 4, "scoreValue": 400},
+        {"type": "tank", "x": 1300, "y": 540, "vx": -50, "vy": 0, "health": 10, "scoreValue": 800}
+      ]
+    },
+    {
+      "delayBefore": 2.0,
+      "spawnInterval": 0.2,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "fast", "x": 1300, "y": 100, "vx": -300, "vy": 20, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 180, "vx": -300, "vy": -20, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 260, "vx": -300, "vy": 20, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 340, "vx": -300, "vy": -20, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 420, "vx": -300, "vy": 20, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 500, "vx": -300, "vy": -20, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 580, "vx": -300, "vy": 20, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 660, "vx": -300, "vy": -20, "health": 1, "scoreValue": 200}
+      ]
+    },
+    {
+      "delayBefore": 2.5,
+      "spawnInterval": 0.4,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "shooter", "x": 1300, "y": 100, "vx": -70, "vy": 0, "health": 4, "scoreValue": 450},
+        {"type": "dive_bomber", "x": 1300, "y": 200, "vx": -90, "vy": 0, "health": 3, "scoreValue": 350},
+        {"type": "follow", "x": 1300, "y": 300, "vx": -100, "vy": 0, "health": 4, "scoreValue": 450},
+        {"type": "tank", "x": 1300, "y": 400, "vx": -40, "vy": 0, "health": 12, "scoreValue": 900},
+        {"type": "follow", "x": 1300, "y": 500, "vx": -100, "vy": 0, "health": 4, "scoreValue": 450},
+        {"type": "dive_bomber", "x": 1300, "y": 600, "vx": -90, "vy": 0, "health": 3, "scoreValue": 350}
+      ]
+    },
+    {
+      "delayBefore": 3.0,
+      "spawnInterval": 0.0,
+      "simultaneous": true,
+      "enemies": [
+        {"type": "boss", "x": 1200, "y": 360, "vx": -30, "vy": 0, "health": 50, "scoreValue": 5000}
+      ]
+    }
+  ]
+}
