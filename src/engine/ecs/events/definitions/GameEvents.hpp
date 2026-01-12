@@ -94,6 +94,7 @@ namespace rtype::ecs::events {
         EntityId enemy;
         EntityId killer;
         int pointValue;
+        float x, y;  // Death position for powerup spawning
     };
 
     /**
@@ -172,6 +173,90 @@ namespace rtype::ecs::events {
     struct DanmakuTrigger {
         float x, y;
         int patternId;
+    };
+
+    // ==================== Powerup Events ====================
+
+    /**
+     * @brief Powerup collected by player
+     */
+    struct PowerupCollected {
+        int powerupEntityId;
+        int playerId;
+        int powerupType;
+    };
+
+    /**
+     * @brief Powerup effect expired
+     */
+    struct PowerupExpired {
+        int playerId;
+        int powerupType;
+    };
+
+    // ==================== Force Orb Events ====================
+
+    /**
+     * @brief Request to spawn or upgrade Force orb for player
+     */
+    struct SpawnForceOrb {
+        EntityId playerId;
+        int level = 1;
+    };
+
+    /**
+     * @brief Force orb spawned
+     */
+    struct ForceOrbSpawned {
+        EntityId orbEntity;
+        EntityId playerId;
+        int level;
+    };
+
+    /**
+     * @brief Force orb upgraded
+     */
+    struct ForceOrbUpgraded {
+        EntityId orbEntity;
+        EntityId playerId;
+        int oldLevel;
+        int newLevel;
+    };
+
+    // ==================== Bomb Events ====================
+
+    /**
+     * @brief Bomb activated (screen clear)
+     */
+    struct BombActivated {
+        EntityId playerId;
+        float x, y;
+    };
+
+    /**
+     * @brief Bomb effect completed
+     */
+    struct BombComplete {
+        EntityId playerId;
+        int enemiesDestroyed;
+        int projectilesDestroyed;
+    };
+
+    // ==================== Level Loader Events ====================
+
+    /**
+     * @brief Level loaded from JSON
+     */
+    struct LevelLoaded {
+        int totalWaves;
+        int difficulty;
+    };
+
+    /**
+     * @brief Request to load a specific level
+     */
+    struct LoadLevelRequest {
+        std::string levelPath;
     };
 
 } // namespace rtype::ecs::events

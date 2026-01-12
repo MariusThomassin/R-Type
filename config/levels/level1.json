@@ -1,0 +1,73 @@
+{
+  "name": "Training Grounds",
+  "difficulty": 1,
+  "waveDelay": 2.5,
+  "waves": [
+    {
+      "delayBefore": 1.0,
+      "spawnInterval": 0.8,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "basic", "x": 1300, "y": 200, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "basic", "x": 1300, "y": 360, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "basic", "x": 1300, "y": 520, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100}
+      ]
+    },
+    {
+      "delayBefore": 2.0,
+      "spawnInterval": 0.6,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "sine_wave", "x": 1300, "y": 180, "vx": -100, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "sine_wave", "x": 1300, "y": 360, "vx": -100, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "sine_wave", "x": 1300, "y": 540, "vx": -100, "vy": 0, "health": 1, "scoreValue": 150},
+        {"type": "basic", "x": 1300, "y": 270, "vx": -140, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "basic", "x": 1300, "y": 450, "vx": -140, "vy": 0, "health": 1, "scoreValue": 100}
+      ]
+    },
+    {
+      "delayBefore": 2.5,
+      "spawnInterval": 0.5,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "fast", "x": 1300, "y": 150, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 250, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 350, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 450, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
+        {"type": "fast", "x": 1300, "y": 550, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200}
+      ]
+    },
+    {
+      "delayBefore": 3.0,
+      "spawnInterval": 0.4,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "shooter", "x": 1300, "y": 200, "vx": -80, "vy": 0, "health": 2, "scoreValue": 250},
+        {"type": "basic", "x": 1300, "y": 300, "vx": -100, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "basic", "x": 1300, "y": 420, "vx": -100, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "shooter", "x": 1300, "y": 520, "vx": -80, "vy": 0, "health": 2, "scoreValue": 250},
+        {"type": "sine_wave", "x": 1300, "y": 360, "vx": -90, "vy": 0, "health": 1, "scoreValue": 150}
+      ]
+    },
+    {
+      "delayBefore": 2.0,
+      "spawnInterval": 0.3,
+      "simultaneous": true,
+      "enemies": [
+        {"type": "zigzag", "x": 1300, "y": 120, "vx": -110, "vy": 50, "health": 1, "scoreValue": 175},
+        {"type": "zigzag", "x": 1300, "y": 240, "vx": -110, "vy": -50, "health": 1, "scoreValue": 175},
+        {"type": "zigzag", "x": 1300, "y": 360, "vx": -110, "vy": 50, "health": 1, "scoreValue": 175},
+        {"type": "zigzag", "x": 1300, "y": 480, "vx": -110, "vy": -50, "health": 1, "scoreValue": 175},
+        {"type": "zigzag", "x": 1300, "y": 600, "vx": -110, "vy": 50, "health": 1, "scoreValue": 175}
+      ]
+    },
+    {
+      "delayBefore": 3.0,
+      "spawnInterval": 1.0,
+      "simultaneous": false,
+      "enemies": [
+        {"type": "tank", "x": 1300, "y": 360, "vx": -60, "vy": 0, "health": 5, "scoreValue": 500}
+      ]
+    }
+  ]
+}

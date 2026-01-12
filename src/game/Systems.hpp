@@ -28,3 +28,10 @@
 
 // Stress test system
 #include "systems/StressTestSystem.hpp"
+
+// Powerup system
+#include "systems/PowerupSystem.hpp"
+
+// Enemy systems
+#include "systems/EnemySpawnerSystem.hpp"
+#include "systems/EnemyAISystem.hpp"

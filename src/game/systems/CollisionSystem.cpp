@@ -1,6 +1,6 @@
 /*
 ** R-Type ECS - CollisionSystem Implementation
-** AABB collision detection with layer-based filtering
+** AABB collision detection with spatial hash broad-phase
 */
 
 #include "CollisionSystem.hpp"
@@ -11,8 +11,9 @@
 
 namespace rtype::ecs {
 
-    CollisionSystem::CollisionSystem(EventBus& eventBus)
+    CollisionSystem::CollisionSystem(EventBus& eventBus, float cellSize)
         : m_eventBus(eventBus)
+        , m_spatialHash(cellSize)
     {
     }
 
@@ -22,32 +23,36 @@ namespace rtype::ecs {
         if (!m_registry || !m_enabled) return;
 
         m_collisions.clear();
+        m_spatialHash.clear();
 
-        // Collect all entities with colliders
-        std::vector<EntityId> entities;
+        // Build spatial hash: insert all collidable entities
         m_registry->forEach<TransformComponent, ColliderComponent>(
-            [&entities](EntityId entity) {
-                entities.push_back(entity);
+            [this](EntityId entity) {
+                const auto& transform = m_registry->getComponent<TransformComponent>(entity);
+                const auto& collider = m_registry->getComponent<ColliderComponent>(entity);
+                
+                AABB bounds = buildAABB(transform, collider);
+                m_spatialHash.insert(entity, bounds);
             }
         );
 
-        // Broad-phase: Check all pairs (N^2 - can be optimized with spatial partitioning later)
-        for (size_t i = 0; i < entities.size(); ++i) {
-            EntityId entityA = entities[i];
+        // Broad-phase using spatial hash: only check pairs in same/adjacent cells
+        m_spatialHash.forEachPotentialPair(
+            [this](EntityId entityA, EntityId entityB) {
+                // Verify entities still exist (safety check)
+                if (!m_registry->entityExists(entityA) || !m_registry->entityExists(entityB)) {
+                    return;
+                }
 
-            const auto& transformA = m_registry->getComponent<TransformComponent>(entityA);
-            const auto& colliderA = m_registry->getComponent<ColliderComponent>(entityA);
-
-            for (size_t j = i + 1; j < entities.size(); ++j) {
-                EntityId entityB = entities[j];
-
+                const auto& transformA = m_registry->getComponent<TransformComponent>(entityA);
+                const auto& colliderA = m_registry->getComponent<ColliderComponent>(entityA);
                 const auto& transformB = m_registry->getComponent<TransformComponent>(entityB);
                 const auto& colliderB = m_registry->getComponent<ColliderComponent>(entityB);
 
                 // Layer filtering: Check if these layers should collide
                 if (!CollisionUtils::canCollide(colliderA.layer, colliderA.mask,
                                                colliderB.layer, colliderB.mask)) {
-                    continue;
+                    return;
                 }
 
                 // Narrow-phase: AABB collision test
@@ -56,7 +61,16 @@ namespace rtype::ecs {
                     handleCollision(entityA, entityB);
                 }
             }
-        }
+        );
+    }
+
+    AABB CollisionSystem::buildAABB(const TransformComponent& transform, const ColliderComponent& collider) const {
+        return AABB{
+            transform.x + collider.offsetX,
+            transform.y + collider.offsetY,
+            collider.width,
+            collider.height
+        };
     }
 
     bool CollisionSystem::checkAABB(

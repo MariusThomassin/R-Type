@@ -20,12 +20,17 @@
 #include "debug/PerformanceTab.hpp"
 #include "debug/ModesTab.hpp"
 #include "debug/UILibraryTab.hpp"
+#include "debug/EngineTab.hpp"
+#include "debug/FeaturesTestTab.hpp"
 
 #include <raylib.h>
 #include <vector>
 #include <memory>
 
 namespace rtype::ecs {
+
+    // Forward declaration for windowed debug system
+    class WindowedDebugSystem;
 
     /**
      * @brief Debug overlay system with event-based input
@@ -80,6 +85,12 @@ namespace rtype::ecs {
             bool isEnabled() const { return m_enabled; }
 
             /**
+             * @brief Set the enabled state
+             * @param enabled New enabled state
+             */
+            void setEnabled(bool enabled) { m_enabled = enabled; }
+
+            /**
              * @brief Get the execution phase of this system
              * @return The phase determining update order
              */
@@ -94,6 +105,20 @@ namespace rtype::ecs {
              * @brief Update the stress test state in ModesTab
              */
             void updateStressTestState(bool active, bool complete, int intensity, float progress, const std::string& reportFilename);
+
+            /**
+             * @brief Update engine subsystem stats in EngineTab
+             * @param spatialEntities Number of entities in spatial hash
+             * @param spatialCells Number of active cells
+             * @param collisionPairs Number of collision pairs checked
+             * @param deferredCount Number of deferred entity deletions
+             */
+            void updateEngineStats(size_t spatialEntities, size_t spatialCells, 
+                                   size_t collisionPairs, size_t deferredCount);
+
+            // === Windowed debug system toggle ===
+            void setWindowedDebugSystem(WindowedDebugSystem* windowed) { m_windowedDebugSystem = windowed; }
+            void switchToWindowed();
 
         private:
             /**
@@ -137,6 +162,11 @@ namespace rtype::ecs {
              * @brief Special reference to ModesTab for state updates
              */
             std::unique_ptr<debug::ModesTab> m_modesTab;
+
+            /**
+             * @brief Pointer to EngineTab for updating engine stats
+             */
+            debug::EngineTab* m_engineTab = nullptr;
 
             /**
              * @brief Index of ModesTab in m_tabs vector
@@ -200,5 +230,10 @@ namespace rtype::ecs {
              * @brief Mouse wheel event subscription ID
              */
             EventBus::SubscriberId m_mouseWheelSub;
+            
+            /**
+             * @brief Reference to windowed debug system for switching
+             */
+            WindowedDebugSystem* m_windowedDebugSystem = nullptr;
         };
 } // namespace rtype::ecs

@@ -7,9 +7,11 @@
 
 #include "engine/ecs/core/EventBus.hpp"
 #include "InputEvents.hpp"
+#include "shared/SettingsManager.hpp"
 
 #include <raylib.h>
 #include <unordered_map>
+#include <cmath>
 
 namespace rtype::ecs::events {
 
@@ -21,15 +23,27 @@ namespace rtype::ecs::events {
      * - Consistent input state across fixed-timestep iterations
      * - IsKeyPressed events aren't lost
      * - Platform-specific code is isolated here
+     * 
+     * Supports configurable key bindings via SettingsManager.
      */
     class InputManager {
     public:
         /**
          * @brief Construct a new Input Manager object
          * @param eventBus Reference to the EventBus for dispatching events
+         * @param settings Optional pointer to SettingsManager for key bindings
          */
-        InputManager(EventBus& eventBus) : m_eventBus(eventBus) {
+        InputManager(EventBus& eventBus, rtype::SettingsManager* settings = nullptr) 
+            : m_eventBus(eventBus), m_settings(settings) {
             initKeyMap();
+        }
+
+        /**
+         * @brief Set or update the SettingsManager reference
+         * @param settings Pointer to SettingsManager (can be null for defaults)
+         */
+        void setSettings(rtype::SettingsManager* settings) {
+            m_settings = settings;
         }
 
         /**
@@ -38,6 +52,7 @@ namespace rtype::ecs::events {
         void pollInput() {
             pollKeyboard();
             pollMouse();
+            pollGamepad();
         }
 
         /**
@@ -72,11 +87,81 @@ namespace rtype::ecs::events {
             return it != m_keyPressed.end() && it->second;
         }
 
+        /**
+         * @brief Get current gamepad state
+         * @param gamepadId The gamepad index (0-3)
+         * @return GamepadState reference
+         */
+        const GamepadState& getGamepadState(int gamepadId = 0) const {
+            if (gamepadId >= 0 && gamepadId < MAX_GAMEPADS) {
+                return m_gamepadStates[gamepadId];
+            }
+            return m_gamepadStates[0];
+        }
+
+        /**
+         * @brief Check if a gamepad is connected
+         * @param gamepadId The gamepad index (0-3)
+         * @return true if connected
+         */
+        bool isGamepadConnected(int gamepadId = 0) const {
+            if (gamepadId >= 0 && gamepadId < MAX_GAMEPADS) {
+                return m_gamepadStates[gamepadId].connected;
+            }
+            return false;
+        }
+
+        /**
+         * @brief Check if a gamepad button is currently held
+         * @param button The button to check
+         * @param gamepadId The gamepad index
+         * @return true if button is down
+         */
+        bool isGamepadButtonDown(GamepadButton button, int gamepadId = 0) const {
+            if (gamepadId >= 0 && gamepadId < MAX_GAMEPADS) {
+                int idx = static_cast<int>(button);
+                if (idx >= 0 && idx < static_cast<int>(GamepadButton::COUNT)) {
+                    return m_gamepadStates[gamepadId].buttons[idx];
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @brief Get gamepad axis value
+         * @param axis The axis to read
+         * @param gamepadId The gamepad index
+         * @return Axis value (-1 to 1)
+         */
+        float getGamepadAxis(GamepadAxis axis, int gamepadId = 0) const {
+            if (gamepadId >= 0 && gamepadId < MAX_GAMEPADS) {
+                const auto& state = m_gamepadStates[gamepadId];
+                switch (axis) {
+                    case GamepadAxis::LeftX: return state.leftStickX;
+                    case GamepadAxis::LeftY: return state.leftStickY;
+                    case GamepadAxis::RightX: return state.rightStickX;
+                    case GamepadAxis::RightY: return state.rightStickY;
+                    case GamepadAxis::LeftTrigger: return state.leftTrigger;
+                    case GamepadAxis::RightTrigger: return state.rightTrigger;
+                    default: return 0.0f;
+                }
+            }
+            return 0.0f;
+        }
+
+        static constexpr int MAX_GAMEPADS = 4;
+
     private:
         /**
          * @brief Reference to the EventBus for dispatching events
          */
         EventBus& m_eventBus;
+        
+        /**
+         * @brief Pointer to SettingsManager for key bindings (can be null)
+         */
+        rtype::SettingsManager* m_settings = nullptr;
+        
         /**
          * @brief Current input states
          */
@@ -98,6 +183,15 @@ namespace rtype::ecs::events {
          * @brief Mapping from KeyCode to raylib key codes
          */
         std::unordered_map<KeyCode, int> m_keyToRaylib;
+
+        /**
+         * @brief Gamepad states for each connected gamepad
+         */
+        GamepadState m_gamepadStates[MAX_GAMEPADS];
+        /**
+         * @brief Previous button states for detecting press/release
+         */
+        bool m_prevGamepadButtons[MAX_GAMEPADS][static_cast<int>(GamepadButton::COUNT)] = {{false}};
 
         /**
          * @brief Initialize the key mapping between KeyCode and raylib keys
@@ -165,6 +259,7 @@ namespace rtype::ecs::events {
                 }
             }
 
+            // Set raw key states (for legacy compatibility)
             m_keyState.up = m_keyDown[KeyCode::Up];
             m_keyState.down = m_keyDown[KeyCode::Down];
             m_keyState.left = m_keyDown[KeyCode::Left];
@@ -181,7 +276,70 @@ namespace rtype::ecs::events {
             m_keyState.ctrl = m_keyDown[KeyCode::LeftControl] || m_keyDown[KeyCode::RightControl];
             m_keyState.alt = m_keyDown[KeyCode::LeftAlt] || m_keyDown[KeyCode::RightAlt];
 
+            // Set action flags based on key bindings
+            updateActionFlags();
+
             m_eventBus.emit(KeyStateEvent{m_keyState});
+        }
+
+        /**
+         * @brief Check if a bound action key is currently pressed
+         * @param action The action name (e.g., "up", "shoot")
+         * @return true if the bound key is held down
+         */
+        bool isActionKeyDown(const std::string& action) const {
+            if (!m_settings) {
+                // Fallback to defaults if no settings
+                return isDefaultActionDown(action);
+            }
+            
+            int keyCode = m_settings->getBoundKey(action);
+            if (keyCode > 0) {
+                return IsKeyDown(keyCode);
+            }
+            return false;
+        }
+
+        /**
+         * @brief Check default key bindings (when SettingsManager not available)
+         */
+        bool isDefaultActionDown(const std::string& action) const {
+            if (action == "up") return m_keyDown.count(KeyCode::W) ? m_keyDown.at(KeyCode::W) : false || 
+                                       m_keyDown.count(KeyCode::Up) ? m_keyDown.at(KeyCode::Up) : false;
+            if (action == "down") return m_keyDown.count(KeyCode::S) ? m_keyDown.at(KeyCode::S) : false || 
+                                         m_keyDown.count(KeyCode::Down) ? m_keyDown.at(KeyCode::Down) : false;
+            if (action == "left") return m_keyDown.count(KeyCode::A) ? m_keyDown.at(KeyCode::A) : false || 
+                                         m_keyDown.count(KeyCode::Left) ? m_keyDown.at(KeyCode::Left) : false;
+            if (action == "right") return m_keyDown.count(KeyCode::D) ? m_keyDown.at(KeyCode::D) : false || 
+                                          m_keyDown.count(KeyCode::Right) ? m_keyDown.at(KeyCode::Right) : false;
+            if (action == "shoot") return m_keyDown.count(KeyCode::Space) ? m_keyDown.at(KeyCode::Space) : false;
+            if (action == "bomb") return IsKeyDown(KEY_B);
+            if (action == "orbSwitch") return m_keyDown.count(KeyCode::Tab) ? m_keyDown.at(KeyCode::Tab) : false;
+            if (action == "pause") return m_keyDown.count(KeyCode::Escape) ? m_keyDown.at(KeyCode::Escape) : false;
+            if (action == "confirm") return m_keyDown.count(KeyCode::Enter) ? m_keyDown.at(KeyCode::Enter) : false;
+            if (action == "cancel") return m_keyDown.count(KeyCode::Escape) ? m_keyDown.at(KeyCode::Escape) : false;
+            return false;
+        }
+
+        /**
+         * @brief Update action flags based on current key bindings
+         */
+        void updateActionFlags() {
+            // Movement actions
+            m_keyState.actionUp = isActionKeyDown("up");
+            m_keyState.actionDown = isActionKeyDown("down");
+            m_keyState.actionLeft = isActionKeyDown("left");
+            m_keyState.actionRight = isActionKeyDown("right");
+            
+            // Combat actions
+            m_keyState.actionShoot = isActionKeyDown("shoot");
+            m_keyState.actionBomb = isActionKeyDown("bomb");
+            m_keyState.actionOrbSwitch = isActionKeyDown("orbSwitch");
+            
+            // Menu actions
+            m_keyState.actionPause = isActionKeyDown("pause");
+            m_keyState.actionConfirm = isActionKeyDown("confirm");
+            m_keyState.actionCancel = isActionKeyDown("cancel");
         }
 
         /**
@@ -235,6 +393,122 @@ namespace rtype::ecs::events {
                 m_eventBus.emit(MouseWheelEvent{wheel});
             } else {
                 m_mouseState.wheelDelta = 0;
+            }
+        }
+
+        /**
+         * @brief Poll gamepad state and emit events
+         */
+        void pollGamepad() {
+            for (int gp = 0; gp < MAX_GAMEPADS; ++gp) {
+                bool wasConnected = m_gamepadStates[gp].connected;
+                bool isConnected = IsGamepadAvailable(gp);
+
+                m_gamepadStates[gp].connected = isConnected;
+                m_gamepadStates[gp].gamepadId = gp;
+
+                // Emit connection/disconnection events
+                if (isConnected && !wasConnected) {
+                    m_eventBus.emit(GamepadConnectedEvent{gp, true});
+                } else if (!isConnected && wasConnected) {
+                    m_eventBus.emit(GamepadConnectedEvent{gp, false});
+                }
+
+                if (!isConnected) {
+                    continue;
+                }
+
+                // Poll axes with deadzone
+                constexpr float DEADZONE = 0.15f;
+                
+                auto applyDeadzone = [](float value) -> float {
+                    constexpr float DZ = 0.15f;
+                    if (value > -DZ && value < DZ) return 0.0f;
+                    return value;
+                };
+
+                float leftX = applyDeadzone(GetGamepadAxisMovement(gp, GAMEPAD_AXIS_LEFT_X));
+                float leftY = applyDeadzone(GetGamepadAxisMovement(gp, GAMEPAD_AXIS_LEFT_Y));
+                float rightX = applyDeadzone(GetGamepadAxisMovement(gp, GAMEPAD_AXIS_RIGHT_X));
+                float rightY = applyDeadzone(GetGamepadAxisMovement(gp, GAMEPAD_AXIS_RIGHT_Y));
+                float leftTrigger = GetGamepadAxisMovement(gp, GAMEPAD_AXIS_LEFT_TRIGGER);
+                float rightTrigger = GetGamepadAxisMovement(gp, GAMEPAD_AXIS_RIGHT_TRIGGER);
+
+                // Normalize triggers from [-1,1] to [0,1]
+                leftTrigger = (leftTrigger + 1.0f) * 0.5f;
+                rightTrigger = (rightTrigger + 1.0f) * 0.5f;
+
+                // Emit axis events only on significant change
+                constexpr float AXIS_THRESHOLD = 0.05f;
+                
+                if (std::abs(leftX - m_gamepadStates[gp].leftStickX) > AXIS_THRESHOLD) {
+                    m_eventBus.emit(GamepadAxisEvent{gp, GamepadAxis::LeftX, leftX});
+                }
+                if (std::abs(leftY - m_gamepadStates[gp].leftStickY) > AXIS_THRESHOLD) {
+                    m_eventBus.emit(GamepadAxisEvent{gp, GamepadAxis::LeftY, leftY});
+                }
+                if (std::abs(rightX - m_gamepadStates[gp].rightStickX) > AXIS_THRESHOLD) {
+                    m_eventBus.emit(GamepadAxisEvent{gp, GamepadAxis::RightX, rightX});
+                }
+                if (std::abs(rightY - m_gamepadStates[gp].rightStickY) > AXIS_THRESHOLD) {
+                    m_eventBus.emit(GamepadAxisEvent{gp, GamepadAxis::RightY, rightY});
+                }
+                if (std::abs(leftTrigger - m_gamepadStates[gp].leftTrigger) > AXIS_THRESHOLD) {
+                    m_eventBus.emit(GamepadAxisEvent{gp, GamepadAxis::LeftTrigger, leftTrigger});
+                }
+                if (std::abs(rightTrigger - m_gamepadStates[gp].rightTrigger) > AXIS_THRESHOLD) {
+                    m_eventBus.emit(GamepadAxisEvent{gp, GamepadAxis::RightTrigger, rightTrigger});
+                }
+
+                m_gamepadStates[gp].leftStickX = leftX;
+                m_gamepadStates[gp].leftStickY = leftY;
+                m_gamepadStates[gp].rightStickX = rightX;
+                m_gamepadStates[gp].rightStickY = rightY;
+                m_gamepadStates[gp].leftTrigger = leftTrigger;
+                m_gamepadStates[gp].rightTrigger = rightTrigger;
+
+                // Poll buttons - map raylib buttons to our enum
+                struct ButtonMapping {
+                    int raylibButton;
+                    GamepadButton ourButton;
+                };
+                
+                static const ButtonMapping buttonMappings[] = {
+                    {GAMEPAD_BUTTON_RIGHT_FACE_DOWN, GamepadButton::FaceDown},
+                    {GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, GamepadButton::FaceRight},
+                    {GAMEPAD_BUTTON_RIGHT_FACE_LEFT, GamepadButton::FaceLeft},
+                    {GAMEPAD_BUTTON_RIGHT_FACE_UP, GamepadButton::FaceUp},
+                    {GAMEPAD_BUTTON_LEFT_FACE_UP, GamepadButton::DpadUp},
+                    {GAMEPAD_BUTTON_LEFT_FACE_RIGHT, GamepadButton::DpadRight},
+                    {GAMEPAD_BUTTON_LEFT_FACE_DOWN, GamepadButton::DpadDown},
+                    {GAMEPAD_BUTTON_LEFT_FACE_LEFT, GamepadButton::DpadLeft},
+                    {GAMEPAD_BUTTON_LEFT_TRIGGER_1, GamepadButton::LeftBumper},
+                    {GAMEPAD_BUTTON_RIGHT_TRIGGER_1, GamepadButton::RightBumper},
+                    {GAMEPAD_BUTTON_MIDDLE_LEFT, GamepadButton::Back},
+                    {GAMEPAD_BUTTON_MIDDLE_RIGHT, GamepadButton::Start},
+                    {GAMEPAD_BUTTON_MIDDLE, GamepadButton::Guide},
+                    {GAMEPAD_BUTTON_LEFT_THUMB, GamepadButton::LeftThumb},
+                    {GAMEPAD_BUTTON_RIGHT_THUMB, GamepadButton::RightThumb},
+                };
+
+                for (const auto& mapping : buttonMappings) {
+                    int idx = static_cast<int>(mapping.ourButton);
+                    bool wasDown = m_prevGamepadButtons[gp][idx];
+                    bool isDown = IsGamepadButtonDown(gp, mapping.raylibButton);
+
+                    m_gamepadStates[gp].buttons[idx] = isDown;
+
+                    if (isDown && !wasDown) {
+                        m_eventBus.emit(GamepadButtonPressedEvent{gp, mapping.ourButton});
+                    } else if (!isDown && wasDown) {
+                        m_eventBus.emit(GamepadButtonReleasedEvent{gp, mapping.ourButton});
+                    }
+
+                    m_prevGamepadButtons[gp][idx] = isDown;
+                }
+
+                // Emit gamepad state event
+                m_eventBus.emit(GamepadStateEvent{m_gamepadStates[gp]});
             }
         }
     };

@@ -70,6 +70,51 @@ namespace rtype::ecs {
         return m_entities.size();
     }
 
+    void Registry::destroyEntityDeferred(EntityId entity)
+    {
+        std::lock_guard<std::mutex> lock(m_deferredMutex);
+        m_deferredDestroyQueue.push_back(entity);
+    }
+
+    void Registry::destroyEntitiesDeferred(const std::vector<EntityId>& entities)
+    {
+        std::lock_guard<std::mutex> lock(m_deferredMutex);
+        m_deferredDestroyQueue.insert(m_deferredDestroyQueue.end(), 
+                                       entities.begin(), entities.end());
+    }
+
+    std::size_t Registry::flushDeferred()
+    {
+        std::vector<EntityId> entitiesToDestroy;
+        
+        {
+            std::lock_guard<std::mutex> lock(m_deferredMutex);
+            std::swap(entitiesToDestroy, m_deferredDestroyQueue);
+        }
+
+        if (entitiesToDestroy.empty()) {
+            return 0;
+        }
+
+        // Remove duplicates
+        std::sort(entitiesToDestroy.begin(), entitiesToDestroy.end());
+        entitiesToDestroy.erase(
+            std::unique(entitiesToDestroy.begin(), entitiesToDestroy.end()),
+            entitiesToDestroy.end()
+        );
+
+        std::size_t count = entitiesToDestroy.size();
+        destroyEntities(entitiesToDestroy);
+        
+        return count;
+    }
+
+    std::size_t Registry::getDeferredCount() const
+    {
+        std::lock_guard<std::mutex> lock(m_deferredMutex);
+        return m_deferredDestroyQueue.size();
+    }
+
     std::vector<EntityId> Registry::getAllEntities() const
     {
         std::vector<EntityId> result;

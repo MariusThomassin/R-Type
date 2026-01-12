@@ -24,6 +24,7 @@ namespace rtype::ecs {
 
         float projectileSpeed = 800.0f;
         int projectileCount = 1;      // For spread shots
+        int powerLevel = 0;           // Weapon upgrade level (0-5)
 
         WeaponComponent() = default;
 
@@ -39,6 +40,20 @@ namespace rtype::ecs {
          */
         bool isReady(float currentTime) const {
             return canFire && (currentTime - lastFiredTime >= fireRate);
+        }
+
+        /**
+         * @brief Get effective damage based on power level
+         */
+        int getEffectiveDamage() const {
+            return damage + (powerLevel * 5);  // +5 damage per level
+        }
+
+        /**
+         * @brief Get effective fire rate based on power level
+         */
+        float getEffectiveFireRate() const {
+            return fireRate * (1.0f - powerLevel * 0.05f);  // 5% faster per level
         }
 
         std::string getTypeName() const override {

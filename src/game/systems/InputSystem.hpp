@@ -102,13 +102,13 @@ namespace rtype::ecs {
             void update(float dt) override {
                 if (!m_registry) return;
 
-                // Build input flags
+                // Build input flags using action-based methods (respects key bindings)
                 uint8_t inputFlags = 0;
                 if (m_keyState.moveUp()) inputFlags |= 0x01;       // INPUT_UP
                 if (m_keyState.moveDown()) inputFlags |= 0x02;     // INPUT_DOWN
                 if (m_keyState.moveLeft()) inputFlags |= 0x04;     // INPUT_LEFT
                 if (m_keyState.moveRight()) inputFlags |= 0x08;    // INPUT_RIGHT
-                if (m_keyState.space) inputFlags |= 0x10;          // INPUT_SHOOT
+                if (m_keyState.shoot()) inputFlags |= 0x10;        // INPUT_SHOOT
 
                 // If in network mode, send inputs to server instead of applying locally
                 // IMPORTANT: Always send inputs, even when inputFlags = 0, so server knows to stop movement
@@ -146,9 +146,9 @@ namespace rtype::ecs {
                     );
                 }
 
-                // Handle shooting (Space key) - only in local mode
+                // Handle shooting - only in local mode
                 // In network mode, shooting is handled by server via INPUT_SHOOT flag
-                if (m_keyState.space && !m_networkClient) {
+                if (m_keyState.shoot() && !m_networkClient) {
                     m_registry->forEach<PlayerComponent>(
                         [this](EntityId entity) {
                             const auto& player = m_registry->getComponent<PlayerComponent>(entity);

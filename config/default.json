@@ -1,0 +1,42 @@
+{
+    "video": {
+        "resolution": {
+            "width": 1280,
+            "height": 720
+        },
+        "fullscreen": false,
+        "vsync": true,
+        "targetFps": 60
+    },
+    "audio": {
+        "masterVolume": 1.0,
+        "musicVolume": 0.7,
+        "sfxVolume": 1.0
+    },
+    "game": {
+        "playerSpeed": 300.0,
+        "fireRate": 0.15,
+        "startingLives": 3,
+        "invincibilityDuration": 2.0
+    },
+    "difficulty": {
+        "level": "normal",
+        "enemySpawnRate": 2.0,
+        "enemyHealthMultiplier": 1.0,
+        "enemySpeedMultiplier": 1.0,
+        "playerDamageMultiplier": 1.0
+    },
+    "network": {
+        "defaultPort": 4242,
+        "tickRate": 60,
+        "snapshotRate": 20,
+        "maxPlayers": 4,
+        "connectionTimeout": 5.0
+    },
+    "debug": {
+        "showFps": true,
+        "showColliders": false,
+        "showEntityCount": true,
+        "logLevel": "info"
+    }
+}
