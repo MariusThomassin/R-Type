@@ -6,12 +6,14 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "src/engine/ui/Widgets.hpp"
+#include "engine/ui/widgets/TextWidget.hpp"
+#include "engine/ui/UIColor.hpp"
 #include "engine/ecs/components/TransformComponent.hpp"
 #include "engine/ecs/components/SpriteComponent.hpp"
 #include "game/components/SpritesheetComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include <memory>
+#include <raylib.h>
 
 namespace rtype::ecs::debug {
 
@@ -124,52 +126,52 @@ namespace rtype::ecs::debug {
         void initWidgets() {
             // Title
             m_titleText = std::make_shared<ui::TextWidget>("Engine Statistics", 20);
-            m_titleText->setTextColor(ui::Color::White());
-            m_titleText->setBackgroundColor(ui::Color::Transparent());
+            m_titleText->setTextColor(ui::UIColor::White());
+            m_titleText->setBackgroundColor(ui::UIColor::Transparent());
 
             // Entity stats (dynamic)
             m_entityCountText = std::make_shared<ui::TextWidget>("Total Entities: 0", 16);
-            m_entityCountText->setTextColor(ui::Color::White());
-            m_entityCountText->setBackgroundColor(ui::Color::Transparent());
+            m_entityCountText->setTextColor(ui::UIColor::White());
+            m_entityCountText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_spriteCountText = std::make_shared<ui::TextWidget>("  - With SpriteComponent: 0", 14);
-            m_spriteCountText->setTextColor(ui::Color(180, 180, 180, 255));
-            m_spriteCountText->setBackgroundColor(ui::Color::Transparent());
+            m_spriteCountText->setTextColor(ui::UIColor(180, 180, 180, 255));
+            m_spriteCountText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_sheetCountText = std::make_shared<ui::TextWidget>("  - With SpritesheetComponent: 0", 14);
-            m_sheetCountText->setTextColor(ui::Color(180, 180, 180, 255));
-            m_sheetCountText->setBackgroundColor(ui::Color::Transparent());
+            m_sheetCountText->setTextColor(ui::UIColor(180, 180, 180, 255));
+            m_sheetCountText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_bulletCountText = std::make_shared<ui::TextWidget>("  - Projectiles: 0", 14);
-            m_bulletCountText->setTextColor(ui::Color(180, 180, 180, 255));
-            m_bulletCountText->setBackgroundColor(ui::Color::Transparent());
+            m_bulletCountText->setTextColor(ui::UIColor(180, 180, 180, 255));
+            m_bulletCountText->setBackgroundColor(ui::UIColor::Transparent());
 
             // FPS (dynamic)
             m_fpsText = std::make_shared<ui::TextWidget>("FPS: 0  |  Frame: 0.00ms", 16);
-            m_fpsText->setTextColor(ui::Color(100, 255, 100, 255));
-            m_fpsText->setBackgroundColor(ui::Color::Transparent());
+            m_fpsText->setTextColor(ui::UIColor(100, 255, 100, 255));
+            m_fpsText->setBackgroundColor(ui::UIColor::Transparent());
 
             // Architecture info (static)
             m_archTitleText = std::make_shared<ui::TextWidget>("Architecture: IRenderable Pattern", 16);
-            m_archTitleText->setTextColor(ui::Color(100, 200, 255, 255));
-            m_archTitleText->setBackgroundColor(ui::Color::Transparent());
+            m_archTitleText->setTextColor(ui::UIColor(100, 200, 255, 255));
+            m_archTitleText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_archDesc1Text = std::make_shared<ui::TextWidget>("Components render themselves via render(transform, ctx)", 14);
-            m_archDesc1Text->setTextColor(ui::Color(150, 150, 150, 255));
-            m_archDesc1Text->setBackgroundColor(ui::Color::Transparent());
+            m_archDesc1Text->setTextColor(ui::UIColor(150, 150, 150, 255));
+            m_archDesc1Text->setBackgroundColor(ui::UIColor::Transparent());
 
             m_archDesc2Text = std::make_shared<ui::TextWidget>("RenderSystem is a thin coordinator (~220 lines)", 14);
-            m_archDesc2Text->setTextColor(ui::Color(150, 150, 150, 255));
-            m_archDesc2Text->setBackgroundColor(ui::Color::Transparent());
+            m_archDesc2Text->setTextColor(ui::UIColor(150, 150, 150, 255));
+            m_archDesc2Text->setBackgroundColor(ui::UIColor::Transparent());
 
             // Controls (static)
             m_controlsTitleText = std::make_shared<ui::TextWidget>("Controls:", 16);
-            m_controlsTitleText->setTextColor(ui::Color(255, 255, 100, 255));
-            m_controlsTitleText->setBackgroundColor(ui::Color::Transparent());
+            m_controlsTitleText->setTextColor(ui::UIColor(255, 255, 100, 255));
+            m_controlsTitleText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_controlsDescText = std::make_shared<ui::TextWidget>("WASD/Arrows - Move  |  Space - Shoot  |  G - Bullet Pattern", 14);
-            m_controlsDescText->setTextColor(ui::Color(150, 150, 150, 255));
-            m_controlsDescText->setBackgroundColor(ui::Color::Transparent());
+            m_controlsDescText->setTextColor(ui::UIColor(150, 150, 150, 255));
+            m_controlsDescText->setBackgroundColor(ui::UIColor::Transparent());
         }
     };
 

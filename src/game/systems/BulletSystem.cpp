@@ -4,6 +4,9 @@
 */
 
 #include "BulletSystem.hpp"
+#include <cmath>
+#include <vector>
+#include <utility>
 
 namespace rtype::ecs {
 
@@ -61,60 +64,122 @@ namespace rtype::ecs {
         weapon.lastFiredTime = m_gameTime;
 
         bool isPlayer = m_registry->hasComponent<PlayerComponent>(shooterId);
-
-        Entity projectile = m_registry->createEntity();
-
-        float offsetX = 40.0f * transform.scaleX;  // Spawn in front of ship
-        m_registry->addComponent(projectile, TransformComponent(
-            transform.x + offsetX,
-            transform.y,
-            0.0f,
-            1.0f, 1.0f  // Scale controlled by SpritesheetComponent
-        ));
-
         float direction = isPlayer ? 1.0f : -1.0f;
-        m_registry->addComponent(projectile, VelocityComponent(
-            weapon.projectileSpeed * direction,
-            0.0f,
-            weapon.projectileSpeed * 1.5f  // Max speed
-        ));
+        float offsetX = 40.0f * transform.scaleX;
 
-        SpritesheetComponent bulletSprite;
-        bulletSprite.textureId = "touhou_bullets";
-        bulletSprite.frameWidth = 16;
-        bulletSprite.frameHeight = 16;
-        bulletSprite.hasGlow = true;
-        bulletSprite.glowIntensity = 0.4f;
+        EntityId firstProjectile = NULL_ENTITY;
 
-        if (isPlayer) {
-            bulletSprite.layer = 100;
-            bulletSprite.setBullet(BulletType::Rice, BulletColor::Cyan);
-            bulletSprite.rotation = -90.0f;
-            bulletSprite.tintR = 80;
-            bulletSprite.tintG = 240;
-            bulletSprite.tintB = 255;
-        } else {
-            bulletSprite.layer = 99 - (m_enemyBulletCounter % 100);
-            m_enemyBulletCounter++;
-            BulletType type = (std::rand() % 2 == 0) ? BulletType::Ball : BulletType::Outline;
-            BulletColor color = static_cast<BulletColor>(std::rand() % static_cast<int>(BulletColor::COUNT));
-            bulletSprite.setBullet(type, color);
-            BulletColors::applyBulletColorTint(bulletSprite, color);
+        // Determine shot pattern based on weapon power level (0-4)
+        // Level 0: 1 shot straight
+        // Level 1: 2 shots parallel
+        // Level 2: 3 shots (straight + slight angle)
+        // Level 3: 4 shots spread
+        // Level 4+: 5 shots wide spread
+        int level = weapon.powerLevel;
+        int shotCount = 1;
+        std::vector<std::pair<float, float>> shotOffsets; // {angleOffset, yOffset}
+
+        if (level == 0) {
+            shotCount = 1;
+            shotOffsets.push_back({0.0f, 0.0f});
+        } else if (level == 1) {
+            shotCount = 2;
+            shotOffsets.push_back({0.0f, -10.0f});
+            shotOffsets.push_back({0.0f, 10.0f});
+        } else if (level == 2) {
+            shotCount = 3;
+            shotOffsets.push_back({0.0f, 0.0f});
+            shotOffsets.push_back({10.0f, -15.0f});  // Slight upward angle
+            shotOffsets.push_back({-10.0f, 15.0f}); // Slight downward angle
+        } else if (level == 3) {
+            shotCount = 4;
+            shotOffsets.push_back({0.0f, -8.0f});
+            shotOffsets.push_back({0.0f, 8.0f});
+            shotOffsets.push_back({15.0f, -20.0f});
+            shotOffsets.push_back({-15.0f, 20.0f});
+        } else { // level >= 4
+            shotCount = 5;
+            shotOffsets.push_back({0.0f, 0.0f});
+            shotOffsets.push_back({8.0f, -12.0f});
+            shotOffsets.push_back({-8.0f, 12.0f});
+            shotOffsets.push_back({20.0f, -24.0f});
+            shotOffsets.push_back({-20.0f, 24.0f});
         }
 
-        m_registry->addComponent(projectile, bulletSprite);
+        // Spawn each projectile in the pattern
+        for (int i = 0; i < shotCount; i++) {
+            float angleOffset = shotOffsets[i].first;
+            float yOffset = shotOffsets[i].second;
 
-        m_registry->addComponent(projectile, ProjectileComponent(
-            shooterId,
-            weapon.damage,
-            isPlayer
-        ));
+            Entity projectile = m_registry->createEntity();
 
-        if (isPlayer) {
-            m_registry->addComponent(projectile, LifetimeComponent(3.0f));
+            m_registry->addComponent(projectile, TransformComponent(
+                transform.x + offsetX,
+                transform.y + yOffset,
+                0.0f,
+                1.0f, 1.0f
+            ));
+
+            // Calculate velocity with angle offset
+            float baseSpeed = weapon.projectileSpeed;
+            float angleRad = angleOffset * (3.14159265f / 180.0f);
+            float velX = baseSpeed * direction * std::cos(angleRad);
+            float velY = baseSpeed * std::sin(angleRad) * direction;
+
+            m_registry->addComponent(projectile, VelocityComponent(
+                velX,
+                velY,
+                baseSpeed * 1.5f
+            ));
+
+            SpritesheetComponent bulletSprite;
+            bulletSprite.textureId = "touhou_bullets";
+            bulletSprite.frameWidth = 16;
+            bulletSprite.frameHeight = 16;
+            bulletSprite.hasGlow = true;
+            bulletSprite.glowIntensity = 0.4f;
+
+            if (isPlayer) {
+                bulletSprite.layer = 100;
+                // Color varies with power level
+                BulletColor color = static_cast<BulletColor>(std::min(level, 7));
+                bulletSprite.setBullet(BulletType::Rice, color);
+                bulletSprite.rotation = -90.0f + angleOffset;
+                // Apply color tint based on level
+                switch (level) {
+                    case 0: bulletSprite.tintR = 80; bulletSprite.tintG = 200; bulletSprite.tintB = 255; break;  // Cyan
+                    case 1: bulletSprite.tintR = 80; bulletSprite.tintG = 255; bulletSprite.tintB = 80; break;   // Green
+                    case 2: bulletSprite.tintR = 255; bulletSprite.tintG = 255; bulletSprite.tintB = 80; break;  // Yellow
+                    case 3: bulletSprite.tintR = 255; bulletSprite.tintG = 150; bulletSprite.tintB = 50; break;  // Orange
+                    default: bulletSprite.tintR = 255; bulletSprite.tintG = 80; bulletSprite.tintB = 255; break; // Magenta
+                }
+            } else {
+                bulletSprite.layer = 99 - (m_enemyBulletCounter % 100);
+                m_enemyBulletCounter++;
+                BulletType type = (std::rand() % 2 == 0) ? BulletType::Ball : BulletType::Outline;
+                BulletColor color = static_cast<BulletColor>(std::rand() % static_cast<int>(BulletColor::COUNT));
+                bulletSprite.setBullet(type, color);
+                BulletColors::applyBulletColorTint(bulletSprite, color);
+            }
+
+            m_registry->addComponent(projectile, bulletSprite);
+
+            m_registry->addComponent(projectile, ProjectileComponent(
+                shooterId,
+                weapon.getEffectiveDamage(),  // Use level-scaled damage
+                isPlayer
+            ));
+
+            if (isPlayer) {
+                m_registry->addComponent(projectile, LifetimeComponent(3.0f));
+            }
+
+            if (firstProjectile == NULL_ENTITY) {
+                firstProjectile = projectile.id;
+            }
         }
 
-        return projectile.id;
+        return firstProjectile;
     }
 
     EntityId BulletSystem::spawnTouhouBullet(float x, float y, float velX, float velY,

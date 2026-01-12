@@ -38,10 +38,12 @@ namespace rtype {
         std::string action;
         int keyboardKey;
         int gamepadButton;
+        int gamepadAxis;     // -1 = none, 0+ = axis index
+        float axisDirection; // 1.0 = positive, -1.0 = negative
 
-        KeyBinding() : keyboardKey(-1), gamepadButton(-1) {}
-        KeyBinding(const std::string& a, int k, int g = -1) 
-            : action(a), keyboardKey(k), gamepadButton(g) {}
+        KeyBinding() : keyboardKey(-1), gamepadButton(-1), gamepadAxis(-1), axisDirection(1.0f) {}
+        KeyBinding(const std::string& a, int k, int g = -1, int axis = -1, float dir = 1.0f) 
+            : action(a), keyboardKey(k), gamepadButton(g), gamepadAxis(axis), axisDirection(dir) {}
     };
 
     /**
@@ -135,6 +137,23 @@ namespace rtype {
             m_dirty = true;
         }
 
+        void bindGamepadAxis(const std::string& action, int axis, float direction = 1.0f) {
+            m_bindings[action].gamepadAxis = axis;
+            m_bindings[action].axisDirection = direction;
+            m_bindings[action].action = action;
+            m_dirty = true;
+        }
+
+        int getBoundGamepadAxis(const std::string& action) const {
+            auto it = m_bindings.find(action);
+            return (it != m_bindings.end()) ? it->second.gamepadAxis : -1;
+        }
+
+        float getBoundAxisDirection(const std::string& action) const {
+            auto it = m_bindings.find(action);
+            return (it != m_bindings.end()) ? it->second.axisDirection : 1.0f;
+        }
+
         int getBoundKey(const std::string& action) const {
             auto it = m_bindings.find(action);
             return (it != m_bindings.end()) ? it->second.keyboardKey : -1;
@@ -175,15 +194,18 @@ namespace rtype {
 
         void setDefaultBindings() {
             m_bindings.clear();
-            // Movement (WASD + Arrows)
-            m_bindings["up"] = KeyBinding("up", 87, 1);        // W, DPad Up
-            m_bindings["down"] = KeyBinding("down", 83, 3);    // S, DPad Down
-            m_bindings["left"] = KeyBinding("left", 65, 4);    // A, DPad Left
-            m_bindings["right"] = KeyBinding("right", 68, 2);  // D, DPad Right
+            // Movement (WASD + Arrows + Left Stick)
+            m_bindings["up"] = KeyBinding("up", 87, 11, 1, -1.0f);      // W, DPad Up, Left Stick Y-
+            m_bindings["down"] = KeyBinding("down", 83, 13, 1, 1.0f);   // S, DPad Down, Left Stick Y+
+            m_bindings["left"] = KeyBinding("left", 65, 14, 0, -1.0f);  // A, DPad Left, Left Stick X-
+            m_bindings["right"] = KeyBinding("right", 68, 12, 0, 1.0f); // D, DPad Right, Left Stick X+
             // Actions
-            m_bindings["shoot"] = KeyBinding("shoot", 32, 7);  // Space, A button
-            m_bindings["bomb"] = KeyBinding("bomb", 66, 8);    // B, B button
-            m_bindings["pause"] = KeyBinding("pause", 256, 6); // ESC, Start
+            m_bindings["shoot"] = KeyBinding("shoot", 32, 0);     // Space, A button (FaceDown)
+            m_bindings["bomb"] = KeyBinding("bomb", 66, 1);       // B key, B button (FaceRight)
+            m_bindings["orbSwitch"] = KeyBinding("orbSwitch", 9, 5); // Tab, RB (RightBumper)
+            m_bindings["pause"] = KeyBinding("pause", 256, 7);    // ESC, Start
+            m_bindings["confirm"] = KeyBinding("confirm", 257, 0); // Enter, A button
+            m_bindings["cancel"] = KeyBinding("cancel", 256, 1);   // ESC, B button
         }
 
         bool parseJson(const std::string& content) {
@@ -216,15 +238,46 @@ namespace rtype {
             pos = content.find('{', pos);
             if (pos == std::string::npos) return;
 
-            size_t end = content.find('}', pos);
-            if (end == std::string::npos) return;
+            // Find the matching closing brace for the bindings object
+            int braceCount = 1;
+            size_t end = pos + 1;
+            while (end < content.size() && braceCount > 0) {
+                if (content[end] == '{') braceCount++;
+                else if (content[end] == '}') braceCount--;
+                end++;
+            }
+            
+            std::string bindingsStr = content.substr(pos, end - pos);
 
-            std::string bindingsStr = content.substr(pos, end - pos + 1);
+            // Parse each action binding
+            const std::vector<std::string> actions = {
+                "up", "down", "left", "right", 
+                "shoot", "bomb", "orbSwitch", 
+                "pause", "confirm", "cancel"
+            };
 
-            // Parse each known action
-            for (auto& [action, binding] : m_bindings) {
-                int key = extractInt(bindingsStr, action, binding.keyboardKey);
-                binding.keyboardKey = key;
+            for (const auto& action : actions) {
+                // Find this action's block
+                size_t actionPos = bindingsStr.find("\"" + action + "\"");
+                if (actionPos == std::string::npos) continue;
+
+                // Find the action's object
+                size_t objStart = bindingsStr.find('{', actionPos);
+                if (objStart == std::string::npos) continue;
+
+                size_t objEnd = bindingsStr.find('}', objStart);
+                if (objEnd == std::string::npos) continue;
+
+                std::string actionBlock = bindingsStr.substr(objStart, objEnd - objStart + 1);
+
+                // Parse the binding fields
+                int keyboardKey = extractInt(actionBlock, "keyboardKey", m_bindings[action].keyboardKey);
+                int gamepadButton = extractInt(actionBlock, "gamepadButton", m_bindings[action].gamepadButton);
+                int gamepadAxis = extractInt(actionBlock, "gamepadAxis", m_bindings[action].gamepadAxis);
+                float axisDirection = static_cast<float>(extractInt(actionBlock, "axisDirection", 
+                    static_cast<int>(m_bindings[action].axisDirection)));
+
+                m_bindings[action] = KeyBinding(action, keyboardKey, gamepadButton, gamepadAxis, axisDirection);
             }
         }
 

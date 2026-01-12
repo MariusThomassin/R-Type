@@ -9,6 +9,7 @@
 #include "engine/ecs/core/Registry.hpp"
 #include "engine/ecs/core/EventBus.hpp"
 #include "engine/ecs/core/SystemManager.hpp"
+#include "engine/ecs/events/definitions/GameEvents.hpp"
 
 #include <memory>
 #include <chrono>
@@ -150,6 +151,18 @@ namespace rtype::server {
          * @brief Check game over condition
          */
         void checkGameOver();
+
+        /**
+         * @brief Handle Force orb spawn/upgrade request
+         * @param event Spawn event data
+         */
+        void handleForceOrbSpawn(const ecs::events::SpawnForceOrb& event);
+
+        /**
+         * @brief Handle bomb activation
+         * @param event Bomb event data
+         */
+        void handleBombActivation(const ecs::events::BombActivated& event);
 
     private:
         /**

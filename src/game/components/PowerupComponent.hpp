@@ -17,7 +17,9 @@ namespace rtype::ecs {
         SPEED_BOOST = 1,    // Move faster temporarily
         HEALTH_UP = 2,      // Restore health
         SHIELD = 3,         // Temporary invincibility
-        WEAPON_UPGRADE = 4  // Upgrade weapon power level
+        WEAPON_UPGRADE = 4, // Upgrade weapon power level
+        FORCE_ORB = 5,      // Spawn/upgrade Force orb attachment
+        BOMB = 6            // Screen-clearing bomb
     };
 
     /**
@@ -51,6 +53,8 @@ namespace rtype::ecs {
                 case PowerupType::HEALTH_UP:      return 0x00FF00FF;  // Green
                 case PowerupType::SHIELD:         return 0x00FFFFFF;  // Blue
                 case PowerupType::WEAPON_UPGRADE: return 0xFF8800FF;  // Orange
+                case PowerupType::FORCE_ORB:      return 0x8800FFFF;  // Purple
+                case PowerupType::BOMB:           return 0xFF0000FF;  // Red
                 default:                          return 0xFFFFFFFF;  // White
             }
         }
@@ -65,6 +69,8 @@ namespace rtype::ecs {
                 case PowerupType::HEALTH_UP:      return "Health Up";
                 case PowerupType::SHIELD:         return "Shield";
                 case PowerupType::WEAPON_UPGRADE: return "Weapon Upgrade";
+                case PowerupType::FORCE_ORB:      return "Force Orb";
+                case PowerupType::BOMB:           return "Bomb";
                 default:                          return "Unknown";
             }
         }

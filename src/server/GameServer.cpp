@@ -35,6 +35,11 @@
 
 // Event includes
 #include "engine/ecs/core/EventBus.hpp"
+#include "engine/ecs/events/definitions/GameEvents.hpp"
+
+// Powerup components
+#include "game/components/ForceOrbComponent.hpp"
+#include "game/components/PowerupComponent.hpp"
 
 #include <thread>
 #include <cmath>
@@ -120,6 +125,20 @@ namespace rtype::server {
         m_collisionSubId = m_eventBus.subscribe<ecs::CollisionEvent>(
             [this](const ecs::CollisionEvent& event) {
                 handlePlayerCollision(event);
+            }
+        );
+
+        // Subscribe to Force Orb spawn events
+        m_eventBus.subscribe<ecs::events::SpawnForceOrb>(
+            [this](const ecs::events::SpawnForceOrb& event) {
+                handleForceOrbSpawn(event);
+            }
+        );
+
+        // Subscribe to Bomb activation events
+        m_eventBus.subscribe<ecs::events::BombActivated>(
+            [this](const ecs::events::BombActivated& event) {
+                handleBombActivation(event);
             }
         );
 
@@ -558,6 +577,113 @@ namespace rtype::server {
             auto buffer = network::serializeMessage(network::MessageType::GAME_OVER, gameOverMsg);
             m_networkManager->broadcast(buffer);
         }
+    }
+
+    void GameServer::handleForceOrbSpawn(const ecs::events::SpawnForceOrb& event) {
+        std::cout << "[GameServer] Force orb spawn requested for player " << event.playerId 
+                  << " (level " << event.level << ")" << std::endl;
+
+        // Check if player already has an orb
+        ecs::Entity existingOrb{ecs::NULL_ENTITY};
+        auto orbEntities = m_registry.getEntitiesWith<ecs::ForceOrbComponent>();
+        for (ecs::EntityId eid : orbEntities) {
+            auto* orb = m_registry.tryGetComponent<ecs::ForceOrbComponent>(eid);
+            if (orb && orb->ownerId == event.playerId) {
+                existingOrb = ecs::Entity{eid};
+                break;
+            }
+        }
+
+        if (existingOrb.id != ecs::NULL_ENTITY) {
+            // Upgrade existing orb
+            auto* orbComp = m_registry.tryGetComponent<ecs::ForceOrbComponent>(existingOrb);
+            if (orbComp && orbComp->level < 3) {
+                int oldLevel = orbComp->level;
+                orbComp->level = std::min(orbComp->level + 1, 3);
+                orbComp->updateForLevel();
+                std::cout << "[GameServer] Upgraded Force orb from level " << oldLevel 
+                          << " to " << orbComp->level << std::endl;
+
+                // Emit upgrade event
+                m_eventBus.emit(ecs::events::ForceOrbUpgraded{
+                    existingOrb.id, event.playerId, oldLevel, orbComp->level
+                });
+
+                // TODO: Broadcast orb upgrade to clients
+            }
+        } else {
+            // Spawn new Force orb
+            ecs::Entity orb = m_registry.createEntity();
+            
+            // Get player position for orb placement
+            auto* playerTransform = m_registry.tryGetComponent<ecs::TransformComponent>(
+                ecs::Entity{event.playerId});
+            float orbX = 100.0f, orbY = 360.0f;  // Default position
+            if (playerTransform) {
+                orbX = playerTransform->x - 40.0f;  // Left of player
+                orbY = playerTransform->y;
+            }
+
+            m_registry.addComponent(orb, ecs::TransformComponent(orbX, orbY));
+            m_registry.addComponent(orb, ecs::ForceOrbComponent(event.playerId, 
+                ecs::OrbDockSide::Left, event.level));
+
+            // Add network component for sync
+            uint32_t netId = m_networkIdManager->allocate(orb);
+            m_registry.addComponent(orb, ecs::NetworkComponent(netId));
+
+            std::cout << "[GameServer] Spawned Force orb entity " << orb.id 
+                      << " with network ID " << netId << std::endl;
+
+            // Emit spawn event
+            m_eventBus.emit(ecs::events::ForceOrbSpawned{orb.id, event.playerId, event.level});
+
+            // TODO: Broadcast orb spawn to clients
+        }
+    }
+
+    void GameServer::handleBombActivation(const ecs::events::BombActivated& event) {
+        std::cout << "[GameServer] Bomb activated by player " << event.playerId 
+                  << " at (" << event.x << ", " << event.y << ")" << std::endl;
+
+        int enemiesDestroyed = 0;
+        int projectilesDestroyed = 0;
+
+        // Destroy all enemy projectiles
+        std::vector<ecs::Entity> toDestroy;
+        auto projectileEntities = m_registry.getEntitiesWith<ecs::ProjectileComponent>();
+        for (ecs::EntityId eid : projectileEntities) {
+            auto* proj = m_registry.tryGetComponent<ecs::ProjectileComponent>(eid);
+            // Only destroy enemy projectiles (not player's)
+            if (proj && !proj->isPlayerProjectile) {
+                toDestroy.push_back(ecs::Entity{eid});
+                projectilesDestroyed++;
+            }
+        }
+
+        // Destroy enemies within bomb radius (screen-wide effect)
+        auto healthEntities = m_registry.getEntitiesWith<ecs::HealthComponent, ecs::TransformComponent>();
+        for (ecs::EntityId eid : healthEntities) {
+            // Check if it's an enemy (not a player)
+            if (!m_registry.tryGetComponent<ecs::PlayerComponent>(eid)) {
+                // Screen-wide bomb effect - destroy all enemies
+                toDestroy.push_back(ecs::Entity{eid});
+                enemiesDestroyed++;
+            }
+        }
+
+        // Actually destroy entities
+        for (const auto& entity : toDestroy) {
+            m_registry.destroyEntity(entity.id);
+        }
+
+        std::cout << "[GameServer] Bomb destroyed " << enemiesDestroyed << " enemies and " 
+                  << projectilesDestroyed << " projectiles" << std::endl;
+
+        // Emit completion event
+        m_eventBus.emit(ecs::events::BombComplete{event.playerId, enemiesDestroyed, projectilesDestroyed});
+
+        // TODO: Broadcast bomb effect to clients for visual feedback
     }
 
 } // namespace rtype::server

@@ -6,7 +6,9 @@
 #pragma once
 
 #include "DebugTab.hpp"
-#include "src/engine/ui/Widgets.hpp"
+#include "engine/ui/widgets/TextWidget.hpp"
+#include "engine/ui/UIColor.hpp"
+#include <raylib.h>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -99,24 +101,24 @@ namespace rtype::ecs::debug {
 
         void initWidgets() {
             m_titleText = std::make_shared<ui::TextWidget>("Performance Metrics", 20);
-            m_titleText->setTextColor(ui::Color::White());
-            m_titleText->setBackgroundColor(ui::Color::Transparent());
+            m_titleText->setTextColor(ui::UIColor::White());
+            m_titleText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_fpsText = std::make_shared<ui::TextWidget>("FPS: 0", 20);
-            m_fpsText->setTextColor(ui::Color(100, 255, 100, 255));
-            m_fpsText->setBackgroundColor(ui::Color::Transparent());
+            m_fpsText->setTextColor(ui::UIColor(100, 255, 100, 255));
+            m_fpsText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_frameTimeText = std::make_shared<ui::TextWidget>("Frame Time: 0.000 ms", 16);
-            m_frameTimeText->setTextColor(ui::Color::White());
-            m_frameTimeText->setBackgroundColor(ui::Color::Transparent());
+            m_frameTimeText->setTextColor(ui::UIColor::White());
+            m_frameTimeText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_avgText = std::make_shared<ui::TextWidget>("Avg (120 frames): 0.000 ms", 16);
-            m_avgText->setTextColor(ui::Color::White());
-            m_avgText->setBackgroundColor(ui::Color::Transparent());
+            m_avgText->setTextColor(ui::UIColor::White());
+            m_avgText->setBackgroundColor(ui::UIColor::Transparent());
 
             m_minMaxText = std::make_shared<ui::TextWidget>("Min: 0.00 ms  Max: 0.00 ms", 14);
-            m_minMaxText->setTextColor(ui::Color(150, 150, 150, 255));
-            m_minMaxText->setBackgroundColor(ui::Color::Transparent());
+            m_minMaxText->setTextColor(ui::UIColor(150, 150, 150, 255));
+            m_minMaxText->setBackgroundColor(ui::UIColor::Transparent());
         }
 
         void drawFrameGraph(int y) {

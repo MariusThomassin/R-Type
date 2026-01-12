@@ -26,6 +26,7 @@
 #include "../engine/ui/widgets/LobbyWidget.hpp"
 #include "../engine/ui/widgets/MultiplayerWidget.hpp"
 #include "../engine/graphics/RenderUtils.hpp"
+#include "../shared/SettingsManager.hpp"
 #include "NetworkClient.hpp"
 
 using namespace rtype::ecs;
@@ -210,8 +211,17 @@ int main(int argc, char* argv[]) {
     // ==================== Event Bus ====================
     rtype::ecs::EventBus eventBus;
 
+    // ==================== Settings Manager ====================
+    rtype::SettingsManager settingsManager;
+    // Try to load settings from file, otherwise use defaults
+    if (!settingsManager.load("config/settings.json")) {
+        std::cout << "[Main] No settings file found, using defaults" << std::endl;
+    } else {
+        std::cout << "[Main] Settings loaded from config/settings.json" << std::endl;
+    }
+
     // ==================== Input Manager ====================
-    rtype::ecs::events::InputManager inputManager(eventBus);
+    rtype::ecs::events::InputManager inputManager(eventBus, &settingsManager);
 
     // ==================== UI Manager ====================
     rtype::ui::UIManager uiManager(eventBus);

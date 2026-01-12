@@ -21,6 +21,7 @@
 #include "debug/ModesTab.hpp"
 #include "debug/UILibraryTab.hpp"
 #include "debug/EngineTab.hpp"
+#include "debug/FeaturesTestTab.hpp"
 
 #include <raylib.h>
 #include <vector>

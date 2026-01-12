@@ -269,14 +269,18 @@ namespace rtype::ecs::debug {
                 const char* name;
                 Color color;
             };
+            // Updated to include all 7 powerup types including Force Orb and Bomb
             PowerupInfo powerups[] = {
                 {"Spread", {0, 255, 255, 255}},
                 {"Speed", {255, 255, 0, 255}},
                 {"Health", {0, 255, 0, 255}},
                 {"Shield", {100, 150, 255, 255}},
-                {"Weapon", {255, 150, 0, 255}}
+                {"Weapon", {255, 150, 0, 255}},
+                {"Orb", {100, 180, 255, 255}},
+                {"Bomb", {255, 100, 50, 255}}
             };
             
+            // First row: 5 powerups
             for (int i = 0; i < 5; ++i) {
                 int btnX = panelX + 15 + i * 70;
                 bool sel = (m_powerupType == i);
@@ -286,12 +290,25 @@ namespace rtype::ecs::debug {
                 DrawText(powerups[i].name, btnX + (65 - tw) / 2, m_typeButtonsY + 6, 10, 
                         sel ? BLACK : powerups[i].color);
             }
-            ctrlY += 50;
+            
+            // Second row: Force Orb and Bomb
+            m_secondRowY = m_typeButtonsY + 28;
+            for (int i = 5; i < 7; ++i) {
+                int btnX = panelX + 15 + (i - 5) * 70;
+                bool sel = (m_powerupType == i);
+                DrawRectangle(btnX, m_secondRowY, 65, 22, sel ? powerups[i].color : Color{45, 45, 60, 255});
+                DrawRectangleLines(btnX, m_secondRowY, 65, 22, powerups[i].color);
+                int tw = MeasureText(powerups[i].name, 10);
+                DrawText(powerups[i].name, btnX + (65 - tw) / 2, m_secondRowY + 6, 10, 
+                        sel ? BLACK : powerups[i].color);
+            }
+            ctrlY += 78;
 
             // Preview
             DrawText("Preview:", panelX + 15, ctrlY, 13, {180, 180, 180, 255});
+            int previewIdx = std::min(m_powerupType, 6);
             drawPlaceholderShape(panelX + 100, ctrlY + 20, PlaceholderVisualComponent::Shape::Diamond,
-                                powerups[m_powerupType].color, 30.0f, true);
+                                powerups[previewIdx].color, 30.0f, true);
         }
 
         void drawCustomControls(int panelX, int panelY) {
@@ -491,8 +508,13 @@ namespace rtype::ecs::debug {
                     break;
                     
                 case SpawnCategory::Powerup:
+                    // First row: 5 powerups
                     for (int i = 0; i < 5; ++i) {
                         if (isMouseOver(30 + 15 + i * 70, m_typeButtonsY, 65, 22)) m_powerupType = i;
+                    }
+                    // Second row: Force Orb and Bomb
+                    for (int i = 5; i < 7; ++i) {
+                        if (isMouseOver(30 + 15 + (i - 5) * 70, m_secondRowY, 65, 22)) m_powerupType = i;
                     }
                     break;
                     
@@ -592,21 +614,38 @@ namespace rtype::ecs::debug {
             float x = 200.0f + static_cast<float>(std::rand() % (m_screenWidth - 400));
             float y = 150.0f + static_cast<float>(std::rand() % (m_screenHeight - 350));
             
-            PowerupType types[] = {PowerupType::SPREAD_SHOT, PowerupType::SPEED_BOOST,
-                                   PowerupType::HEALTH_UP, PowerupType::SHIELD, PowerupType::WEAPON_UPGRADE};
+            // All 7 powerup types including Force Orb and Bomb
+            PowerupType types[] = {
+                PowerupType::SPREAD_SHOT, 
+                PowerupType::SPEED_BOOST,
+                PowerupType::HEALTH_UP, 
+                PowerupType::SHIELD, 
+                PowerupType::WEAPON_UPGRADE,
+                PowerupType::FORCE_ORB,
+                PowerupType::BOMB
+            };
+            
+            int typeIdx = std::min(m_powerupType, 6);
             
             m_registry->addComponent(e, TransformComponent(x, y, 0, 1.0f, 1.0f));
             m_registry->addComponent(e, VelocityComponent(0, 30.0f, 50.0f));  // Slow drift down
-            m_registry->addComponent(e, PowerupComponent(types[m_powerupType], 10.0f, 1.0f));
+            m_registry->addComponent(e, PowerupComponent(types[typeIdx], 10.0f, 1.0f));
             m_registry->addComponent(e, ColliderComponent(24.0f, 24.0f));
             
-            // Placeholder visual
-            Color powerupColors[] = {{0, 255, 255, 255}, {255, 255, 0, 255}, {0, 255, 0, 255},
-                                     {100, 150, 255, 255}, {255, 150, 0, 255}};
+            // Placeholder visual - colors match the 7 powerup types
+            Color powerupColors[] = {
+                {0, 255, 255, 255},    // Spread - Cyan
+                {255, 255, 0, 255},    // Speed - Yellow
+                {0, 255, 0, 255},      // Health - Green
+                {100, 150, 255, 255},  // Shield - Blue
+                {255, 150, 0, 255},    // Weapon - Orange
+                {100, 180, 255, 255},  // Force Orb - Light Blue
+                {255, 100, 50, 255}    // Bomb - Red-Orange
+            };
             PlaceholderVisualComponent placeholder(PlaceholderVisualComponent::Shape::Diamond, 
-                                                   powerupColors[m_powerupType], 20.0f);
+                                                   powerupColors[typeIdx], 20.0f);
             placeholder.pulsing = true;
-            placeholder.label = PowerupComponent::getName(types[m_powerupType]);
+            placeholder.label = PowerupComponent::getName(types[typeIdx]);
             m_registry->addComponent(e, placeholder);
             
             m_registry->addComponent(e, LifetimeComponent(8.0f));

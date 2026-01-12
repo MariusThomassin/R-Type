@@ -8,7 +8,7 @@
 #ifndef TOGGLEBUTTONWIDGET_HPP_
 #define TOGGLEBUTTONWIDGET_HPP_
 
-#include "src/engine/ui/Widget.hpp"
+#include "../Widget.hpp"
 #include <string>
 #include <functional>
 

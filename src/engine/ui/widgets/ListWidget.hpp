@@ -8,7 +8,7 @@
 #ifndef LISTWIDGET_HPP_
 #define LISTWIDGET_HPP_
 
-#include "src/engine/ui/Widget.hpp"
+#include "../Widget.hpp"
 #include <string>
 #include <vector>
 #include <functional>

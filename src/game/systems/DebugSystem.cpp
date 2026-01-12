@@ -27,6 +27,11 @@ namespace rtype::ecs {
         
         m_tabs.push_back(std::make_unique<debug::UILibraryTab>());
         
+        // FeaturesTestTab for testing new gameplay features
+        auto featuresTab = std::make_unique<debug::FeaturesTestTab>();
+        featuresTab->setEventBus(&eventBus);
+        m_tabs.push_back(std::move(featuresTab));
+        
         // ModesTab needs EventBus reference
         m_modesTab = std::make_unique<debug::ModesTab>(eventBus);
         m_tabs.push_back(std::move(m_modesTab));

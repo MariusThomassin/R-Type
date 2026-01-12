@@ -12,9 +12,12 @@
 #include "engine/ecs/components/VelocityComponent.hpp"
 #include "engine/ecs/components/ColliderComponent.hpp"
 #include "engine/ecs/components/LifetimeComponent.hpp"
+#include "engine/ecs/components/HealthComponent.hpp"
 #include "game/components/PowerupComponent.hpp"
 #include "game/components/PlayerComponent.hpp"
 #include "game/components/WeaponComponent.hpp"
+#include "game/components/EnemyComponent.hpp"
+#include "game/components/ProjectileComponent.hpp"
 #include "engine/ecs/events/definitions/GameEvents.hpp"
 
 #include <random>
@@ -155,16 +158,20 @@ namespace rtype::ecs {
             int roll = dist(m_rng);
 
             // Weighted distribution:
-            // Health Up: 35%
-            // Speed Boost: 25%
-            // Spread Shot: 20%
-            // Shield: 15%
-            // Weapon Upgrade: 5%
-            if (roll < 35) return PowerupType::HEALTH_UP;
-            if (roll < 60) return PowerupType::SPEED_BOOST;
-            if (roll < 80) return PowerupType::SPREAD_SHOT;
-            if (roll < 95) return PowerupType::SHIELD;
-            return PowerupType::WEAPON_UPGRADE;
+            // Health Up: 30%
+            // Speed Boost: 20%
+            // Spread Shot: 15%
+            // Shield: 12%
+            // Weapon Upgrade: 10%
+            // Force Orb: 8%
+            // Bomb: 5%
+            if (roll < 30) return PowerupType::HEALTH_UP;
+            if (roll < 50) return PowerupType::SPEED_BOOST;
+            if (roll < 65) return PowerupType::SPREAD_SHOT;
+            if (roll < 77) return PowerupType::SHIELD;
+            if (roll < 87) return PowerupType::WEAPON_UPGRADE;
+            if (roll < 95) return PowerupType::FORCE_ORB;
+            return PowerupType::BOMB;
         }
 
         /**
@@ -296,6 +303,16 @@ namespace rtype::ecs {
                         weapon.powerLevel = std::min(weapon.powerLevel + 1, 5);
                     }
                     break;
+
+                case PowerupType::FORCE_ORB:
+                    // Emit event for ForceOrbSystem to handle
+                    m_eventBus.emit(events::SpawnForceOrb{playerEntity, 1});
+                    break;
+
+                case PowerupType::BOMB:
+                    // Trigger screen-clearing bomb effect
+                    activateBomb(playerEntity);
+                    break;
             }
 
             // Emit pickup event
@@ -368,6 +385,78 @@ namespace rtype::ecs {
             for (EntityId e : toRemove) {
                 m_registry->destroyEntity(Entity{e});
             }
+        }
+
+        /**
+         * @brief Activate bomb effect - destroy enemy projectiles and weak enemies
+         */
+        void activateBomb(EntityId playerEntity) {
+            if (!m_registry->hasComponent<TransformComponent>(playerEntity)) return;
+
+            const auto& playerTransform = m_registry->getComponent<TransformComponent>(playerEntity);
+            
+            int enemiesDestroyed = 0;
+            int projectilesDestroyed = 0;
+
+            std::vector<EntityId> toDestroy;
+
+            // Destroy all enemy projectiles
+            m_registry->forEach<ProjectileComponent, TransformComponent>(
+                [this, &toDestroy, &projectilesDestroyed](EntityId projEntity) {
+                    const auto& proj = m_registry->getComponent<ProjectileComponent>(projEntity);
+                    if (!proj.isPlayerProjectile) {
+                        toDestroy.push_back(projEntity);
+                        projectilesDestroyed++;
+                    }
+                }
+            );
+
+            // Destroy weak enemies (health <= 2)
+            m_registry->forEach<EnemyComponent, TransformComponent>(
+                [this, &toDestroy, &enemiesDestroyed](EntityId enemyEntity) {
+                    // Check if enemy has low health
+                    if (m_registry->hasComponent<HealthComponent>(enemyEntity)) {
+                        const auto& health = m_registry->getComponent<HealthComponent>(enemyEntity);
+                        if (health.currentHealth <= 2) {
+                            toDestroy.push_back(enemyEntity);
+                            enemiesDestroyed++;
+                        }
+                    } else {
+                        // No health component = instantly destroyable
+                        toDestroy.push_back(enemyEntity);
+                        enemiesDestroyed++;
+                    }
+                }
+            );
+
+            // Destroy entities
+            for (EntityId e : toDestroy) {
+                if (m_registry->entityExists(e)) {
+                    // Award points for enemies
+                    if (m_registry->hasComponent<EnemyComponent>(e)) {
+                        if (m_registry->hasComponent<PlayerComponent>(playerEntity)) {
+                            auto& player = m_registry->getComponent<PlayerComponent>(playerEntity);
+                            player.addScore(50); // Reduced points for bomb kills
+                        }
+                        
+                        // Get position for death effects
+                        if (m_registry->hasComponent<TransformComponent>(e)) {
+                            const auto& t = m_registry->getComponent<TransformComponent>(e);
+                            m_eventBus.emit(events::EnemyDestroyed{e, playerEntity, 50, t.x, t.y});
+                        }
+                    }
+                    m_registry->destroyEntity(Entity{e});
+                }
+            }
+
+            // Emit bomb complete event
+            m_eventBus.emit(events::BombComplete{
+                playerEntity,
+                enemiesDestroyed,
+                projectilesDestroyed
+            });
+
+            // TODO: Add visual bomb effect (screen flash, particles)
         }
     };
 
