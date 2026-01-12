@@ -271,8 +271,11 @@ namespace rtype::ui {
 
     void UIManager::handleMouseRelease(const rtype::ecs::events::MouseButtonReleasedEvent& event)
     {
-        // Empty implementation - mouse release events not currently handled by widgets
-        (void)event; // Suppress unused parameter warning
+        // Forward mouse release to hovered widget
+        if (m_hoveredWidget && m_hoveredWidget->isEnabled()) {
+            m_hoveredWidget->onMouseRelease();
+        }
+        (void)event; // Suppress unused parameter warning for event details
     }
 
 } // namespace rtype::ui

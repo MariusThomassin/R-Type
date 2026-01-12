@@ -56,6 +56,9 @@ set(MODERN_UI_SOURCES
     ui/widgets/ProgressBarWidget.cpp
     ui/widgets/PanelWidget.cpp
     ui/widgets/WindowWidget.cpp
+    ui/widgets/SliderWidget.cpp
+    ui/widgets/SettingsWidget.cpp
+    ui/widgets/MainMenuWidget.cpp
 )
 
 add_library(rtype_ui_library STATIC ${MODERN_UI_SOURCES})

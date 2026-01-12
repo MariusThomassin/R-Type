@@ -13,6 +13,7 @@
 #include <functional>
 #include "../Widget.hpp"
 #include "../../graphics/RenderUtils.hpp"
+#include <raylib.h>
 
 #define DEFAULT_BUTTON_TEXT "Button"
 
@@ -178,6 +179,48 @@ namespace rtype::ui {
          */
         void renderSelf() const override;
 
+        /**
+         * @brief Set the click sound for this button
+         * @param soundPath Path to the sound file to play on click
+         */
+        void setClickSound(const std::string& soundPath);
+
+        /**
+         * @brief Set the click sound using a preloaded Sound object
+         * @param sound Raylib Sound object to play on click
+         */
+        void setClickSound(const Sound& sound);
+
+        /**
+         * @brief Enable or disable click sound
+         * @param enabled Whether to play sound on click
+         */
+        void setClickSoundEnabled(bool enabled);
+
+        /**
+         * @brief Check if click sound is enabled
+         * @return True if click sound is enabled
+         */
+        bool isClickSoundEnabled() const;
+
+        /**
+         * @brief Set default click sound for all new buttons
+         * @param soundPath Path to the default sound file
+         */
+        static void setDefaultClickSound(const std::string& soundPath);
+
+        /**
+         * @brief Set global volume for button sounds
+         * @param volume Volume level (0.0f to 1.0f)
+         */
+        static void setSoundVolume(float volume);
+
+        /**
+         * @brief Get current global volume for button sounds
+         * @return Volume level (0.0f to 1.0f)
+         */
+        static float getSoundVolume();
+
     protected:
         /**
          * @brief Button label text
@@ -197,6 +240,23 @@ namespace rtype::ui {
         UIStyle _hoveredStyle;
         UIStyle _pressedStyle;
         UIStyle _disabledStyle;
+
+        // Sound system
+        Sound _clickSound;
+        bool _hasCustomSound = false;
+        bool _soundEnabled = true;
+        std::string _soundPath;
+        
+        // Static default sound (shared by all buttons)
+        static Sound s_defaultClickSound;
+        static bool s_defaultSoundLoaded;
+        static std::string s_defaultSoundPath;
+        static float s_soundVolume;  // Global volume for button sounds (0.0f to 1.0f)
+        
+        /**
+         * @brief Initialize default click sound for all buttons
+         */
+        static void initializeDefaultSound();
     };
 
 } // namespace rtype::ui

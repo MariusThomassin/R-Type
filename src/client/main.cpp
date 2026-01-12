@@ -8,6 +8,7 @@
 #include <raylib.h>
 
 #include <iostream>
+#include <string>
 #include "../engine/ecs/ECS.hpp"
 #include "../engine/ecs/core/EventBus.hpp"
 #include "../engine/ecs/events/Events.hpp"
@@ -20,6 +21,8 @@
 #include "../engine/ui/widgets/ButtonWidget.hpp"
 #include "../engine/ui/widgets/TextWidget.hpp"
 #include "../engine/ui/widgets/PanelWidget.hpp"
+#include "../engine/ui/widgets/SettingsWidget.hpp"
+#include "../engine/ui/widgets/MainMenuWidget.hpp"
 #include "../engine/graphics/RenderUtils.hpp"
 #include "NetworkClient.hpp"
 
@@ -31,6 +34,88 @@ using rtype::ui::UIColor;
 constexpr int SCREEN_WIDTH = 1280;
 constexpr int SCREEN_HEIGHT = 720;
 constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;  // 60 Hz game logic
+
+// Music system variables
+static Music backgroundMusic = {};
+static bool musicLoaded = false;
+static bool musicEnabled = true;
+static float musicVolume = 0.75f;
+static std::string currentMusicPath = "assets/sound/music/Sketchbook 2024-10-13.ogg";
+
+/**
+ * @brief Initialize and load background music
+ */
+void initializeMusic() {
+    if (!IsAudioDeviceReady()) {
+        std::cout << "Audio device not ready, cannot load music" << std::endl;
+        return;
+    }
+    
+    backgroundMusic = LoadMusicStream(currentMusicPath.c_str());
+    if (backgroundMusic.frameCount > 0) {
+        musicLoaded = true;
+        SetMusicVolume(backgroundMusic, musicVolume);
+        std::cout << "Background music loaded: " << currentMusicPath << std::endl;
+        
+        if (musicEnabled) {
+            PlayMusicStream(backgroundMusic);
+            std::cout << "Background music started" << std::endl;
+        }
+    } else {
+        std::cout << "Failed to load background music: " << currentMusicPath << std::endl;
+    }
+}
+
+/**
+ * @brief Update music playback (call every frame)
+ */
+void updateMusic() {
+    if (musicLoaded && musicEnabled) {
+        UpdateMusicStream(backgroundMusic);
+        
+        // Loop the music when it finishes
+        if (!IsMusicStreamPlaying(backgroundMusic)) {
+            PlayMusicStream(backgroundMusic);
+        }
+    }
+}
+
+/**
+ * @brief Set music enabled/disabled state
+ */
+void setMusicEnabled(bool enabled) {
+    musicEnabled = enabled;
+    if (musicLoaded) {
+        if (enabled) {
+            PlayMusicStream(backgroundMusic);
+            std::cout << "Background music resumed" << std::endl;
+        } else {
+            PauseMusicStream(backgroundMusic);
+            std::cout << "Background music paused" << std::endl;
+        }
+    }
+}
+
+/**
+ * @brief Set music volume (0.0 to 1.0)
+ */
+void setMusicVolume(float volume) {
+    musicVolume = volume;
+    if (musicLoaded) {
+        SetMusicVolume(backgroundMusic, musicVolume);
+    }
+}
+
+/**
+ * @brief Clean up music resources
+ */
+void cleanupMusic() {
+    if (musicLoaded) {
+        UnloadMusicStream(backgroundMusic);
+        musicLoaded = false;
+        std::cout << "Background music unloaded" << std::endl;
+    }
+}
 
 /**
  * @brief Create the player entity with all necessary components
@@ -115,6 +200,10 @@ int main(int argc, char* argv[]) {
     // ==================== Raylib Initialization ====================
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "R-Type");
     ClearWindowState(FLAG_WINDOW_RESIZABLE);  // Fixed window size to prevent FPS drops on resize
+    
+    // ==================== Audio Initialization ====================
+    InitAudioDevice();  // Explicitly initialize audio device
+    std::cout << "Audio device initialized. Ready: " << (IsAudioDeviceReady() ? "YES" : "NO") << std::endl;
 
     // ==================== Event Bus ====================
     rtype::ecs::EventBus eventBus;
@@ -129,7 +218,10 @@ int main(int argc, char* argv[]) {
 
     // ==================== Game State Management ====================
     GameState gameState = GameState::MENU;
-
+    
+    // ==================== Settings Panel ====================
+    bool showingSettingsPanel = false;
+    
     // ==================== ECS Setup ====================
     Registry registry;
     SystemManager systems(&registry);
@@ -144,101 +236,96 @@ int main(int argc, char* argv[]) {
                   << ", continuing in offline mode" << std::endl;
     }
 
-    // ==================== Menu Panel Setup ====================
+    // ==================== Settings Panel Setup ====================
     
-    // -- Create main menu panel --
-    auto menuPanel = std::make_shared<rtype::ui::PanelWidget>();
-    menuPanel->setPosition(SCREEN_WIDTH / 2.0f - 250, 60.0f);
-    menuPanel->setSize(500.0f, 500.0f);
-    menuPanel->setBackgroundColor(UIColor(0, 0, 0, 180)); // Semi-transparent black background
-    menuPanel->setBorderColor(UIColor(100, 100, 255, 200)); // Blue border with transparency
-    menuPanel->setBorderWidth(2.0f);
-    uiManager.addWidget(menuPanel);
+    // Create settings widget with initial configuration
+    rtype::ui::SettingsConfig initialConfig;
+    initialConfig.musicEnabled = true;
+    initialConfig.musicVolume = 75.0f;
+    initialConfig.effectsVolume = 75.0f;  // Initial effects volume
 
-    // Get content bounds for proper positioning within panel
-    auto contentBounds = menuPanel->getContentBounds();
+    // ==================== Button Click Sound Setup ====================
+    // Set a default click sound for all buttons
+    rtype::ui::ButtonWidget::setDefaultClickSound("assets/sound/mixkit-modern-technology-select-3124.wav");
+    // Set initial volume to match effects volume settings (convert percentage to 0.0-1.0 range)
+    rtype::ui::ButtonWidget::setSoundVolume(initialConfig.effectsVolume / 100.0f);
+    
+    std::cout << "Button click sound system initialized!" << std::endl;
+    std::cout << "- Default click sound: mixkit-modern-technology-select-3124.wav" << std::endl;
+    std::cout << "- All buttons will now play sound on click" << std::endl;
+    std::cout << "- Use button->setClickSound(\"path\") to customize individual button sounds" << std::endl;
+    std::cout << "- Use button->setClickSoundEnabled(false) to disable sound for specific buttons" << std::endl;
 
-    // -- Create title glow layers for effect (back to front) --
-    auto titleGlow2 = std::make_shared<rtype::ui::TextWidget>("R-TYPE", 64);
-    titleGlow2->setPosition(contentBounds.width / 2.0f - 118, 44.0f); // Properly centered with glow offset
-    titleGlow2->setSize(200.0f, 80.0f);
-    titleGlow2->setBackgroundColor(UIColor::Transparent());
-    titleGlow2->setTextColor(UIColor(255, 30, 30, 60)); // Very dim red glow
-    menuPanel->addChild(titleGlow2);
+    // ==================== Background Music Setup ====================
+    // Initialize music system with initial settings
+    ::musicEnabled = initialConfig.musicEnabled;
+    ::musicVolume = initialConfig.musicVolume / 100.0f;
+    initializeMusic();
+    
+    auto settingsWidget = std::make_shared<rtype::ui::SettingsWidget>(initialConfig);
+    settingsWidget->setPosition(SCREEN_WIDTH / 2.0f - 300, SCREEN_HEIGHT / 2.0f - 250);
+    
+    // Set up callbacks for settings events
+    rtype::ui::SettingsCallbacks callbacks;
+    callbacks.onMusicToggle = [](bool enabled) {
+        std::cout << "Music " << (enabled ? "enabled" : "disabled") << "!" << std::endl;
+        setMusicEnabled(enabled);
+    };
+    callbacks.onMusicVolumeChange = [](float volume) {
+        std::cout << "Music volume changed to: " << static_cast<int>(volume) << "%" << std::endl;
+        setMusicVolume(volume / 100.0f);  // Convert percentage to 0.0-1.0 range
+    };
+    callbacks.onEffectsVolumeChange = [](float volume) {
+        std::cout << "Effects volume changed to: " << static_cast<int>(volume) << "%" << std::endl;
+        // Update button click sound volume to match effects volume settings
+        rtype::ui::ButtonWidget::setSoundVolume(volume / 100.0f);  // Convert percentage to 0.0-1.0 range
+    };
+    // Create settings widget first without close callback
+    uiManager.addWidget(settingsWidget);
+    settingsWidget->initialize(); // Initialize after adding to UI manager
 
-    auto titleGlow1 = std::make_shared<rtype::ui::TextWidget>("R-TYPE", 64);
-    titleGlow1->setPosition(contentBounds.width / 2.0f - 119, 46.0f); // Slightly offset for glow effect
-    titleGlow1->setSize(200.0f, 80.0f);
-    titleGlow1->setBackgroundColor(UIColor::Transparent());
-    titleGlow1->setTextColor(UIColor(255, 50, 50, 100)); // Dim red glow
-    menuPanel->addChild(titleGlow1);
+    // ==================== Main Menu Widget Setup ====================
+    
+    // Create main menu widget
+    rtype::ui::MainMenuConfig menuConfig;
+    menuConfig.title = "R-TYPE";
+    menuConfig.subtitle = "The classic side-scrolling shooter";
 
-    // -- Create glowing game title (main title on top) --
-    auto gameTitle = std::make_shared<rtype::ui::TextWidget>("R-TYPE", 64);
-    gameTitle->setPosition(contentBounds.width / 2.0f - 120, 48.0f); // Centered in panel
-    gameTitle->setSize(200.0f, 80.0f);
-    gameTitle->setBackgroundColor(UIColor::Transparent());
-    gameTitle->setTextColor(UIColor(255, 100, 100, 255)); // Bright red for main text
-    menuPanel->addChild(gameTitle);
+    auto mainMenuWidget = std::make_shared<rtype::ui::MainMenuWidget>(menuConfig);
+    mainMenuWidget->setPosition(SCREEN_WIDTH / 2.0f - 250, 60.0f);
 
-    // -- Create subtitle --
-    auto subtitle = std::make_shared<rtype::ui::TextWidget>("The classic side-scrolling shooter", 24);
-    subtitle->setPosition(contentBounds.width / 2.0f - 200, 140.0f); // Centered below title
-    subtitle->setSize(400.0f, 40.0f);
-    subtitle->setBackgroundColor(UIColor::Transparent());
-    subtitle->setTextColor(UIColor(200, 200, 255, 255)); // Light blue
-    menuPanel->addChild(subtitle);
-
-    // -- Create Play button with enhanced styling --
-    auto playButton = std::make_shared<rtype::ui::ButtonWidget>("PLAY");
-    playButton->setPosition(contentBounds.width / 2.0f - 120, 200.0f); // Centered in panel
-    playButton->setSize(240.0f, 60.0f);
-    playButton->setBackgroundColor(UIColor(0, 150, 0, 200)); // Semi-transparent green
-    playButton->setBorderColor(UIColor(0, 255, 0, 255)); // Bright green border
-    playButton->setBorderWidth(2.0f);
-    playButton->setTextColor(UIColor::White());
-    playButton->setOnClick([&gameState, &networkClient]() {
-        std::cout << "Play button clicked! Starting game..." << std::endl;
+    // Set up callbacks for main menu events
+    rtype::ui::MainMenuCallbacks menuCallbacks;
+    menuCallbacks.onPlay = [&gameState]() {
         gameState = GameState::PLAYING;
+    };
 
-        // Send PLAYER_READY to server
-        if (networkClient.isConnected()) {
-            networkClient.sendPlayerReady();
-        }
-    });
-    menuPanel->addChild(playButton);
+    menuCallbacks.onSettings = [&showingSettingsPanel, &settingsWidget, &mainMenuWidget]() {
+        showingSettingsPanel = true;
+        settingsWidget->show();
+        mainMenuWidget->hide();
+    };
 
-    // -- Create Settings button --
-    auto settingsButton = std::make_shared<rtype::ui::ButtonWidget>("SETTINGS");
-    settingsButton->setPosition(contentBounds.width / 2.0f - 120, 280.0f); // Centered in panel
-    settingsButton->setSize(240.0f, 50.0f);
-    settingsButton->setBackgroundColor(UIColor(100, 100, 100, 200)); // Semi-transparent gray
-    settingsButton->setBorderColor(UIColor(150, 150, 150, 255)); // Light gray border
-    settingsButton->setBorderWidth(2.0f);
-    settingsButton->setTextColor(UIColor::White());
-    settingsButton->setOnClick([]() {
-        std::cout << "Settings button clicked!" << std::endl;
-        // TODO: Implement settings menu
-    });
-    menuPanel->addChild(settingsButton);
-
-    // -- Create Exit button with enhanced styling --
-    auto exitButton = std::make_shared<rtype::ui::ButtonWidget>("EXIT");
-    exitButton->setPosition(contentBounds.width / 2.0f - 120, 350.0f); // Centered in panel
-    exitButton->setSize(240.0f, 50.0f);
-    exitButton->setBackgroundColor(UIColor(150, 0, 0, 200)); // Semi-transparent red
-    exitButton->setBorderColor(UIColor(255, 0, 0, 255)); // Bright red border
-    exitButton->setBorderWidth(2.0f);
-    exitButton->setTextColor(UIColor::White());
-    exitButton->setOnClick([&shouldExit]() {
-        std::cout << "Exit button clicked! Closing window..." << std::endl;
+    menuCallbacks.onExit = [&shouldExit]() {
         shouldExit = true;
-    });
-    menuPanel->addChild(exitButton);
+    };
 
-    // ==================== Menu Animation Variables ====================
-    float glowTime = 0.0f;
-    float titlePulse = 1.0f;
+    // Send PLAYER_READY to server
+    if (networkClient.isConnected()) {
+        networkClient.sendPlayerReady();
+    }
+
+    mainMenuWidget->setCallbacks(menuCallbacks);
+    uiManager.addWidget(mainMenuWidget);
+    mainMenuWidget->initialize(); // Initialize after adding to UI manager
+
+    // Now set the settings callbacks (after mainMenuWidget is created)
+    callbacks.onClose = [&showingSettingsPanel, mainMenuWidget]() {
+        showingSettingsPanel = false;
+        mainMenuWidget->show(); // Show main menu again
+        std::cout << "Settings panel closed." << std::endl;
+    };
+    settingsWidget->setCallbacks(callbacks);
 
     auto* inputSystem = systems.addSystem<InputSystem>(eventBus, 350.0f, &networkClient);
     systems.addSystem<MovementSystem>();
@@ -266,26 +353,9 @@ int main(int argc, char* argv[]) {
     windowedDebugSystem->setClassicDebugSystem(classicDebugSystem);
     classicDebugSystem->setWindowedDebugSystem(windowedDebugSystem);
     
-    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, windowedDebugSystem, classicDebugSystem, &gameState, &uiManager, &glowTime]() {
-        // Render UI and menu background only in menu state
+    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, windowedDebugSystem, classicDebugSystem, &gameState, &uiManager]() {
+        // Render UI only in menu state (MainMenuWidget handles its own background)
         if (gameState == GameState::MENU) {
-            // Draw animated star field background
-            for (int i = 0; i < 100; i++) {
-                int x = static_cast<int>(fmodf(i * 137.5f, static_cast<float>(SCREEN_WIDTH))); // Pseudo-random positions
-                int y = static_cast<int>(fmodf(i * 273.7f, static_cast<float>(SCREEN_HEIGHT)));
-                float twinkle = sinf(glowTime + i * 0.1f) * 0.5f + 0.5f;
-                int alpha = static_cast<int>(50 + 100 * twinkle);
-                DrawCircle(x, y, 1.0f, Color{255, 255, 255, static_cast<unsigned char>(alpha)});
-            }
-            
-            // Draw subtle gradient overlay
-            for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
-                float intensity = static_cast<float>(y) / SCREEN_HEIGHT;
-                int alpha = static_cast<int>(20 * intensity);
-                DrawRectangle(0, y, SCREEN_WIDTH, 4, Color{0, 0, 50, static_cast<unsigned char>(alpha)});
-            }
-            
-            // Render UI elements
             uiManager.render();
         }
         
@@ -374,24 +444,13 @@ int main(int argc, char* argv[]) {
         accumulator += frameTime;
 
         inputManager.pollInput();
+        
+        // Update background music
+        updateMusic();
 
         // Update UI only in menu state
         if (gameState == GameState::MENU) {
             uiManager.update(frameTime);
-            
-            // Update glowing animation
-            glowTime += frameTime * 2.0f; // Speed of glow animation
-            titlePulse = 0.7f + 0.3f * (sinf(glowTime) + 1.0f) / 2.0f; // Pulse between 0.7 and 1.0
-            
-            // Update title glow colors dynamically
-            int baseRed = 255;
-            int glowRed = static_cast<int>(baseRed * titlePulse);
-            int glowAlpha1 = static_cast<int>(150 * titlePulse);
-            int glowAlpha2 = static_cast<int>(80 * titlePulse);
-            
-            gameTitle->setTextColor(UIColor(glowRed, static_cast<int>(100 * titlePulse), static_cast<int>(100 * titlePulse), 255));
-            titleGlow1->setTextColor(UIColor(255, 50, 50, glowAlpha1));
-            titleGlow2->setTextColor(UIColor(255, 30, 30, glowAlpha2));
         }
         
         // Handle pause toggle with ESC key
@@ -471,6 +530,8 @@ int main(int argc, char* argv[]) {
     }
 
     // ==================== Cleanup ====================
+    cleanupMusic();      // Clean up music resources
+    CloseAudioDevice();  // Clean up audio device
     CloseWindow();
 
     return 0;
