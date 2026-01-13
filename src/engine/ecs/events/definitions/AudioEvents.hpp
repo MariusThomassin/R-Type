@@ -62,4 +62,66 @@ namespace rtype::ecs::events {
         float newVolume;
     };
 
+    // ==================== Music State Events ====================
+
+    /**
+     * @brief Emitted when music state changes
+     */
+    struct MusicStateChanged {
+        enum class State {
+            Stopped,
+            Playing,
+            Paused
+        };
+        
+        State newState;
+        std::string trackPath;
+    };
+
+    /**
+     * @brief Emitted when music finishes playing (if not looping)
+     */
+    struct MusicFinished {
+        std::string trackPath;
+    };
+
+    // ==================== Background Events ====================
+
+    /**
+     * @brief Request to change the background image
+     */
+    struct BackgroundChangeRequest {
+        std::string imagePath;      // Path to background image (empty = use starfield)
+        int layer = -100;           // Render layer
+    };
+
+    /**
+     * @brief Request to enable/disable starfield overlay
+     */
+    struct StarfieldToggleRequest {
+        bool enabled = true;
+        int layer = -99;            // Render layer (above background image)
+    };
+
+    /**
+     * @brief Request to change procedural background type
+     */
+    struct ProceduralBgChangeRequest {
+        int bgType = 0;             // ProceduralBgType enum value
+        int layer = -101;           // Render layer (behind image)
+        float cycleDuration = 120.0f; // Duration of full day/night cycle (seconds)
+    };
+
+    /**
+     * @brief Emitted when background assets are loaded for a level
+     */
+    struct LevelAssetsLoaded {
+        std::string backgroundPath;
+        std::string stageMusicPath;
+        std::string bossMusicPath;
+        bool hasBackground;
+        bool hasStageMusic;
+        bool hasBossMusic;
+    };
+
 } // namespace rtype::ecs::events

@@ -2,6 +2,9 @@
   "name": "Training Grounds",
   "difficulty": 1,
   "waveDelay": 2.5,
+  "background": "assets/backgrounds/26211.png",
+  "stageMusic": "assets/sound/music/Sketchbook 2024-10-13.ogg",
+  "bossMusic": "assets/sound/music/Sketchbook 2024-10-16.ogg",
   "waves": [
     {
       "delayBefore": 1.0,

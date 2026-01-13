@@ -77,14 +77,26 @@ class LevelConfig:
     difficulty: int = 1
     waveDelay: float = 2.0
     waves: List[WaveConfig] = field(default_factory=list)
+    # Level assets
+    background: str = ""
+    stageMusic: str = ""
+    bossMusic: str = ""
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "name": self.name,
             "difficulty": self.difficulty,
             "waveDelay": self.waveDelay,
             "waves": [w.to_dict() for w in self.waves]
         }
+        # Only include asset fields if they have values
+        if self.background:
+            result["background"] = self.background
+        if self.stageMusic:
+            result["stageMusic"] = self.stageMusic
+        if self.bossMusic:
+            result["bossMusic"] = self.bossMusic
+        return result
 
     @classmethod
     def from_dict(cls, data: dict) -> 'LevelConfig':
@@ -93,7 +105,10 @@ class LevelConfig:
             name=data.get("name", "New Level"),
             difficulty=int(data.get("difficulty", 1)),
             waveDelay=float(data.get("waveDelay", 2.0)),
-            waves=waves
+            waves=waves,
+            background=data.get("background", ""),
+            stageMusic=data.get("stageMusic", ""),
+            bossMusic=data.get("bossMusic", "")
         )
 
     def to_json(self, indent: int = 2) -> str:

@@ -51,6 +51,12 @@ namespace rtype::ecs {
         std::vector<WaveConfig> waves;
         float waveDelay = 2.0f;         // Default delay between waves
         int difficulty = 1;
+        
+        // Level assets
+        std::string name;               // Level name
+        std::string background;         // Path to background image
+        std::string stageMusic;         // Path to stage music
+        std::string bossMusic;          // Path to boss music
     };
 
     /**

@@ -9,3 +9,5 @@
 #pragma once
 
 #include "systems/MovementSystem.hpp"
+#include "systems/MusicSystem.hpp"
+#include "systems/BackgroundSystem.hpp"
