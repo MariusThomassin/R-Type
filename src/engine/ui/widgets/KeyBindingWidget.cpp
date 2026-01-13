@@ -13,11 +13,11 @@
 namespace rtype::ui {
 
     KeyBindingWidget::KeyBindingWidget(const std::string& actionName, rtype::ecs::events::KeyCode currentKey)
-        : m_actionName(actionName)
-        , m_currentKey(currentKey)
-        , m_waitingForInput(false)
-        , m_blinkTimer(0.0f)
-        , m_onKeyChange(nullptr)
+        : _actionName(actionName)
+        , _currentKey(currentKey)
+        , _waitingForInput(false)
+        , _blinkTimer(0.0f)
+        , _onKeyChange(nullptr)
     {
         // Set default size and style
         setSize(300.0f, 40.0f);
@@ -27,43 +27,43 @@ namespace rtype::ui {
     }
 
     void KeyBindingWidget::setOnKeyChange(const KeyChangeCallback& callback) {
-        m_onKeyChange = callback;
+        _onKeyChange = callback;
     }
 
     void KeyBindingWidget::setCurrentKey(rtype::ecs::events::KeyCode newKey) {
-        m_currentKey = newKey;
-        m_waitingForInput = false;
+        _currentKey = newKey;
+        _waitingForInput = false;
     }
 
     rtype::ecs::events::KeyCode KeyBindingWidget::getCurrentKey() const {
-        return m_currentKey;
+        return _currentKey;
     }
 
     const std::string& KeyBindingWidget::getActionName() const {
-        return m_actionName;
+        return _actionName;
     }
 
     void KeyBindingWidget::setWaitingForInput(bool waiting) {
-        m_waitingForInput = waiting;
+        _waitingForInput = waiting;
         if (waiting) {
-            m_blinkTimer = 0.0f;
+            _blinkTimer = 0.0f;
         }
     }
 
     bool KeyBindingWidget::isWaitingForInput() const {
-        return m_waitingForInput;
+        return _waitingForInput;
     }
 
     bool KeyBindingWidget::onMouseClick() {
         if (!isEnabled()) return false;
         
         setWaitingForInput(true);
-        std::cout << "KeyBindingWidget: Waiting for input for " << m_actionName << std::endl;
+        std::cout << "KeyBindingWidget: Waiting for input for " << _actionName << std::endl;
         return true; // Consume the event
     }
 
     bool KeyBindingWidget::onKeyPress(rtype::ecs::events::KeyCode key) {
-        if (!m_waitingForInput || !isEnabled()) return false;
+        if (!_waitingForInput || !isEnabled()) return false;
 
         // Don't allow escape key to be bound (reserved for canceling)
         if (key == rtype::ecs::events::KeyCode::Escape) {
@@ -75,21 +75,21 @@ namespace rtype::ui {
         setCurrentKey(key);
         
         // Notify callback if set
-        if (m_onKeyChange) {
-            m_onKeyChange(key);
+        if (_onKeyChange) {
+            _onKeyChange(key);
         }
         
-        std::cout << "KeyBindingWidget: " << m_actionName << " bound to " << keyCodeToString(key) << std::endl;
+        std::cout << "KeyBindingWidget: " << _actionName << " bound to " << keyCodeToString(key) << std::endl;
         return true; // Consume the event
     }
 
     void KeyBindingWidget::update(float deltaTime) {
         Widget::update(deltaTime);
         
-        if (m_waitingForInput) {
-            m_blinkTimer += deltaTime;
-            if (m_blinkTimer >= 2.0f) { // Reset after 2 seconds
-                m_blinkTimer = 0.0f;
+        if (_waitingForInput) {
+            _blinkTimer += deltaTime;
+            if (_blinkTimer >= 2.0f) { // Reset after 2 seconds
+                _blinkTimer = 0.0f;
             }
         }
     }
@@ -102,9 +102,9 @@ namespace rtype::ui {
         const UIStyle& style = getStyle();
         UIColor bgColor = style.backgroundColor;
         
-        if (m_waitingForInput) {
+        if (_waitingForInput) {
             // Pulse effect when waiting for input
-            float pulse = (sin(m_blinkTimer * 6.0f) + 1.0f) * 0.5f;
+            float pulse = (sin(_blinkTimer * 6.0f) + 1.0f) * 0.5f;
             uint32_t newR = static_cast<uint32_t>(bgColor.getRed() + (255 - bgColor.getRed()) * pulse * 0.3f);
             uint32_t newG = static_cast<uint32_t>(bgColor.getGreen() + (255 - bgColor.getGreen()) * pulse * 0.3f);
             bgColor = UIColor(newR, newG, bgColor.getBlue(), bgColor.getAlpha());
@@ -115,7 +115,7 @@ namespace rtype::ui {
         
         // Draw border
         UIColor borderColor = style.borderColor;
-        if (m_waitingForInput) {
+        if (_waitingForInput) {
             borderColor = UIColor(255, 200, 100, borderColor.getAlpha()); // Orange highlight when waiting
         }
         DrawRectangleLinesEx(rect, style.borderWidth, borderColor.toRaylib());
@@ -129,7 +129,7 @@ namespace rtype::ui {
         float textY = transform.y + (transform.height - 20) * 0.5f; // Centered vertically
         
         // Draw action name on the left
-        DrawText(m_actionName.c_str(), static_cast<int>(transform.x + padding), static_cast<int>(textY), 
+        DrawText(_actionName.c_str(), static_cast<int>(transform.x + padding), static_cast<int>(textY), 
                  20, textColor.toRaylib());
         
         // Draw key binding on the right
@@ -144,17 +144,16 @@ namespace rtype::ui {
     }
 
     std::string KeyBindingWidget::getDisplayText() const {
-        if (m_waitingForInput) {
+        if (_waitingForInput) {
             // Blink between "Press any key..." and "Press ESC to cancel"
-            float blinkCycle = fmod(m_blinkTimer, 1.0f);
+            float blinkCycle = fmod(_blinkTimer, 1.0f);
             if (blinkCycle < 0.5f) {
                 return "Press any key...";
             } else {
                 return "ESC to cancel";
             }
         } else {
-            return keyCodeToString(m_currentKey);
+            return keyCodeToString(_currentKey);
         }
     }
-
 } // namespace rtype::ui

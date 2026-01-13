@@ -5,165 +5,158 @@
 
 namespace rtype::ui {
 
-LobbyWidget::LobbyWidget(const LobbyConfig& config)
-    : Widget()
-    , config_(config)
-    , initialized_(false)
-{
-    // Set larger size to match multiplayer widget
-    setSize(1200.0f, 650.0f);
-}
+    LobbyWidget::LobbyWidget(const LobbyConfig& config) : Widget() , _config(config) , _initialized(false)
+    {
+        // Set larger size to match multiplayer widget
+        setSize(1200.0f, 650.0f);
+    }
 
-void LobbyWidget::setCallbacks(const LobbyCallbacks& callbacks) {
-    callbacks_ = callbacks;
-}
+    void LobbyWidget::setCallbacks(const LobbyCallbacks& callbacks) {
+        _callbacks = callbacks;
+    }
 
-void LobbyWidget::initialize() {
-    if (initialized_) return;
+    void LobbyWidget::initialize() {
+        if (_initialized) return;
+        createLobbyPanel();
+        createTitle();
+        createContent();
+        createButtons();
 
-    createLobbyPanel();
-    createTitle();
-    createContent();
-    createButtons();
+        _initialized = true;
+    }
 
-    initialized_ = true;
-}
+    void LobbyWidget::createLobbyPanel() {
+        _lobbyPanel = std::make_shared<PanelWidget>();
+        _lobbyPanel->setPosition(-200.0f, -25.0f);
+        auto transform = getTransform();
+        _lobbyPanel->setSize(transform.width, transform.height);
+        _lobbyPanel->setBackgroundColor(UIColor(10, 20, 40, 220)); // Dark blue background
+        _lobbyPanel->setBorderColor(UIColor(100, 150, 255, 255)); // Blue border
+        _lobbyPanel->setBorderWidth(3.0f);
+        _lobbyPanel->setTitle("LOBBY");
+        
+        addChild(_lobbyPanel);
+    }
 
-void LobbyWidget::createLobbyPanel() {
-    lobbyPanel_ = std::make_shared<PanelWidget>();
-    lobbyPanel_->setPosition(-200.0f, -25.0f);
-    auto transform = getTransform();
-    lobbyPanel_->setSize(transform.width, transform.height);
-    lobbyPanel_->setBackgroundColor(UIColor(10, 20, 40, 220)); // Dark blue background
-    lobbyPanel_->setBorderColor(UIColor(100, 150, 255, 255)); // Blue border
-    lobbyPanel_->setBorderWidth(3.0f);
-    lobbyPanel_->setTitle("LOBBY");
-    
-    addChild(lobbyPanel_);
-}
+    void LobbyWidget::createTitle() {
+        auto contentBounds = _lobbyPanel->getContentBounds();
+        // Lobby title
+        _lobbyTitle = std::make_shared<TextWidget>(_config.title, _config.titleFontSize);
+        _lobbyTitle->setPosition(contentBounds.width / 2.0f - 100, 20.0f);
+        _lobbyTitle->setSize(200.0f, 60.0f);
+        _lobbyTitle->setBackgroundColor(UIColor::Transparent());
+        _lobbyTitle->setTextColor(UIColor(100, 200, 255, 255)); // Light blue
+        _lobbyPanel->addChild(_lobbyTitle);
 
-void LobbyWidget::createTitle() {
-    auto contentBounds = lobbyPanel_->getContentBounds();
+        // Room name
+        _roomNameText = std::make_shared<TextWidget>("Room: " + _config.roomName, _config.textFontSize + 4);
+        _roomNameText->setPosition(50.0f, 80.0f);
+        _roomNameText->setSize(400.0f, 40.0f);
+        _roomNameText->setBackgroundColor(UIColor::Transparent());
+        _roomNameText->setTextColor(UIColor(200, 220, 255, 255)); // Lighter blue
+        _lobbyPanel->addChild(_roomNameText);
 
-    // Lobby title
-    lobbyTitle_ = std::make_shared<TextWidget>(config_.title, config_.titleFontSize);
-    lobbyTitle_->setPosition(contentBounds.width / 2.0f - 100, 20.0f);
-    lobbyTitle_->setSize(200.0f, 60.0f);
-    lobbyTitle_->setBackgroundColor(UIColor::Transparent());
-    lobbyTitle_->setTextColor(UIColor(100, 200, 255, 255)); // Light blue
-    lobbyPanel_->addChild(lobbyTitle_);
+        // Connection info (IP:Port for sharing)
+        _connectionInfoText = std::make_shared<TextWidget>("Share this to join: 127.0.0.1:4242", _config.textFontSize - 2);
+        _connectionInfoText->setPosition(50.0f, 120.0f);
+        _connectionInfoText->setSize(600.0f, 30.0f);
+        _connectionInfoText->setBackgroundColor(UIColor::Transparent());
+        _connectionInfoText->setTextColor(UIColor(150, 200, 150, 255)); // Light green
+        _lobbyPanel->addChild(_connectionInfoText);
+    }
 
-    // Room name
-    roomNameText_ = std::make_shared<TextWidget>("Room: " + config_.roomName, config_.textFontSize + 4);
-    roomNameText_->setPosition(50.0f, 80.0f);
-    roomNameText_->setSize(400.0f, 40.0f);
-    roomNameText_->setBackgroundColor(UIColor::Transparent());
-    roomNameText_->setTextColor(UIColor(200, 220, 255, 255)); // Lighter blue
-    lobbyPanel_->addChild(roomNameText_);
+    void LobbyWidget::createContent() {
+        auto contentBounds = _lobbyPanel->getContentBounds();
+        // Players section label
+        _playersLabel = std::make_shared<TextWidget>("Players:", _config.textFontSize);
+        _playersLabel->setPosition(50.0f, 160.0f);
+        _playersLabel->setSize(200.0f, 30.0f);
+        _playersLabel->setBackgroundColor(UIColor::Transparent());
+        _playersLabel->setTextColor(UIColor(180, 200, 255, 255));
+        _lobbyPanel->addChild(_playersLabel);
 
-    // Connection info (IP:Port for sharing)
-    connectionInfoText_ = std::make_shared<TextWidget>("Share this to join: 127.0.0.1:4242", config_.textFontSize - 2);
-    connectionInfoText_->setPosition(50.0f, 120.0f);
-    connectionInfoText_->setSize(600.0f, 30.0f);
-    connectionInfoText_->setBackgroundColor(UIColor::Transparent());
-    connectionInfoText_->setTextColor(UIColor(150, 200, 150, 255)); // Light green
-    lobbyPanel_->addChild(connectionInfoText_);
-}
+        // Placeholder players list
+        std::string playersText = "• Player 1 (You) - Host\n• Waiting for players...\n• Empty slot\n• Empty slot";
+        _playersList = std::make_shared<TextWidget>(playersText, _config.textFontSize - 2);
+        _playersList->setPosition(70.0f, 200.0f);
+        _playersList->setSize(600.0f, 200.0f);
+        _playersList->setBackgroundColor(UIColor(5, 10, 20, 100)); // Semi-transparent dark background
+        _playersList->setBorderColor(UIColor(50, 80, 120, 255));
+        _playersList->setBorderWidth(1.0f);
+        _playersList->setTextColor(UIColor(160, 180, 220, 255));
+        _lobbyPanel->addChild(_playersList);
+    }
 
-void LobbyWidget::createContent() {
-    auto contentBounds = lobbyPanel_->getContentBounds();
+    void LobbyWidget::createButtons() {
+        auto contentBounds = _lobbyPanel->getContentBounds();
 
-    // Players section label
-    playersLabel_ = std::make_shared<TextWidget>("Players:", config_.textFontSize);
-    playersLabel_->setPosition(50.0f, 160.0f);
-    playersLabel_->setSize(200.0f, 30.0f);
-    playersLabel_->setBackgroundColor(UIColor::Transparent());
-    playersLabel_->setTextColor(UIColor(180, 200, 255, 255));
-    lobbyPanel_->addChild(playersLabel_);
+        // Back button
+        _backButton = std::make_shared<ButtonWidget>("BACK TO MENU");
+        _backButton->setPosition(25.0f, 580.0f);
+        _backButton->setSize(200.0f, 50.0f);
+        _backButton->setBackgroundColor(UIColor(100, 100, 100, 200)); // Gray
+        _backButton->setBorderColor(UIColor(150, 150, 150, 255));
+        _backButton->setBorderWidth(2.0f);
+        _backButton->setTextColor(UIColor::White());
+        _backButton->setOnClick([this]() {
+            std::cout << "Back to menu button clicked!" << std::endl;
+            if (_callbacks.onBack) {
+                _callbacks.onBack();
+            }
+        });
+        _lobbyPanel->addChild(_backButton);
+        // Start game button (for host)
+        _startGameButton = std::make_shared<ButtonWidget>("START GAME");
+        _startGameButton->setPosition(contentBounds.width - 215.0f, 580.0f);
+        _startGameButton->setSize(200.0f, 50.0f);
+        _startGameButton->setBackgroundColor(UIColor(0, 150, 0, 200)); // Green
+        _startGameButton->setBorderColor(UIColor(0, 255, 0, 255));
+        _startGameButton->setBorderWidth(2.0f);
+        _startGameButton->setTextColor(UIColor::White());
+        _startGameButton->setOnClick([this]() {
+            std::cout << "Start game button clicked!" << std::endl;
+            if (_callbacks.onStartGame) {
+                _callbacks.onStartGame();
+            }
+        });
+        _lobbyPanel->addChild(_startGameButton);
+    }
 
-    // Placeholder players list
-    std::string playersText = "• Player 1 (You) - Host\n• Waiting for players...\n• Empty slot\n• Empty slot";
-    playersList_ = std::make_shared<TextWidget>(playersText, config_.textFontSize - 2);
-    playersList_->setPosition(70.0f, 200.0f);
-    playersList_->setSize(600.0f, 200.0f);
-    playersList_->setBackgroundColor(UIColor(5, 10, 20, 100)); // Semi-transparent dark background
-    playersList_->setBorderColor(UIColor(50, 80, 120, 255));
-    playersList_->setBorderWidth(1.0f);
-    playersList_->setTextColor(UIColor(160, 180, 220, 255));
-    lobbyPanel_->addChild(playersList_);
-}
-
-void LobbyWidget::createButtons() {
-    auto contentBounds = lobbyPanel_->getContentBounds();
-
-    // Back button
-    backButton_ = std::make_shared<ButtonWidget>("BACK TO MENU");
-    backButton_->setPosition(25.0f, 580.0f);
-    backButton_->setSize(200.0f, 50.0f);
-    backButton_->setBackgroundColor(UIColor(100, 100, 100, 200)); // Gray
-    backButton_->setBorderColor(UIColor(150, 150, 150, 255));
-    backButton_->setBorderWidth(2.0f);
-    backButton_->setTextColor(UIColor::White());
-    backButton_->setOnClick([this]() {
-        std::cout << "Back to menu button clicked!" << std::endl;
-        if (callbacks_.onBack) {
-            callbacks_.onBack();
+    void LobbyWidget::show() {
+        setVisible(true);
+        if (_lobbyPanel) {
+            _lobbyPanel->setVisible(true);
         }
-    });
-    lobbyPanel_->addChild(backButton_);
+    }
 
-    // Start game button (for host)
-    startGameButton_ = std::make_shared<ButtonWidget>("START GAME");
-    startGameButton_->setPosition(contentBounds.width - 215.0f, 580.0f);
-    startGameButton_->setSize(200.0f, 50.0f);
-    startGameButton_->setBackgroundColor(UIColor(0, 150, 0, 200)); // Green
-    startGameButton_->setBorderColor(UIColor(0, 255, 0, 255));
-    startGameButton_->setBorderWidth(2.0f);
-    startGameButton_->setTextColor(UIColor::White());
-    startGameButton_->setOnClick([this]() {
-        std::cout << "Start game button clicked!" << std::endl;
-        if (callbacks_.onStartGame) {
-            callbacks_.onStartGame();
+    void LobbyWidget::hide() {
+        setVisible(false);
+        if (_lobbyPanel) {
+            _lobbyPanel->setVisible(false);
         }
-    });
-    lobbyPanel_->addChild(startGameButton_);
-}
-
-void LobbyWidget::show() {
-    setVisible(true);
-    if (lobbyPanel_) {
-        lobbyPanel_->setVisible(true);
     }
-}
 
-void LobbyWidget::hide() {
-    setVisible(false);
-    if (lobbyPanel_) {
-        lobbyPanel_->setVisible(false);
+    bool LobbyWidget::isVisible() const {
+        return Widget::isVisible();
     }
-}
 
-bool LobbyWidget::isVisible() const {
-    return Widget::isVisible();
-}
-
-void LobbyWidget::renderSelf() const {
-    // The lobby panel and its children handle their own rendering
-    // This method is required by the Widget interface but the actual
-    // rendering is done by the child widgets (lobbyPanel_ and its children)
-}
-
-void LobbyWidget::setRoomName(const std::string& name) {
-    config_.roomName = name;
-    if (roomNameText_) {
-        roomNameText_->setText("Room: " + name);
+    void LobbyWidget::renderSelf() const {
+        // The lobby panel and its children handle their own rendering
+        // This method is required by the Widget interface but the actual
+        // rendering is done by the child widgets (lobbyPanel_ and its children)
     }
-}
 
-void LobbyWidget::setBackgroundColor(const UIColor& color) {
-    if (lobbyPanel_) {
-        lobbyPanel_->setBackgroundColor(color);
+    void LobbyWidget::setRoomName(const std::string& name) {
+        _config.roomName = name;
+        if (_roomNameText) {
+            _roomNameText->setText("Room: " + name);
+        }
     }
-}
+
+    void LobbyWidget::setBackgroundColor(const UIColor& color) {
+        if (_lobbyPanel) {
+            _lobbyPanel->setBackgroundColor(color);
+        }
+    }
 
 } // namespace rtype::ui
