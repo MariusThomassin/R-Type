@@ -232,9 +232,9 @@ int main(int argc, char* argv[]) {
 
     // ==================== Game State Management ====================
     GameState gameState = GameState::MENU;
+    GameState previousState = GameState::MENU; // Track where we came from for settings
     
     // ==================== Settings Panel ====================
-    bool showingSettingsPanel = false;
     bool showingLobby = false;
     bool showingMultiplayer = false;
     
@@ -323,8 +323,9 @@ int main(int argc, char* argv[]) {
 
     // Set up callbacks for main menu events
     rtype::ui::MainMenuCallbacks menuCallbacks;
-    menuCallbacks.onPlay = [&gameState]() {
+    menuCallbacks.onPlay = [&gameState, &mainMenuWidget]() {
         gameState = GameState::PLAYING;
+        mainMenuWidget->hide(); // Fix: Hide main menu when starting game
     };
 
     menuCallbacks.onMultiplayer = [&gameState, &showingMultiplayer]() {
@@ -333,8 +334,9 @@ int main(int argc, char* argv[]) {
         std::cout << "Opening multiplayer menu..." << std::endl;
     };
 
-    menuCallbacks.onSettings = [&showingSettingsPanel, &settingsWidget, &mainMenuWidget]() {
-        showingSettingsPanel = true;
+    menuCallbacks.onSettings = [&gameState, &previousState, &settingsWidget, &mainMenuWidget]() {
+        previousState = gameState; // Remember where we came from
+        gameState = GameState::SETTINGS;
         settingsWidget->show();
         mainMenuWidget->hide();
     };
@@ -353,8 +355,8 @@ int main(int argc, char* argv[]) {
     mainMenuWidget->initialize(); // Initialize after adding to UI manager
 
     // Now set the settings callbacks (after mainMenuWidget is created)
-    callbacks.onClose = [&showingSettingsPanel, mainMenuWidget]() {
-        showingSettingsPanel = false;
+    callbacks.onClose = [&gameState, mainMenuWidget]() {
+        gameState = GameState::MENU;
         mainMenuWidget->show(); // Show main menu again
         std::cout << "Settings panel closed." << std::endl;
     };
@@ -485,11 +487,13 @@ int main(int argc, char* argv[]) {
     mainMenuWidget->setCallbacks(menuCallbacks); // Update callbacks
 
     // Update settings close callback to handle all states
-    callbacks.onClose = [&showingSettingsPanel, &gameState, &mainMenuWidget, &multiplayerWidget, &lobbyWidget]() {
+    callbacks.onClose = [&gameState, &previousState, &mainMenuWidget, &multiplayerWidget, &lobbyWidget]() {
         std::cout << "Closing settings panel..." << std::endl;
-        showingSettingsPanel = false;
+
+        // Return to the state we came from
+        gameState = previousState;
         
-        // Only show appropriate widgets, don't hide others
+        // Show appropriate widgets based on where we're going back to
         if (gameState == GameState::MENU) {
             mainMenuWidget->show();
         } else if (gameState == GameState::MULTIPLAYER) {
@@ -531,13 +535,13 @@ int main(int argc, char* argv[]) {
     windowedDebugSystem->setClassicDebugSystem(classicDebugSystem);
     classicDebugSystem->setWindowedDebugSystem(windowedDebugSystem);
     
-    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, windowedDebugSystem, classicDebugSystem, &gameState, &uiManager, &showingSettingsPanel]() {
+    renderSystem->setOverlayCallback([showoffSystem, stressTestSystem, windowedDebugSystem, classicDebugSystem, &gameState, &uiManager]() {
         // Render UI in menu, multiplayer, lobby states, and paused when showing settings
         if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY || 
-            (gameState == GameState::PAUSED && showingSettingsPanel)) {
+            gameState == GameState::PAUSED || gameState == GameState::SETTINGS) {
             uiManager.render();
         }
-        
+
         // Game state overlays - draw active debug system
         windowedDebugSystem->draw();
         classicDebugSystem->draw();
@@ -629,7 +633,7 @@ int main(int argc, char* argv[]) {
 
         // Update UI in menu, multiplayer, lobby states, and paused when showing settings
         if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY || 
-            (gameState == GameState::PAUSED && showingSettingsPanel)) {
+            gameState == GameState::PAUSED || gameState == GameState::SETTINGS) {
             uiManager.update(frameTime);
         }
         
@@ -650,8 +654,8 @@ int main(int argc, char* argv[]) {
         // Handle pause toggle with ESC key - but not when settings panel is capturing input
         if (IsKeyPressed(KEY_ESCAPE)) {
             // Don't handle ESC for pause if settings panel is visible and waiting for key input
-            bool settingsWaitingForInput = showingSettingsPanel && settingsWidget->isVisible() && settingsWidget->isWaitingForKeyInput();
-            
+            bool settingsWaitingForInput = true ? (gameState == GameState::SETTINGS) && settingsWidget->isVisible() && settingsWidget->isWaitingForKeyInput() : false;
+
             if (!settingsWaitingForInput && gameState == GameState::PLAYING) {
                 std::cout << "Game paused..." << std::endl;
                 gameState = GameState::PAUSED;
@@ -666,10 +670,17 @@ int main(int argc, char* argv[]) {
             if (IsKeyPressed(KEY_M)) {
                 std::cout << "Returning to menu..." << std::endl;
                 gameState = GameState::MENU;
+                mainMenuWidget->show(); // Fix: Show main menu when returning from pause
             }
             if (IsKeyPressed(KEY_Q)) {
                 std::cout << "Quitting game..." << std::endl;
                 shouldExit = true;
+            }
+            if (IsKeyPressed(KEY_S)) {
+                std::cout << "Opening settings..." << std::endl;
+                previousState = gameState; // Remember we came from pause
+                gameState = GameState::SETTINGS;
+                settingsWidget->show(); // Fix: Show settings widget when opening from pause menu
             }
         }
 
