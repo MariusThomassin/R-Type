@@ -167,6 +167,12 @@ namespace rtype::ecs {
             config.waveDelay = j.value("waveDelay", 2.0f);
             config.difficulty = j.value("difficulty", 1);
             
+            // Parse level assets
+            config.name = j.value("name", "");
+            config.background = j.value("background", "");
+            config.stageMusic = j.value("stageMusic", "");
+            config.bossMusic = j.value("bossMusic", "");
+            
             if (j.contains("waves") && j["waves"].is_array()) {
                 for (const auto& waveJson : j["waves"]) {
                     config.waves.push_back(parseWave(waveJson));
@@ -228,6 +234,21 @@ namespace rtype::ecs {
             
             j["waveDelay"] = config.waveDelay;
             j["difficulty"] = config.difficulty;
+            
+            // Serialize level assets
+            if (!config.name.empty()) {
+                j["name"] = config.name;
+            }
+            if (!config.background.empty()) {
+                j["background"] = config.background;
+            }
+            if (!config.stageMusic.empty()) {
+                j["stageMusic"] = config.stageMusic;
+            }
+            if (!config.bossMusic.empty()) {
+                j["bossMusic"] = config.bossMusic;
+            }
+            
             j["waves"] = nlohmann::json::array();
             
             for (const auto& wave : config.waves) {

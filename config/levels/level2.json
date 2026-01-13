@@ -2,6 +2,9 @@
   "name": "Deep Space",
   "difficulty": 2,
   "waveDelay": 2.0,
+  "background": "assets/backgrounds/26212.png",
+  "stageMusic": "assets/sound/music/Sketchbook 2024-10-14.ogg",
+  "bossMusic": "assets/sound/music/Sketchbook 2024-10-23.ogg",
   "waves": [
     {
       "delayBefore": 1.0,

@@ -16,3 +16,4 @@
 #include "components/SpriteComponent.hpp"
 #include "components/AIComponent.hpp"
 #include "components/NetworkComponent.hpp"
+#include "components/ImageBackgroundComponent.hpp"

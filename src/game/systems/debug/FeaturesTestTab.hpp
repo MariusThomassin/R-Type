@@ -1,10 +1,6 @@
 /*
 ** R-Type ECS - Features Test Tab
-** Debug tab for testing new gameplay features:
-** - Force Orb (spawn, upgrade, switch sides)
-** - Bomb power-up (clear screen)
-** - Weapon level tiers (1-5 projectile spread)
-** - LevelLoader integration
+** Debug tab for testing gameplay features and level assets
 */
 
 #pragma once
@@ -23,43 +19,30 @@
 #include "game/components/SpritesheetComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include "engine/ecs/events/definitions/GameEvents.hpp"
+#include "engine/ecs/events/definitions/AudioEvents.hpp"
 #include "game/systems/LevelLoader.hpp"
 #include <vector>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 
 namespace rtype::ecs::debug {
 
-    /**
-     * @brief Debug tab for testing new gameplay features
-     * 
-     * Provides controls for:
-     * - Spawning/upgrading Force Orb
-     * - Triggering Bomb power-up
-     * - Adjusting weapon power level
-     * - Loading levels from JSON
-     * - Spawning test enemies
-     */
     class FeaturesTestTab : public IDebugTab {
     public:
         const char* getName() const override { return "Features"; }
 
         void init() {
-            // Discover available levels
-            m_levelFiles = LevelLoader::discoverLevels("config/levels");
-            if (m_levelFiles.empty()) {
-                // Try relative path from build directory
-                m_levelFiles = LevelLoader::discoverLevels("../config/levels");
-            }
+            discoverAssets();
         }
 
         void update(float dt) override {
+            if (!m_initialized) {
+                discoverAssets();
+                m_initialized = true;
+            }
             m_animTime += dt;
-            
-            // Update player stats display
             updatePlayerStats();
-            
-            // Update Force Orb display
             updateForceOrbStats();
         }
 
@@ -69,7 +52,6 @@ namespace rtype::ecs::debug {
             DrawText("Features Test Panel", 30, y, 20, {100, 255, 200, 255});
             y += 30;
 
-            // Draw sections
             drawPlayerSection(y);
             y += 160;
             
@@ -80,6 +62,9 @@ namespace rtype::ecs::debug {
             y += 120;
             
             drawLevelSection(y);
+            y += 110;
+            
+            drawAssetTestSection(y);
         }
 
         void handleMouse(const MouseInput& mouse) override {
@@ -119,6 +104,37 @@ namespace rtype::ecs::debug {
                     loadLevel(static_cast<int>(i));
                 }
             }
+            
+            // Background buttons
+            for (size_t i = 0; i < m_backgroundFiles.size() && i < 3; ++i) {
+                if (isMouseOver(m_bgBtnX + static_cast<int>(i) * 70, m_bgBtnY, 65, 24)) {
+                    testBackground(static_cast<int>(i));
+                }
+            }
+            
+            // Music buttons
+            for (size_t i = 0; i < m_musicFiles.size() && i < 4; ++i) {
+                if (isMouseOver(m_musicBtnX + static_cast<int>(i) * 85, m_musicBtnY, 80, 24)) {
+                    testMusic(static_cast<int>(i));
+                }
+            }
+            
+            // Stop music button
+            if (isMouseOver(m_stopMusicBtnX, m_stopMusicBtnY, 60, 24)) {
+                stopMusic();
+            }
+            
+            // Procedural background buttons
+            for (int i = 0; i < 6; ++i) {
+                if (isMouseOver(45 + i * 65, m_procBgBtnY, 60, 24)) {
+                    testProceduralBackground(i);
+                }
+            }
+            
+            // Fast cycle toggle
+            if (isMouseOver(160, m_procBgBtnY + 28, 50, 20)) {
+                m_fastCycleMode = !m_fastCycleMode;
+            }
         }
 
         void setEventBus(EventBus* eventBus) {
@@ -128,6 +144,11 @@ namespace rtype::ecs::debug {
     private:
         EventBus* m_eventBus = nullptr;
         std::vector<std::string> m_levelFiles;
+        std::vector<std::string> m_backgroundFiles;
+        std::vector<std::string> m_musicFiles;
+        std::string m_basePath;
+        bool m_initialized = false;
+        bool m_fastCycleMode = false; // Fast cycle for testing day/night
         
         // Player stats cache
         EntityId m_playerEntity = NULL_ENTITY;
@@ -149,6 +170,79 @@ namespace rtype::ecs::debug {
         int m_bombBtnX = 0, m_bombBtnY = 0;
         int m_spawnEnemiesBtnX = 0, m_spawnEnemiesBtnY = 0;
         int m_levelBtnX = 0, m_levelBtnY = 0;
+        int m_bgBtnX = 0, m_bgBtnY = 0;
+        int m_musicBtnX = 0, m_musicBtnY = 0;
+        int m_stopMusicBtnX = 0, m_stopMusicBtnY = 0;
+        int m_procBgBtnY = 0;
+
+        void discoverAssets() {
+            namespace fs = std::filesystem;
+            
+            // Try various base paths relative to where executable runs
+            std::vector<std::string> basePaths = {
+                "..",                              // Running from build/
+                ".",                               // Running from project root
+                "../..",                           // Running from build/subdir
+                fs::current_path().parent_path().string()  // Parent of cwd
+            };
+            
+            // Find base path with config/levels
+            for (const auto& base : basePaths) {
+                try {
+                    std::string levelPath = base + "/config/levels";
+                    if (fs::exists(levelPath) && fs::is_directory(levelPath)) {
+                        m_basePath = base;
+                        break;
+                    }
+                } catch (...) {}
+            }
+            
+            // Fallback: if still empty, try parent
+            if (m_basePath.empty()) {
+                m_basePath = "..";
+            }
+            
+            // Discover levels
+            std::string levelDir = m_basePath + "/config/levels";
+            try {
+                if (fs::exists(levelDir) && fs::is_directory(levelDir)) {
+                    for (const auto& entry : fs::directory_iterator(levelDir)) {
+                        if (entry.path().extension() == ".json") {
+                            m_levelFiles.push_back(entry.path().string());
+                        }
+                    }
+                    std::sort(m_levelFiles.begin(), m_levelFiles.end());
+                }
+            } catch (...) {}
+            
+            // Discover backgrounds
+            std::string bgDir = m_basePath + "/assets/backgrounds";
+            try {
+                if (fs::exists(bgDir) && fs::is_directory(bgDir)) {
+                    for (const auto& entry : fs::directory_iterator(bgDir)) {
+                        auto ext = entry.path().extension().string();
+                        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                            m_backgroundFiles.push_back(entry.path().string());
+                        }
+                    }
+                    std::sort(m_backgroundFiles.begin(), m_backgroundFiles.end());
+                }
+            } catch (...) {}
+            
+            // Discover music
+            std::string musicDir = m_basePath + "/assets/sound/music";
+            try {
+                if (fs::exists(musicDir) && fs::is_directory(musicDir)) {
+                    for (const auto& entry : fs::directory_iterator(musicDir)) {
+                        auto ext = entry.path().extension().string();
+                        if (ext == ".ogg" || ext == ".mp3" || ext == ".wav") {
+                            m_musicFiles.push_back(entry.path().string());
+                        }
+                    }
+                    std::sort(m_musicFiles.begin(), m_musicFiles.end());
+                }
+            } catch (...) {}
+        }
 
         void updatePlayerStats() {
             // Find local player entity
@@ -377,6 +471,88 @@ namespace rtype::ecs::debug {
             }
         }
 
+        void drawAssetTestSection(int y) {
+            DrawRectangle(30, y, 400, 180, {45, 40, 55, 230});
+            DrawRectangleLines(30, y, 400, 180, {150, 120, 200, 255});
+            DrawText("Asset Testing", 40, y + 8, 16, {180, 150, 255, 255});
+            
+            int ctrlY = y + 32;
+            
+            // Backgrounds
+            char bgLabel[32];
+            snprintf(bgLabel, sizeof(bgLabel), "Backgrounds (%zu):", m_backgroundFiles.size());
+            DrawText(bgLabel, 45, ctrlY, 12, {180, 180, 180, 255});
+            
+            m_bgBtnX = 45;
+            m_bgBtnY = ctrlY + 18;
+            
+            for (size_t i = 0; i < m_backgroundFiles.size() && i < 3; ++i) {
+                namespace fs = std::filesystem;
+                int btnX = m_bgBtnX + static_cast<int>(i) * 70;
+                std::string name = fs::path(m_backgroundFiles[i]).stem().string();
+                if (name.length() > 6) name = name.substr(0, 6) + "..";
+                
+                DrawRectangle(btnX, m_bgBtnY, 65, 24, {50, 60, 80, 255});
+                DrawRectangleLines(btnX, m_bgBtnY, 65, 24, {100, 150, 200, 255});
+                DrawText(name.c_str(), btnX + 4, m_bgBtnY + 6, 11, WHITE);
+            }
+            
+            ctrlY += 50;
+            
+            // Music
+            char musicLabel[32];
+            snprintf(musicLabel, sizeof(musicLabel), "Music (%zu):", m_musicFiles.size());
+            DrawText(musicLabel, 45, ctrlY, 12, {180, 180, 180, 255});
+            
+            m_musicBtnX = 45;
+            m_musicBtnY = ctrlY + 18;
+            
+            for (size_t i = 0; i < m_musicFiles.size() && i < 4; ++i) {
+                namespace fs = std::filesystem;
+                int btnX = m_musicBtnX + static_cast<int>(i) * 85;
+                std::string name = fs::path(m_musicFiles[i]).stem().string();
+                if (name.length() > 8) name = name.substr(0, 8) + "..";
+                
+                DrawRectangle(btnX, m_musicBtnY, 80, 24, {60, 50, 70, 255});
+                DrawRectangleLines(btnX, m_musicBtnY, 80, 24, {200, 150, 200, 255});
+                DrawText(name.c_str(), btnX + 4, m_musicBtnY + 6, 11, WHITE);
+            }
+            
+            // Stop music button
+            m_stopMusicBtnX = 385;
+            m_stopMusicBtnY = m_musicBtnY;
+            DrawRectangle(m_stopMusicBtnX, m_stopMusicBtnY, 40, 24, {80, 40, 40, 255});
+            DrawRectangleLines(m_stopMusicBtnX, m_stopMusicBtnY, 40, 24, {200, 80, 80, 255});
+            DrawText("Stop", m_stopMusicBtnX + 6, m_stopMusicBtnY + 6, 11, WHITE);
+            
+            ctrlY += 50;
+            
+            // Procedural backgrounds
+            DrawText("SFX Backgrounds:", 45, ctrlY, 12, {180, 180, 180, 255});
+            m_procBgBtnY = ctrlY + 18;
+            
+            const char* bgNames[] = {"Sunrise", "City", "Space", "Future", "Ocean", "Mount"};
+            Color bgColors[] = {
+                {255, 150, 80, 255}, {100, 120, 180, 255}, {150, 100, 200, 255},
+                {80, 255, 200, 255}, {80, 150, 255, 255}, {100, 180, 100, 255}
+            };
+            
+            for (int i = 0; i < 6; ++i) {
+                int btnX = 45 + i * 65;
+                DrawRectangle(btnX, m_procBgBtnY, 60, 24, {40, 40, 50, 255});
+                DrawRectangleLines(btnX, m_procBgBtnY, 60, 24, bgColors[i]);
+                DrawText(bgNames[i], btnX + 4, m_procBgBtnY + 6, 10, bgColors[i]);
+            }
+            
+            // Fast cycle toggle
+            ctrlY += 50;
+            DrawText("Fast Cycle (10s):", 45, ctrlY, 12, {180, 180, 180, 255});
+            int toggleX = 160;
+            DrawRectangle(toggleX, ctrlY - 2, 50, 20, m_fastCycleMode ? Color{50, 150, 50, 255} : Color{50, 50, 60, 255});
+            DrawRectangleLines(toggleX, ctrlY - 2, 50, 20, {100, 100, 110, 255});
+            DrawText(m_fastCycleMode ? "ON" : "OFF", toggleX + 15, ctrlY + 2, 12, WHITE);
+        }
+
         // === Actions ===
 
         void spawnOrUpgradeForceOrb() {
@@ -465,16 +641,70 @@ namespace rtype::ecs::debug {
             if (index < 0 || index >= static_cast<int>(m_levelFiles.size())) return;
             
             auto levelConfig = LevelLoader::loadFromFile(m_levelFiles[index]);
-            if (levelConfig) {
-                // Emit level loaded event
-                if (m_eventBus) {
-                    m_eventBus->emit(events::LevelLoaded{
-                        static_cast<int>(levelConfig->waves.size()),
-                        levelConfig->difficulty
-                    });
+            if (levelConfig && m_eventBus) {
+                // Prepend base path to asset paths
+                std::string bgPath = levelConfig->background;
+                std::string stagePath = levelConfig->stageMusic;
+                std::string bossPath = levelConfig->bossMusic;
+                
+                if (!bgPath.empty() && bgPath[0] != '/' && bgPath[0] != '.') {
+                    bgPath = m_basePath + "/" + bgPath;
                 }
-                std::cout << "[FeaturesTestTab] Loaded level: " << m_levelFiles[index] << std::endl;
+                if (!stagePath.empty() && stagePath[0] != '/' && stagePath[0] != '.') {
+                    stagePath = m_basePath + "/" + stagePath;
+                }
+                if (!bossPath.empty() && bossPath[0] != '/' && bossPath[0] != '.') {
+                    bossPath = m_basePath + "/" + bossPath;
+                }
+                
+                // Emit level assets loaded first
+                m_eventBus->emit(events::LevelAssetsLoaded{
+                    bgPath,
+                    stagePath,
+                    bossPath,
+                    !bgPath.empty(),
+                    !stagePath.empty(),
+                    !bossPath.empty()
+                });
+                
+                // Then emit level loaded
+                m_eventBus->emit(events::LevelLoaded{
+                    static_cast<int>(levelConfig->waves.size()),
+                    levelConfig->difficulty
+                });
             }
+        }
+        
+        void testBackground(int index) {
+            if (index < 0 || index >= static_cast<int>(m_backgroundFiles.size())) return;
+            if (!m_eventBus) return;
+            
+            m_eventBus->emit(events::BackgroundChangeRequest{
+                m_backgroundFiles[index],
+                -100
+            });
+        }
+        
+        void testMusic(int index) {
+            if (index < 0 || index >= static_cast<int>(m_musicFiles.size())) return;
+            if (!m_eventBus) return;
+            
+            m_eventBus->emit(events::PlayMusic{
+                m_musicFiles[index],
+                1.0f,
+                true
+            });
+        }
+        
+        void stopMusic() {
+            if (!m_eventBus) return;
+            m_eventBus->emit(events::StopMusic{});
+        }
+        
+        void testProceduralBackground(int type) {
+            if (!m_eventBus) return;
+            float duration = m_fastCycleMode ? 10.0f : 120.0f;
+            m_eventBus->emit(events::ProceduralBgChangeRequest{type, -101, duration});
         }
     };
 

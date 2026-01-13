@@ -2,6 +2,9 @@
   "name": "Bydo Core",
   "difficulty": 3,
   "waveDelay": 1.5,
+  "background": "assets/backgrounds/26216.png",
+  "stageMusic": "assets/sound/music/Sketchbook 2024-10-26.ogg",
+  "bossMusic": "assets/sound/music/Sketchbook 2024-10-30.ogg",
   "waves": [
     {
       "delayBefore": 0.5,

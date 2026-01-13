@@ -10,10 +10,11 @@
 #include "../../engine/ecs/core/Registry.hpp"
 #include "../../engine/ecs/components/TransformComponent.hpp"
 #include "../../engine/ecs/components/SpriteComponent.hpp"
+#include "../../engine/ecs/components/ImageBackgroundComponent.hpp"
+#include "../../engine/ecs/components/ProceduralBackgroundComponent.hpp"
 #include "../components/SpritesheetComponent.hpp"
 #include "../components/PlayerShipComponent.hpp"
 #include "../components/PlayerComponent.hpp"
-#include "../components/BackgroundComponent.hpp"
 #include "../components/ProjectileComponent.hpp"
 #include "../../engine/ui/UIManager.hpp"
 
@@ -108,12 +109,21 @@ namespace rtype::ecs {
                 BeginDrawing();
                 ClearBackground({8, 8, 20, 255});
                 
-                m_registry->forEach<TransformComponent, BackgroundComponent>(
-                    [this, &ctx, dt](EntityId e) {
-                        auto& background = m_registry->getComponent<BackgroundComponent>(e);
+                // Render procedural backgrounds first (layer -101)
+                m_registry->forEach<TransformComponent, ProceduralBackgroundComponent>(
+                    [this, &ctx](EntityId e) {
+                        auto& proc = m_registry->getComponent<ProceduralBackgroundComponent>(e);
                         const auto& transform = m_registry->getComponent<TransformComponent>(e);
-                        background.updateAnimation(dt);
-                        background.render(transform, ctx);
+                        proc.render(transform, ctx);
+                    }
+                );
+                
+                // Render image backgrounds (layer -100)
+                m_registry->forEach<TransformComponent, ImageBackgroundComponent>(
+                    [this, &ctx](EntityId e) {
+                        auto& imgBg = m_registry->getComponent<ImageBackgroundComponent>(e);
+                        const auto& transform = m_registry->getComponent<TransformComponent>(e);
+                        imgBg.render(transform, ctx);
                     }
                 );
 
