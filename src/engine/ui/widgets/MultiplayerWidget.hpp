@@ -126,62 +126,154 @@ public:
     void refreshRoomList();
 
 private:
-    // Configuration
-    MultiplayerConfig config_;
-    MultiplayerCallbacks callbacks_;
+    /**
+     * @brief Configuration for the multiplayer interface
+     */
+    MultiplayerConfig _config;
+    /**
+     * @brief Callback functions for multiplayer events
+     */
+    MultiplayerCallbacks _callbacks;
 
-    // UI Components
-    std::shared_ptr<PanelWidget> mainPanel_;
-    std::shared_ptr<TextWidget> titleText_;
+    /**
+     * @brief Main panel containing all UI elements
+     */
+    std::shared_ptr<PanelWidget> _mainPanel;
+    /**
+     * @brief Title text widget
+     */
+    std::shared_ptr<TextWidget> _titleText;
     
-    // Tab buttons
-    std::shared_ptr<ButtonWidget> joinTabButton_;
-    std::shared_ptr<ButtonWidget> createTabButton_;
+    /**
+     * @brief Tab buttons
+     */
+    std::shared_ptr<ButtonWidget> _joinTabButton;
+    /**
+     * @brief Create tab button
+     */
+    std::shared_ptr<ButtonWidget> _createTabButton;
     
-    // Join tab components
-    std::shared_ptr<PanelWidget> joinPanel_;
-    std::shared_ptr<TextWidget> joinInstructionsText_;
-    std::shared_ptr<TextWidget> ipLabel_;
-    std::shared_ptr<InputFieldWidget> ipInput_;
-    std::shared_ptr<TextWidget> portLabel_;
-    std::shared_ptr<InputFieldWidget> portInput_;
-    std::shared_ptr<TextWidget> roomNameJoinLabel_;
-    std::shared_ptr<InputFieldWidget> roomNameJoinInput_;
-    std::shared_ptr<ButtonWidget> joinServerButton_;
-    std::shared_ptr<ButtonWidget> joinRoomButton_;
+    /**
+     * @brief Join tab components
+     */
+    std::shared_ptr<PanelWidget> _joinPanel;
+    /**
+     * @brief Instructions text for joining
+     */
+    std::shared_ptr<TextWidget> _joinInstructionsText;
+    /**
+     * @brief IP address and port input fields
+     */
+    std::shared_ptr<TextWidget> _ipLabel;
+    /**
+     * @brief IP address input field
+     */
+    std::shared_ptr<InputFieldWidget> _ipInput;
+    /**
+     * @brief Port label
+     */
+    std::shared_ptr<TextWidget> _portLabel;
+    /**
+     * @brief Port input field
+     */
+    std::shared_ptr<InputFieldWidget> _portInput;
+    /**
+     * @brief Room name label for joining
+     */
+    std::shared_ptr<TextWidget> _roomNameJoinLabel;
+    /**
+     * @brief Room name input field for joining
+     */
+    std::shared_ptr<InputFieldWidget> _roomNameJoinInput;
+    /**
+     * @brief Join Server buttons
+     */
+    std::shared_ptr<ButtonWidget> _joinServerButton;
+    /**
+     * @brief Join Room button
+     */
+    std::shared_ptr<ButtonWidget> _joinRoomButton;
+    /**
+     * @brief Room list panel
+     */
+    std::shared_ptr<PanelWidget> _roomListPanel;
+    /**
+     * @brief Room list title text
+     */
+    std::shared_ptr<TextWidget> _roomListTitle;
+    /**
+     * @brief Room list content text
+     */
+    std::shared_ptr<TextWidget> _roomListContent;
     
-    // Room list components
-    std::shared_ptr<PanelWidget> roomListPanel_;
-    std::shared_ptr<TextWidget> roomListTitle_;
-    std::shared_ptr<TextWidget> roomListContent_;
+    /**
+     * @brief Create tab components
+     */
+    std::shared_ptr<PanelWidget> _createPanel;
+    /**
+     * @brief Instructions text for creating a room
+     */
+    std::shared_ptr<TextWidget> _createInstructionsText;
     
-    // Create tab components
-    std::shared_ptr<PanelWidget> createPanel_;
-    std::shared_ptr<TextWidget> createInstructionsText_;
+    /**
+     * @brief Room creation fields
+     */
+    std::shared_ptr<TextWidget> _roomNameLabel;
+    /**
+     * @brief Room name input field for creation
+     */
+    std::shared_ptr<InputFieldWidget> _roomNameInput;
+    /**
+     * @brief Password label
+     */
+    std::shared_ptr<TextWidget> _passwordLabel;
+    /**
+     * @brief Password input field
+     */
+    std::shared_ptr<InputFieldWidget> _passwordInput;
+    /**
+     * @brief Background color selection
+     */
+    std::shared_ptr<TextWidget> _colorLabel;
+    /**
+     * @brief Color preview panel
+     */
+    std::shared_ptr<PanelWidget> _colorPreview;
+    /**
+     * @brief Color selection buttons
+     */
+    std::vector<std::shared_ptr<ButtonWidget>> _colorButtons;
+    /**
+     * @brief Create Room button
+     */
+    std::shared_ptr<ButtonWidget> _createRoomButton;
     
-    // Room customization components
-    std::shared_ptr<TextWidget> roomNameLabel_;
-    std::shared_ptr<InputFieldWidget> roomNameInput_;
-    std::shared_ptr<TextWidget> passwordLabel_;
-    std::shared_ptr<InputFieldWidget> passwordInput_;
-    std::shared_ptr<TextWidget> colorLabel_;
-    std::shared_ptr<PanelWidget> colorPreview_;
-    std::vector<std::shared_ptr<ButtonWidget>> colorButtons_;
+    /**
+     * @brief Join back button for navigation
+     */
+    std::shared_ptr<ButtonWidget> _joinBackButton;
+    /**
+     * @brief Create back button for navigation
+     */
+    std::shared_ptr<ButtonWidget> _createBackButton;
     
-    std::shared_ptr<ButtonWidget> createRoomButton_;
-    
-    // Navigation
-    std::shared_ptr<ButtonWidget> joinBackButton_;
-    std::shared_ptr<ButtonWidget> createBackButton_;
-    
-    // Error handling
-    std::shared_ptr<ErrorMessageWidget> errorMessageWidget_;
+    /**
+     * @brief Error message dialog
+     */
+    std::shared_ptr<ErrorMessageWidget> _errorMessageWidget;
 
-    // State
-    bool initialized_;
-    MultiplayerTab currentTab_;
-    RoomSettings currentRoomSettings_;
-
+    /**
+     * @brief Whether the widget has been initialized
+     */
+    bool _initialized;
+    /**
+     * @brief Currently selected tab
+     */
+    MultiplayerTab _currentTab;
+    /**
+     * @brief Current room settings for creation
+     */
+    RoomSettings _currentRoomSettings;
     /**
      * @brief Create the main panel and title
      */
