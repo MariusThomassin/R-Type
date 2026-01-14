@@ -244,13 +244,9 @@ int main(int argc, char* argv[]) {
     bool shouldExit = false;
 
     // ==================== Network Setup ====================
+    // NetworkClient is created but NOT connected at startup
+    // Connection happens through the multiplayer menu when user selects a server
     rtype::client::NetworkClient networkClient(registry);
-
-    // Connect to server with command-line arguments
-    if (!networkClient.connect(serverIp, serverPort)) {
-        std::cerr << "[Main] Failed to connect to " << serverIp << ":" << serverPort
-                  << ", continuing in offline mode" << std::endl;
-    }
 
     // ==================== Settings Panel Setup ====================
     
@@ -345,10 +341,8 @@ int main(int argc, char* argv[]) {
         shouldExit = true;
     };
 
-    // Send PLAYER_READY to server
-    if (networkClient.isConnected()) {
-        networkClient.sendPlayerReady();
-    }
+    // NOTE: sendPlayerReady is now called when connecting via the multiplayer menu
+    // We no longer connect at startup, so this is removed
 
     mainMenuWidget->setCallbacks(menuCallbacks);
     uiManager.addWidget(mainMenuWidget);
@@ -365,10 +359,11 @@ int main(int argc, char* argv[]) {
     // ==================== Multiplayer Widget Setup ====================
     
     // Create multiplayer widget
+    // Use command-line arguments as defaults (if provided), otherwise use hardcoded defaults
     rtype::ui::MultiplayerConfig multiplayerConfig;
-    multiplayerConfig.title = "MULTIPLAYER";
-    multiplayerConfig.defaultIP = "127.0.0.1";
-    multiplayerConfig.defaultPort = 4242;
+    multiplayerConfig.title = "CONNECT TO SERVER";
+    multiplayerConfig.defaultIP = serverIp;  // Use command-line argument or default (127.0.0.1)
+    multiplayerConfig.defaultPort = serverPort;  // Use command-line argument or default (4242)
 
     auto multiplayerWidget = std::make_shared<rtype::ui::MultiplayerWidget>(multiplayerConfig);
     multiplayerWidget->setPosition(SCREEN_WIDTH / 2.0f - 400, SCREEN_HEIGHT / 2.0f - 300);
@@ -395,9 +390,32 @@ int main(int argc, char* argv[]) {
         std::cout << "Returning to main menu from multiplayer..." << std::endl;
     };
 
-    multiplayerCallbacks.onJoinServer = [&gameState, &showingMultiplayer, &showingLobby, &lobbyWidget, &networkClient](const std::string& ip, int port) {
-        // TODO: User will implement this callback
-        std::cout << "Join server callback called with " << ip << ":" << port << std::endl;
+    multiplayerCallbacks.onJoinServer = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const std::string& ip, int port) {
+        std::cout << "[Main] Attempting to connect to " << ip << ":" << port << std::endl;
+        
+        // Disconnect if already connected to a different server
+        if (networkClient.isConnected()) {
+            networkClient.disconnect();
+        }
+        
+        // Connect to the specified server
+        if (networkClient.connect(ip, static_cast<uint16_t>(port))) {
+            std::cout << "[Main] Connected to server " << ip << ":" << port << std::endl;
+            
+            // Send player ready message
+            networkClient.sendPlayerReady();
+            
+            // Go to lobby state
+            gameState = GameState::LOBBY;
+            showingMultiplayer = false;
+            showingLobby = true;
+            multiplayerWidget->hide();
+            lobbyWidget->show();
+            std::cout << "[Main] Entering lobby..." << std::endl;
+        } else {
+            std::cerr << "[Main] Failed to connect to " << ip << ":" << port << std::endl;
+            // Show error message in multiplayer widget (if it has that capability)
+        }
     };
 
     multiplayerCallbacks.onCreateRoom = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const rtype::ui::RoomSettings& settings) {
@@ -614,10 +632,9 @@ int main(int argc, char* argv[]) {
     Entity background = createBackground(registry, SCREEN_WIDTH, SCREEN_HEIGHT);
     (void)background;
 
-    // Create a local player for testing (when not connected to server)
-    // In production, player is created by the server via network
-    Entity player = createPlayer(registry, 1);
-    (void)player;
+    // NOTE: Player entity is NO LONGER created locally
+    // The server creates and synchronizes player entities when connected
+    // This ensures the game can only be played with a server connection
 
     // ==================== Game Loop (Fixed Timestep) ====================
     float accumulator = 0.0f;

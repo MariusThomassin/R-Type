@@ -81,41 +81,29 @@ void MainMenuWidget::createTitle() {
 void MainMenuWidget::createButtons() {
     auto contentBounds = menuPanel_->getContentBounds();
 
-    // Play button
-    playButton_ = std::make_shared<ButtonWidget>("PLAY");
-    playButton_->setPosition(contentBounds.width / 2.0f - 120, 200.0f);
-    playButton_->setSize(240.0f, 60.0f);
-    playButton_->setBackgroundColor(UIColor(0, 150, 0, 200)); // Semi-transparent green
-    playButton_->setBorderColor(UIColor(0, 255, 0, 255)); // Bright green border
-    playButton_->setBorderWidth(2.0f);
-    playButton_->setTextColor(UIColor::White());
-    playButton_->setOnClick([this]() {
-        std::cout << "Play button clicked! Starting game..." << std::endl;
-        if (callbacks_.onPlay) {
-            callbacks_.onPlay();
-        }
-    });
-    menuPanel_->addChild(playButton_);
-
-    // Multiplayer button
-    multiplayerButton_ = std::make_shared<ButtonWidget>("MULTIPLAYER");
-    multiplayerButton_->setPosition(contentBounds.width / 2.0f - 120, 270.0f);
-    multiplayerButton_->setSize(240.0f, 50.0f);
-    multiplayerButton_->setBackgroundColor(UIColor(0, 100, 200, 200)); // Blue
-    multiplayerButton_->setBorderColor(UIColor(0, 150, 255, 255)); // Light blue border
+    // Multiplayer button (PRIMARY - now green since solo play is removed)
+    // Network connection is required to play, so this is the main entry point
+    multiplayerButton_ = std::make_shared<ButtonWidget>("PLAY ONLINE");
+    multiplayerButton_->setPosition(contentBounds.width / 2.0f - 120, 200.0f);
+    multiplayerButton_->setSize(240.0f, 60.0f);
+    multiplayerButton_->setBackgroundColor(UIColor(0, 150, 0, 200)); // Semi-transparent green (primary)
+    multiplayerButton_->setBorderColor(UIColor(0, 255, 0, 255)); // Bright green border
     multiplayerButton_->setBorderWidth(2.0f);
     multiplayerButton_->setTextColor(UIColor::White());
     multiplayerButton_->setOnClick([this]() {
-        std::cout << "Multiplayer button clicked!" << std::endl;
+        std::cout << "Play Online button clicked! Opening multiplayer menu..." << std::endl;
         if (callbacks_.onMultiplayer) {
             callbacks_.onMultiplayer();
         }
     });
     menuPanel_->addChild(multiplayerButton_);
 
+    // Note: playButton_ is no longer used since solo play is not allowed
+    // The game now requires a network connection
+
     // Settings button
     settingsButton_ = std::make_shared<ButtonWidget>("SETTINGS");
-    settingsButton_->setPosition(contentBounds.width / 2.0f - 120, 330.0f);
+    settingsButton_->setPosition(contentBounds.width / 2.0f - 120, 280.0f);
     settingsButton_->setSize(240.0f, 50.0f);
     settingsButton_->setBackgroundColor(UIColor(100, 100, 100, 200)); // Semi-transparent gray
     settingsButton_->setBorderColor(UIColor(150, 150, 150, 255)); // Light gray border
@@ -131,7 +119,7 @@ void MainMenuWidget::createButtons() {
 
     // Exit button
     exitButton_ = std::make_shared<ButtonWidget>("EXIT");
-    exitButton_->setPosition(contentBounds.width / 2.0f - 120, 390.0f);
+    exitButton_->setPosition(contentBounds.width / 2.0f - 120, 350.0f);
     exitButton_->setSize(240.0f, 50.0f);
     exitButton_->setBackgroundColor(UIColor(150, 0, 0, 200)); // Semi-transparent red
     exitButton_->setBorderColor(UIColor(255, 0, 0, 255)); // Bright red border

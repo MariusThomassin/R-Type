@@ -48,7 +48,7 @@
 
 namespace rtype::server {
 
-    GameServer::GameServer()
+    GameServer::GameServer(uint16_t port)
         : m_registry()
         , m_eventBus()
         , m_systemManager(&m_registry)  // SystemManager takes a pointer
@@ -67,6 +67,7 @@ namespace rtype::server {
         , m_demoSpawnCounter(0)
         , m_logTimer(0.0f)
         , m_gameStarted{false}
+        , m_port(port)
     {
         std::srand(static_cast<unsigned>(std::time(nullptr)));
     }
@@ -79,7 +80,7 @@ namespace rtype::server {
 
         // Initialize network managers
         m_networkIdManager = std::make_unique<NetworkIdManager>();
-        m_networkManager = std::make_unique<NetworkManager>(m_registry, 4242);
+        m_networkManager = std::make_unique<NetworkManager>(m_registry, m_port);
         m_playerManager = std::make_unique<PlayerManager>(m_registry, *m_networkManager, *m_networkIdManager);
 
         initializeSystems();
