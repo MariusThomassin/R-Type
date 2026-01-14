@@ -156,6 +156,79 @@ namespace rtype::client {
                     break;
                 }
 
+                // Level management messages
+                case network::MessageType::LEVEL_INFO: {
+                    network::LevelInfoMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleLevelInfo(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::LEVEL_START: {
+                    network::LevelStartMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleLevelStart(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::LEVEL_COMPLETE: {
+                    network::LevelCompleteMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleLevelComplete(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::WAVE_START: {
+                    network::WaveStartMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleWaveStart(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::WAVE_COMPLETE: {
+                    network::WaveCompleteMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleWaveComplete(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::BOSS_START: {
+                    network::BossStartMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleBossStart(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::BOSS_DEFEATED: {
+                    network::BossDefeatedMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleBossDefeated(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::DIFFICULTY_CHANGE: {
+                    network::DifficultyChangeMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleDifficultyChange(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::SCORE_UPDATE: {
+                    network::ScoreUpdateMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleScoreUpdate(msg);
+                    }
+                    break;
+                }
+
                 default:
                     std::cerr << "[NetworkClient] Unknown message type: "
                              << static_cast<int>(pending.type) << std::endl;
@@ -541,6 +614,140 @@ namespace rtype::client {
 
         std::cout << "[NetworkClient] Player health updated to " << message.newHealth
                   << " - spawned hit effect" << std::endl;
+    }
+
+    // ============================================================
+    // Level and Game Event Handlers
+    // ============================================================
+
+    void NetworkClient::handleLevelInfo(const network::LevelInfoMessage& message) {
+        std::cout << "[NetworkClient] Received LEVEL_INFO: " << message.levelName 
+                  << " (level " << static_cast<int>(message.levelIndex + 1) 
+                  << ", loop " << static_cast<int>(message.loopCount)
+                  << ", difficulty x" << message.difficultyMultiplier << ")" << std::endl;
+
+        if (m_callbacks.onLevelInfo) {
+            m_callbacks.onLevelInfo(message);
+        }
+    }
+
+    void NetworkClient::handleLevelStart(const network::LevelStartMessage& message) {
+        std::cout << "[NetworkClient] Received LEVEL_START: level " 
+                  << static_cast<int>(message.levelIndex + 1) << std::endl;
+
+        if (m_callbacks.onLevelStart) {
+            m_callbacks.onLevelStart(message);
+        }
+    }
+
+    void NetworkClient::handleLevelComplete(const network::LevelCompleteMessage& message) {
+        std::cout << "[NetworkClient] Received LEVEL_COMPLETE: level " 
+                  << static_cast<int>(message.levelIndex + 1)
+                  << ", score " << message.totalScore
+                  << ", next level " << static_cast<int>(message.nextLevelIndex + 1)
+                  << (message.isLooping ? " (LOOPING!)" : "") << std::endl;
+
+        if (m_callbacks.onLevelComplete) {
+            m_callbacks.onLevelComplete(message);
+        }
+    }
+
+    void NetworkClient::handleWaveStart(const network::WaveStartMessage& message) {
+        std::cout << "[NetworkClient] Received WAVE_START: wave " 
+                  << static_cast<int>(message.waveNumber) << "/" << static_cast<int>(message.totalWaves)
+                  << " (" << static_cast<int>(message.enemyCount) << " enemies)" << std::endl;
+
+        if (m_callbacks.onWaveStart) {
+            m_callbacks.onWaveStart(message);
+        }
+    }
+
+    void NetworkClient::handleWaveComplete(const network::WaveCompleteMessage& message) {
+        std::cout << "[NetworkClient] Received WAVE_COMPLETE: wave " 
+                  << static_cast<int>(message.waveNumber)
+                  << ", time bonus " << message.timeBonus << std::endl;
+
+        if (m_callbacks.onWaveComplete) {
+            m_callbacks.onWaveComplete(message);
+        }
+    }
+
+    void NetworkClient::handleBossStart(const network::BossStartMessage& message) {
+        std::cout << "[NetworkClient] Received BOSS_START: networkId=" << message.bossNetworkId
+                  << " (phases: " << static_cast<int>(message.totalPhases) << ")" << std::endl;
+
+        if (m_callbacks.onBossStart) {
+            m_callbacks.onBossStart(message);
+        }
+    }
+
+    void NetworkClient::handleBossDefeated(const network::BossDefeatedMessage& message) {
+        std::cout << "[NetworkClient] Received BOSS_DEFEATED: networkId=" << message.bossNetworkId
+                  << ", score " << message.scoreValue << std::endl;
+
+        if (m_callbacks.onBossDefeated) {
+            m_callbacks.onBossDefeated(message);
+        }
+    }
+
+    void NetworkClient::handleDifficultyChange(const network::DifficultyChangeMessage& message) {
+        std::cout << "[NetworkClient] Received DIFFICULTY_CHANGE: " << message.displayName
+                  << " (loop " << static_cast<int>(message.loopCount)
+                  << ", multiplier x" << message.difficultyMultiplier << ")" << std::endl;
+
+        if (m_callbacks.onDifficultyChange) {
+            m_callbacks.onDifficultyChange(message);
+        }
+    }
+
+    void NetworkClient::handleScoreUpdate(const network::ScoreUpdateMessage& message) {
+        std::cout << "[NetworkClient] Received SCORE_UPDATE: client " << message.clientId
+                  << ", score " << message.newScore << " (delta " << message.delta << ")" << std::endl;
+
+        if (m_callbacks.onScoreUpdate) {
+            m_callbacks.onScoreUpdate(message);
+        }
+    }
+
+    // ============================================================
+    // Additional Send Methods
+    // ============================================================
+
+    void NetworkClient::sendLoadLevelRequest(uint8_t levelIndex) {
+        if (!m_connected) {
+            std::cerr << "[NetworkClient] Cannot send LOAD_LEVEL_REQUEST - not connected!" << std::endl;
+            return;
+        }
+
+        network::LoadLevelRequestMessage msg;
+        msg.clientId = m_clientId;
+        msg.levelIndex = levelIndex;
+
+        auto buffer = network::serializeMessage(network::MessageType::LOAD_LEVEL_REQUEST, msg);
+        sendToServer(buffer);
+
+        std::cout << "[NetworkClient] Sent LOAD_LEVEL_REQUEST for level " 
+                  << static_cast<int>(levelIndex + 1) << std::endl;
+    }
+
+    void NetworkClient::sendPlayerProfile(const char* name, uint8_t avatarId, uint8_t colorScheme) {
+        if (!m_connected) {
+            std::cerr << "[NetworkClient] Cannot send PLAYER_PROFILE - not connected!" << std::endl;
+            return;
+        }
+
+        network::PlayerProfileMessage msg;
+        msg.clientId = m_clientId;
+        std::strncpy(msg.playerName, name, sizeof(msg.playerName) - 1);
+        msg.playerName[sizeof(msg.playerName) - 1] = '\0';
+        msg.avatarId = avatarId;
+        msg.colorScheme = colorScheme;
+
+        auto buffer = network::serializeMessage(network::MessageType::PLAYER_PROFILE, msg);
+        sendToServer(buffer);
+
+        std::cout << "[NetworkClient] Sent PLAYER_PROFILE (name=" << name 
+                  << ", avatar=" << static_cast<int>(avatarId) << ")" << std::endl;
     }
 
 } // namespace rtype::client

@@ -12,6 +12,7 @@
 #include <mutex>
 #include <queue>
 #include <iostream>
+#include <functional>
 
 namespace rtype::client {
 
@@ -21,6 +22,21 @@ namespace rtype::client {
     struct PendingMessage {
         network::MessageType type;
         std::vector<uint8_t> data;
+    };
+
+    /**
+     * @brief Callbacks for level and game events
+     */
+    struct NetworkCallbacks {
+        std::function<void(const network::LevelInfoMessage&)> onLevelInfo;
+        std::function<void(const network::LevelStartMessage&)> onLevelStart;
+        std::function<void(const network::LevelCompleteMessage&)> onLevelComplete;
+        std::function<void(const network::WaveStartMessage&)> onWaveStart;
+        std::function<void(const network::WaveCompleteMessage&)> onWaveComplete;
+        std::function<void(const network::BossStartMessage&)> onBossStart;
+        std::function<void(const network::BossDefeatedMessage&)> onBossDefeated;
+        std::function<void(const network::DifficultyChangeMessage&)> onDifficultyChange;
+        std::function<void(const network::ScoreUpdateMessage&)> onScoreUpdate;
     };
 
     /**
@@ -108,6 +124,29 @@ namespace rtype::client {
          */
         std::vector<std::string> requestRoomList();
 
+        /**
+         * @brief Set callbacks for level and game events
+         *
+         * @param callbacks Struct containing callback functions
+         */
+        void setCallbacks(const NetworkCallbacks& callbacks) { m_callbacks = callbacks; }
+
+        /**
+         * @brief Send a LOAD_LEVEL_REQUEST to the server
+         *
+         * @param levelIndex Level to request (0-based)
+         */
+        void sendLoadLevelRequest(uint8_t levelIndex);
+
+        /**
+         * @brief Send player profile to server
+         *
+         * @param name Player name (up to 9 chars)
+         * @param avatarId Avatar index
+         * @param colorScheme Color scheme index
+         */
+        void sendPlayerProfile(const char* name, uint8_t avatarId, uint8_t colorScheme);
+
     private:
         /**
          * @brief Reception loop (runs in separate thread)
@@ -152,6 +191,20 @@ namespace rtype::client {
         void handlePlayerHit(const network::PlayerHitMessage& message);
 
         /**
+         * @brief Handle level and game event messages (main thread)
+         * These invoke the registered callbacks
+         */
+        void handleLevelInfo(const network::LevelInfoMessage& message);
+        void handleLevelStart(const network::LevelStartMessage& message);
+        void handleLevelComplete(const network::LevelCompleteMessage& message);
+        void handleWaveStart(const network::WaveStartMessage& message);
+        void handleWaveComplete(const network::WaveCompleteMessage& message);
+        void handleBossStart(const network::BossStartMessage& message);
+        void handleBossDefeated(const network::BossDefeatedMessage& message);
+        void handleDifficultyChange(const network::DifficultyChangeMessage& message);
+        void handleScoreUpdate(const network::ScoreUpdateMessage& message);
+
+        /**
          * @brief Send CLIENT_HELLO to server
          */
         void sendHello();
@@ -185,6 +238,9 @@ namespace rtype::client {
 
         // Input sequence number
         uint32_t m_inputSequence;
+
+        // Callbacks for level/game events
+        NetworkCallbacks m_callbacks;
     };
 
 } // namespace rtype::client

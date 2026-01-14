@@ -21,6 +21,7 @@ set(GAME_CLIENT_SOURCES
 set(CLIENT_SOURCES
     main.cpp
     NetworkClient.cpp
+    LocalServer.cpp
 )
 
 # Client executable
@@ -32,6 +33,7 @@ target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR})
 # Link libraries
 target_link_libraries(client PRIVATE ecs_engine)
 target_link_libraries(client PRIVATE rtype_shared)
+target_link_libraries(client PRIVATE server_core)  # For LocalServer (embedded GameServer)
 target_link_libraries(client PRIVATE asio_lib)
 target_link_libraries(client PRIVATE raylib)
 target_link_libraries(client PRIVATE rtype_ui_library)

@@ -13,30 +13,61 @@ namespace rtype::network {
 
     /**
      * @brief Message types for network communication
+     * 
+     * Protocol Version: 2
+     * 
+     * Ranges:
+     * - 0x00-0x09: Client → Server messages
+     * - 0x0A-0x1F: Server → Client messages (legacy)
+     * - 0x20-0x2F: Level/Game state messages (Server → Client)
+     * - 0x30-0x3F: Player profile messages (Bidirectional)
      */
     enum class MessageType : uint8_t {
-        // Client → Server
-        CLIENT_HELLO = 0,        // Initial connection
-        CLIENT_INPUT = 1,        // Player input
-        CLIENT_DISCONNECT = 2,   // Clean disconnect
-        PLAYER_READY = 3,        // Player clicked Play button and is ready
-        CHAT_MESSAGE = 4,        // Chat message from player
-        PAUSE_REQUEST = 5,       // Request to pause/unpause
+        // ============================================================
+        // Client → Server (0x00 - 0x09)
+        // ============================================================
+        CLIENT_HELLO = 0x00,        // Initial connection
+        CLIENT_INPUT = 0x01,        // Player input
+        CLIENT_DISCONNECT = 0x02,   // Clean disconnect
+        PLAYER_READY = 0x03,        // Player clicked Play button and is ready
+        CHAT_MESSAGE = 0x04,        // Chat message from player
+        PAUSE_REQUEST = 0x05,       // Request to pause/unpause
+        LOAD_LEVEL_REQUEST = 0x06,  // Request to load a specific level (host only)
 
-        // Server → Client
-        SERVER_WELCOME = 10,     // Connection response (assigns clientId)
-        ENTITY_SPAWN = 11,       // Spawn new entity
-        ENTITY_STATE = 12,       // Update position/velocity
-        ENTITY_DESTROY = 13,     // Destroy entity
-        SERVER_SNAPSHOT = 14,    // Full world state snapshot
-        PLAYER_SPAWN = 15,       // Spawn player entity
-        PLAYER_HIT = 16,         // Player took damage
-        PLAYER_DEATH = 17,       // Player died (will respawn)
-        PLAYER_RESPAWN = 18,     // Player respawned
-        GAME_OVER = 19,          // Game over (all players dead)
-        CHAT_BROADCAST = 20,     // Chat message broadcast to all
-        PAUSE_STATE = 21,        // Server pause state change
-        SCORE_UPDATE = 22        // Score update for a player
+        // ============================================================
+        // Server → Client: Core (0x0A - 0x1F)
+        // ============================================================
+        SERVER_WELCOME = 0x0A,      // Connection response (assigns clientId)
+        ENTITY_SPAWN = 0x0B,        // Spawn new entity
+        ENTITY_STATE = 0x0C,        // Update position/velocity
+        ENTITY_DESTROY = 0x0D,      // Destroy entity
+        SERVER_SNAPSHOT = 0x0E,     // Full world state snapshot
+        PLAYER_SPAWN = 0x0F,        // Spawn player entity
+        PLAYER_HIT = 0x10,          // Player took damage
+        PLAYER_DEATH = 0x11,        // Player died (will respawn)
+        PLAYER_RESPAWN = 0x12,      // Player respawned
+        GAME_OVER = 0x13,           // Game over (all players dead)
+        CHAT_BROADCAST = 0x14,      // Chat message broadcast to all
+        PAUSE_STATE = 0x15,         // Server pause state change
+        SCORE_UPDATE = 0x16,        // Score update for a player
+
+        // ============================================================
+        // Server → Client: Level Management (0x20 - 0x2F)
+        // ============================================================
+        LEVEL_INFO = 0x20,          // Level metadata (assets, waves, difficulty)
+        LEVEL_START = 0x21,         // Level is starting
+        LEVEL_COMPLETE = 0x22,      // Level completed successfully
+        WAVE_START = 0x23,          // Wave is starting
+        WAVE_COMPLETE = 0x24,       // Wave completed
+        BOSS_START = 0x25,          // Boss fight starting
+        BOSS_DEFEATED = 0x26,       // Boss was defeated
+        DIFFICULTY_CHANGE = 0x27,   // Difficulty multiplier changed (loop)
+
+        // ============================================================
+        // Bidirectional: Player Profile (0x30 - 0x3F)
+        // ============================================================
+        PLAYER_PROFILE = 0x30,      // Player profile (name, avatar)
+        PROFILE_UPDATE = 0x31       // Profile updated (broadcast to others)
     };
 
     /**
@@ -269,6 +300,138 @@ namespace rtype::network {
     };
 
     // ============================================================
+    // Level Management Messages (Server → Client)
+    // ============================================================
+
+    /**
+     * @brief Score reason codes for SCORE_UPDATE
+     */
+    enum class ScoreReason : uint8_t {
+        ENEMY_KILL = 0,
+        BOSS_KILL = 1,
+        WAVE_BONUS = 2,
+        LEVEL_BONUS = 3,
+        POWERUP = 4,
+        NO_DAMAGE_BONUS = 5
+    };
+
+    /**
+     * @brief LOAD_LEVEL_REQUEST: Client requests to load a level (host only)
+     */
+    struct LoadLevelRequestMessage {
+        uint32_t clientId;          // Requesting client (must be host)
+        uint8_t levelIndex;         // Level index (0-255)
+    };
+
+    /**
+     * @brief LEVEL_INFO: Server sends level metadata before starting
+     * 
+     * Clients use this to preload assets (background, music).
+     */
+    struct LevelInfoMessage {
+        uint8_t levelIndex;         // Level number (0-based)
+        char levelName[32];         // Display name
+        char backgroundPath[64];    // Background asset path
+        char stageMusicPath[64];    // Stage music asset path
+        char bossMusicPath[64];     // Boss music asset path
+        uint8_t totalWaves;         // Number of waves in level
+        uint8_t difficulty;         // Base difficulty (1-10)
+        uint8_t bossEnabled;        // Has boss section (0 or 1)
+        uint8_t loopCount;          // Current loop number (0 = first playthrough)
+        float difficultyMultiplier; // Difficulty scaling (1.0 = normal)
+    };
+
+    /**
+     * @brief LEVEL_START: Level is starting
+     */
+    struct LevelStartMessage {
+        uint8_t levelIndex;         // Level number
+        float serverTime;           // Server time for synchronization
+        uint8_t playerCount;        // Number of active players
+    };
+
+    /**
+     * @brief LEVEL_COMPLETE: Level completed successfully
+     */
+    struct LevelCompleteMessage {
+        uint8_t levelIndex;         // Completed level
+        uint32_t totalScore;        // Team total score
+        float completionTime;       // Time to complete
+        uint8_t nextLevelIndex;     // Next level (0xFF = loop/no more)
+        uint8_t isLooping;          // 1 if starting a new loop
+    };
+
+    /**
+     * @brief WAVE_START: Wave is starting
+     */
+    struct WaveStartMessage {
+        uint8_t waveNumber;         // Current wave (1-based)
+        uint8_t totalWaves;         // Total waves in level
+        uint8_t enemyCount;         // Enemies in this wave
+    };
+
+    /**
+     * @brief WAVE_COMPLETE: Wave completed
+     */
+    struct WaveCompleteMessage {
+        uint8_t waveNumber;         // Completed wave
+        uint32_t timeBonus;         // Time bonus points
+    };
+
+    /**
+     * @brief BOSS_START: Boss fight starting
+     */
+    struct BossStartMessage {
+        uint32_t bossNetworkId;     // Boss entity network ID
+        uint8_t totalPhases;        // Number of boss phases
+    };
+
+    /**
+     * @brief BOSS_DEFEATED: Boss was defeated
+     */
+    struct BossDefeatedMessage {
+        uint32_t bossNetworkId;     // Boss entity that was defeated
+        uint32_t scoreValue;        // Points awarded
+        float fightDuration;        // How long the fight took
+    };
+
+    /**
+     * @brief DIFFICULTY_CHANGE: New loop started, difficulty increased
+     */
+    struct DifficultyChangeMessage {
+        uint8_t loopCount;          // Current loop (1 = first repeat)
+        float difficultyMultiplier; // New difficulty (1.5 = 150%)
+        char displayName[16];       // "NEW GAME+", "LOOP 2", etc.
+    };
+
+    // ============================================================
+    // Player Profile Messages (Bidirectional)
+    // ============================================================
+
+    /**
+     * @brief PLAYER_PROFILE: Player profile data
+     * 
+     * Sent by client after connection, broadcast by server to others.
+     */
+    struct PlayerProfileMessage {
+        uint32_t clientId;          // Client ID
+        char playerName[10];        // Player name (9 chars + null)
+        uint8_t avatarId;           // Avatar index (0-255)
+        uint8_t colorScheme;        // Color scheme (0-7)
+    };
+
+    /**
+     * @brief Extended score update with reason
+     */
+    struct ScoreUpdateExtMessage {
+        uint32_t clientId;          // Client whose score changed
+        uint32_t playerScore;       // Player's individual score
+        uint32_t teamScore;         // Team total score
+        int32_t delta;              // Points added this update
+        ScoreReason reason;         // Why score changed
+    };
+
+    // ============================================================
     // Serialization utilities
     // ============================================================
 
@@ -339,12 +502,16 @@ namespace rtype::network {
      */
     inline const char* getMessageTypeName(MessageType type) {
         switch (type) {
+            // Client → Server
             case MessageType::CLIENT_HELLO: return "CLIENT_HELLO";
             case MessageType::CLIENT_INPUT: return "CLIENT_INPUT";
             case MessageType::CLIENT_DISCONNECT: return "CLIENT_DISCONNECT";
             case MessageType::PLAYER_READY: return "PLAYER_READY";
             case MessageType::CHAT_MESSAGE: return "CHAT_MESSAGE";
             case MessageType::PAUSE_REQUEST: return "PAUSE_REQUEST";
+            case MessageType::LOAD_LEVEL_REQUEST: return "LOAD_LEVEL_REQUEST";
+            
+            // Server → Client: Core
             case MessageType::SERVER_WELCOME: return "SERVER_WELCOME";
             case MessageType::ENTITY_SPAWN: return "ENTITY_SPAWN";
             case MessageType::ENTITY_STATE: return "ENTITY_STATE";
@@ -358,6 +525,21 @@ namespace rtype::network {
             case MessageType::CHAT_BROADCAST: return "CHAT_BROADCAST";
             case MessageType::PAUSE_STATE: return "PAUSE_STATE";
             case MessageType::SCORE_UPDATE: return "SCORE_UPDATE";
+            
+            // Server → Client: Level Management
+            case MessageType::LEVEL_INFO: return "LEVEL_INFO";
+            case MessageType::LEVEL_START: return "LEVEL_START";
+            case MessageType::LEVEL_COMPLETE: return "LEVEL_COMPLETE";
+            case MessageType::WAVE_START: return "WAVE_START";
+            case MessageType::WAVE_COMPLETE: return "WAVE_COMPLETE";
+            case MessageType::BOSS_START: return "BOSS_START";
+            case MessageType::BOSS_DEFEATED: return "BOSS_DEFEATED";
+            case MessageType::DIFFICULTY_CHANGE: return "DIFFICULTY_CHANGE";
+            
+            // Player Profile
+            case MessageType::PLAYER_PROFILE: return "PLAYER_PROFILE";
+            case MessageType::PROFILE_UPDATE: return "PROFILE_UPDATE";
+            
             default: return "UNKNOWN";
         }
     }

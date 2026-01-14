@@ -45,10 +45,12 @@
 #include <cmath>
 #include <ctime>
 #include <cstdlib>
+#include <cstring>
+#include <cstdio>
 
 namespace rtype::server {
 
-    GameServer::GameServer(uint16_t port)
+    GameServer::GameServer(uint16_t port, bool allowSinglePlayer)
         : m_registry()
         , m_eventBus()
         , m_systemManager(&m_registry)  // SystemManager takes a pointer
@@ -68,8 +70,13 @@ namespace rtype::server {
         , m_logTimer(0.0f)
         , m_gameStarted{false}
         , m_port(port)
+        , m_allowSinglePlayer(allowSinglePlayer)
     {
         std::srand(static_cast<unsigned>(std::time(nullptr)));
+        
+        if (m_allowSinglePlayer) {
+            std::cout << "[GameServer] Single-player mode enabled" << std::endl;
+        }
     }
 
     // Destructor defined here to allow unique_ptr to incomplete types in header
@@ -103,6 +110,9 @@ namespace rtype::server {
         m_networkManager->setOnPlayerReady([this](uint32_t clientId) {
             std::cout << "[GameServer] Client " << clientId << " is ready!" << std::endl;
             
+            // Initialize player score
+            m_playerScores[clientId] = 0;
+            
             // Get player count outside mutex to avoid potential lock ordering issues
             // Note: There's a potential race if a player disconnects between this call
             // and the check below, but this is a safe race (we might just delay game start)
@@ -113,11 +123,18 @@ namespace rtype::server {
                 m_readyClients.insert(clientId);
                 size_t readyCount = m_readyClients.size();
 
-                // Check if game should start (2+ players, all ready)
-                // Double-check m_gameStarted inside the lock to avoid race condition
-                if (!m_gameStarted.load() && playerCount >= 2 && readyCount >= playerCount) {
+                // Minimum players needed: 1 for single-player mode, 2 for multiplayer
+                size_t minPlayers = m_allowSinglePlayer ? 1 : 2;
+
+                // Check if game should start (enough players, all ready)
+                if (!m_gameStarted.load() && playerCount >= minPlayers && readyCount >= playerCount) {
                     m_gameStarted.store(true);
                     std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
+                    
+                    // Auto-load level 1 and start
+                    if (loadLevel(0)) {
+                        startLevel();
+                    }
                 }
             }
         });
@@ -685,6 +702,193 @@ namespace rtype::server {
         m_eventBus.emit(ecs::events::BombComplete{event.playerId, enemiesDestroyed, projectilesDestroyed});
 
         // TODO: Broadcast bomb effect to clients for visual feedback
+    }
+
+    // ============================================================
+    // Level Management Implementation
+    // ============================================================
+
+    bool GameServer::loadLevel(uint8_t levelIndex) {
+        if (levelIndex >= m_levelPaths.size()) {
+            std::cerr << "[GameServer] Invalid level index: " << static_cast<int>(levelIndex) << std::endl;
+            return false;
+        }
+
+        m_currentLevelIndex = levelIndex;
+        
+        std::cout << "[GameServer] Loading level " << static_cast<int>(levelIndex + 1) 
+                  << " (loop " << static_cast<int>(m_loopCount) << ", difficulty x" 
+                  << m_difficultyMultiplier << ")" << std::endl;
+
+        // Broadcast level info to clients
+        broadcastLevelInfo();
+
+        return true;
+    }
+
+    void GameServer::startLevel() {
+        m_levelActive = true;
+        
+        std::cout << "[GameServer] Starting level " << static_cast<int>(m_currentLevelIndex + 1) << std::endl;
+
+        // Broadcast level start
+        network::LevelStartMessage startMsg;
+        startMsg.levelIndex = m_currentLevelIndex;
+        startMsg.serverTime = m_gameTime;
+        startMsg.playerCount = static_cast<uint8_t>(m_playerManager->getPlayerCount());
+
+        auto buffer = network::serializeMessage(network::MessageType::LEVEL_START, startMsg);
+        m_networkManager->broadcast(buffer);
+
+        // Broadcast first wave start
+        broadcastWaveStart(1, 5);  // TODO: Get actual enemy count from level config
+    }
+
+    void GameServer::handleWaveComplete(int waveNumber) {
+        std::cout << "[GameServer] Wave " << waveNumber << " complete!" << std::endl;
+
+        // Broadcast wave complete
+        network::WaveCompleteMessage waveMsg;
+        waveMsg.waveNumber = static_cast<uint8_t>(waveNumber);
+        waveMsg.timeBonus = 0;  // TODO: Calculate time bonus
+
+        auto buffer = network::serializeMessage(network::MessageType::WAVE_COMPLETE, waveMsg);
+        m_networkManager->broadcast(buffer);
+
+        // TODO: Check if more waves or boss, otherwise level complete
+    }
+
+    void GameServer::handleLevelComplete() {
+        m_levelActive = false;
+
+        std::cout << "[GameServer] Level " << static_cast<int>(m_currentLevelIndex + 1) << " complete!" << std::endl;
+
+        // Calculate level bonus
+        uint32_t levelBonus = 1000 * (m_currentLevelIndex + 1) * static_cast<uint32_t>(m_difficultyMultiplier);
+        m_teamScore += levelBonus;
+
+        // Broadcast level complete
+        network::LevelCompleteMessage completeMsg;
+        completeMsg.levelIndex = m_currentLevelIndex;
+        completeMsg.totalScore = m_teamScore;
+        completeMsg.completionTime = m_gameTime;
+        
+        // Determine next level
+        uint8_t nextLevel = m_currentLevelIndex + 1;
+        bool isLooping = false;
+        
+        if (nextLevel >= MAX_LEVELS) {
+            nextLevel = 0;  // Loop back to level 1
+            isLooping = true;
+        }
+        
+        completeMsg.nextLevelIndex = nextLevel;
+        completeMsg.isLooping = isLooping ? 1 : 0;
+
+        auto buffer = network::serializeMessage(network::MessageType::LEVEL_COMPLETE, completeMsg);
+        m_networkManager->broadcast(buffer);
+
+        // Auto-advance to next level after a short delay
+        // For now, advance immediately
+        advanceToNextLevel();
+    }
+
+    void GameServer::advanceToNextLevel() {
+        m_currentLevelIndex++;
+        
+        if (m_currentLevelIndex >= MAX_LEVELS) {
+            // Start new loop with increased difficulty
+            m_currentLevelIndex = 0;
+            m_loopCount++;
+            m_difficultyMultiplier = 1.0f + (m_loopCount * 0.5f);  // 1.5x, 2.0x, 2.5x, etc.
+            
+            // Cap difficulty at reasonable level
+            if (m_difficultyMultiplier > 3.0f) {
+                m_difficultyMultiplier = 3.0f;
+            }
+            
+            std::cout << "[GameServer] Starting loop " << static_cast<int>(m_loopCount) 
+                      << " with difficulty x" << m_difficultyMultiplier << std::endl;
+
+            // Broadcast difficulty change
+            network::DifficultyChangeMessage diffMsg;
+            diffMsg.loopCount = m_loopCount;
+            diffMsg.difficultyMultiplier = m_difficultyMultiplier;
+            
+            // Format display name
+            if (m_loopCount == 1) {
+                std::strncpy(diffMsg.displayName, "NEW GAME+", sizeof(diffMsg.displayName) - 1);
+            } else {
+                snprintf(diffMsg.displayName, sizeof(diffMsg.displayName), "LOOP %d", m_loopCount + 1);
+            }
+            diffMsg.displayName[sizeof(diffMsg.displayName) - 1] = '\0';
+
+            auto buffer = network::serializeMessage(network::MessageType::DIFFICULTY_CHANGE, diffMsg);
+            m_networkManager->broadcast(buffer);
+        }
+
+        // Load and start next level
+        if (loadLevel(m_currentLevelIndex)) {
+            startLevel();
+        }
+    }
+
+    void GameServer::broadcastLevelInfo() {
+        network::LevelInfoMessage infoMsg;
+        infoMsg.levelIndex = m_currentLevelIndex;
+        infoMsg.loopCount = m_loopCount;
+        infoMsg.difficultyMultiplier = m_difficultyMultiplier;
+        
+        // Set level name based on index
+        const char* levelNames[] = {"Training Grounds", "Deep Space", "Alien Hive"};
+        if (m_currentLevelIndex < 3) {
+            std::strncpy(infoMsg.levelName, levelNames[m_currentLevelIndex], sizeof(infoMsg.levelName) - 1);
+        } else {
+            snprintf(infoMsg.levelName, sizeof(infoMsg.levelName), "Level %d", m_currentLevelIndex + 1);
+        }
+        infoMsg.levelName[sizeof(infoMsg.levelName) - 1] = '\0';
+        
+        // Set asset paths (these are relative paths the client will load)
+        std::strncpy(infoMsg.backgroundPath, "assets/backgrounds/26211.png", sizeof(infoMsg.backgroundPath) - 1);
+        std::strncpy(infoMsg.stageMusicPath, "assets/sound/music/Sketchbook 2024-10-13.ogg", sizeof(infoMsg.stageMusicPath) - 1);
+        std::strncpy(infoMsg.bossMusicPath, "assets/sound/music/Sketchbook 2024-10-16.ogg", sizeof(infoMsg.bossMusicPath) - 1);
+        
+        infoMsg.totalWaves = 6;  // TODO: Get from level config
+        infoMsg.difficulty = static_cast<uint8_t>(m_currentLevelIndex + 1);
+        infoMsg.bossEnabled = 1;  // TODO: Get from level config
+
+        auto buffer = network::serializeMessage(network::MessageType::LEVEL_INFO, infoMsg);
+        m_networkManager->broadcast(buffer);
+
+        std::cout << "[GameServer] Broadcast LEVEL_INFO for level " << static_cast<int>(m_currentLevelIndex + 1) << std::endl;
+    }
+
+    void GameServer::broadcastWaveStart(uint8_t waveNumber, uint8_t enemyCount) {
+        network::WaveStartMessage waveMsg;
+        waveMsg.waveNumber = waveNumber;
+        waveMsg.totalWaves = 6;  // TODO: Get from level config
+        waveMsg.enemyCount = enemyCount;
+
+        auto buffer = network::serializeMessage(network::MessageType::WAVE_START, waveMsg);
+        m_networkManager->broadcast(buffer);
+
+        std::cout << "[GameServer] Wave " << static_cast<int>(waveNumber) << " starting with " 
+                  << static_cast<int>(enemyCount) << " enemies" << std::endl;
+    }
+
+    void GameServer::updatePlayerScore(uint32_t clientId, int32_t delta, network::ScoreReason reason) {
+        // Update player score
+        m_playerScores[clientId] += delta;
+        m_teamScore += delta;
+
+        // Broadcast score update
+        network::ScoreUpdateMessage scoreMsg;
+        scoreMsg.clientId = clientId;
+        scoreMsg.newScore = static_cast<int32_t>(m_playerScores[clientId]);
+        scoreMsg.delta = delta;
+
+        auto buffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
+        m_networkManager->broadcast(buffer);
     }
 
 } // namespace rtype::server
