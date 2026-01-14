@@ -179,6 +179,25 @@ namespace rtype::ecs {
                 }
             }
             
+            // Parse powerup spawns
+            if (j.contains("powerupSpawns") && j["powerupSpawns"].is_array()) {
+                for (const auto& spawnJson : j["powerupSpawns"]) {
+                    config.powerupSpawns.push_back(parsePowerupSpawn(spawnJson));
+                }
+            }
+            
+            // Parse bomb spawns
+            if (j.contains("bombSpawns") && j["bombSpawns"].is_array()) {
+                for (const auto& spawnJson : j["bombSpawns"]) {
+                    config.bombSpawns.push_back(parseBombSpawn(spawnJson));
+                }
+            }
+            
+            // Parse boss section
+            if (j.contains("bossSection") && j["bossSection"].is_object()) {
+                config.bossSection = parseBossSection(j["bossSection"]);
+            }
+            
             return config;
         }
 
@@ -191,6 +210,7 @@ namespace rtype::ecs {
             config.delayBefore = j.value("delayBefore", 0.0f);
             config.spawnInterval = j.value("spawnInterval", 0.5f);
             config.simultaneous = j.value("simultaneous", false);
+            config.ordered = j.value("ordered", false);
             
             if (j.contains("enemies") && j["enemies"].is_array()) {
                 for (const auto& enemyJson : j["enemies"]) {
@@ -222,6 +242,83 @@ namespace rtype::ecs {
             config.vy = j.value("vy", 0.0f);
             config.health = j.value("health", 1);
             config.scoreValue = j.value("scoreValue", 100);
+            config.spawnDelay = j.value("spawnDelay", 0.0f);
+            config.shootsAtPlayer = j.value("shootsAtPlayer", false);
+            config.fireRate = j.value("fireRate", 1.5f);
+            
+            return config;
+        }
+
+        /**
+         * @brief Parse JSON into PowerupSpawnConfig
+         */
+        static PowerupSpawnConfig parsePowerupSpawn(const nlohmann::json& j) {
+            PowerupSpawnConfig config;
+            
+            config.type = j.value("type", 0);
+            config.x = j.value("x", 1300.0f);
+            config.y = j.value("y", 360.0f);
+            config.triggerTime = j.value("triggerTime", 0.0f);
+            
+            return config;
+        }
+
+        /**
+         * @brief Parse JSON into BombSpawnConfig
+         */
+        static BombSpawnConfig parseBombSpawn(const nlohmann::json& j) {
+            BombSpawnConfig config;
+            
+            config.x = j.value("x", 1300.0f);
+            config.y = j.value("y", 360.0f);
+            config.triggerTime = j.value("triggerTime", 0.0f);
+            
+            return config;
+        }
+
+        /**
+         * @brief Parse JSON into BossPhaseConfig
+         */
+        static BossPhaseConfig parseBossPhase(const nlohmann::json& j) {
+            BossPhaseConfig config;
+            
+            config.phase = j.value("phase", 1);
+            config.healthThreshold = j.value("healthThreshold", 1.0f);
+            config.pattern = j.value("pattern", "default");
+            config.moveSpeed = j.value("moveSpeed", 50.0f);
+            
+            return config;
+        }
+
+        /**
+         * @brief Parse JSON into BossSectionConfig
+         */
+        static BossSectionConfig parseBossSection(const nlohmann::json& j) {
+            BossSectionConfig config;
+            
+            config.enabled = j.value("enabled", true);
+            config.triggerDelay = j.value("triggerDelay", 2.0f);
+            config.musicChange = j.value("musicChange", true);
+            
+            // Parse boss enemy config
+            if (j.contains("boss") && j["boss"].is_object()) {
+                config.boss = parseEnemy(j["boss"]);
+                config.boss.type = EnemyType::Boss;  // Ensure it's a boss type
+            }
+            
+            // Parse phases
+            if (j.contains("phases") && j["phases"].is_array()) {
+                for (const auto& phaseJson : j["phases"]) {
+                    config.phases.push_back(parseBossPhase(phaseJson));
+                }
+            }
+            
+            // Default phases if none specified
+            if (config.phases.empty()) {
+                config.phases.push_back({1, 1.0f, "default", 50.0f});
+                config.phases.push_back({2, 0.66f, "aggressive", 80.0f});
+                config.phases.push_back({3, 0.33f, "desperate", 120.0f});
+            }
             
             return config;
         }
@@ -255,6 +352,27 @@ namespace rtype::ecs {
                 j["waves"].push_back(serializeWave(wave));
             }
             
+            // Serialize powerup spawns
+            if (!config.powerupSpawns.empty()) {
+                j["powerupSpawns"] = nlohmann::json::array();
+                for (const auto& spawn : config.powerupSpawns) {
+                    j["powerupSpawns"].push_back(serializePowerupSpawn(spawn));
+                }
+            }
+            
+            // Serialize bomb spawns
+            if (!config.bombSpawns.empty()) {
+                j["bombSpawns"] = nlohmann::json::array();
+                for (const auto& spawn : config.bombSpawns) {
+                    j["bombSpawns"].push_back(serializeBombSpawn(spawn));
+                }
+            }
+            
+            // Serialize boss section
+            if (config.bossSection.enabled) {
+                j["bossSection"] = serializeBossSection(config.bossSection);
+            }
+            
             return j;
         }
 
@@ -267,6 +385,9 @@ namespace rtype::ecs {
             j["delayBefore"] = config.delayBefore;
             j["spawnInterval"] = config.spawnInterval;
             j["simultaneous"] = config.simultaneous;
+            if (config.ordered) {
+                j["ordered"] = config.ordered;
+            }
             j["enemies"] = nlohmann::json::array();
             
             for (const auto& enemy : config.enemies) {
@@ -289,6 +410,75 @@ namespace rtype::ecs {
             j["vy"] = config.vy;
             j["health"] = config.health;
             j["scoreValue"] = config.scoreValue;
+            
+            // Include new fields if non-default
+            if (config.spawnDelay > 0.0f) {
+                j["spawnDelay"] = config.spawnDelay;
+            }
+            if (config.shootsAtPlayer) {
+                j["shootsAtPlayer"] = config.shootsAtPlayer;
+                j["fireRate"] = config.fireRate;
+            }
+            
+            return j;
+        }
+
+        /**
+         * @brief Serialize PowerupSpawnConfig to JSON
+         */
+        static nlohmann::json serializePowerupSpawn(const PowerupSpawnConfig& config) {
+            nlohmann::json j;
+            
+            j["type"] = config.type;
+            j["x"] = config.x;
+            j["y"] = config.y;
+            j["triggerTime"] = config.triggerTime;
+            
+            return j;
+        }
+
+        /**
+         * @brief Serialize BombSpawnConfig to JSON
+         */
+        static nlohmann::json serializeBombSpawn(const BombSpawnConfig& config) {
+            nlohmann::json j;
+            
+            j["x"] = config.x;
+            j["y"] = config.y;
+            j["triggerTime"] = config.triggerTime;
+            
+            return j;
+        }
+
+        /**
+         * @brief Serialize BossPhaseConfig to JSON
+         */
+        static nlohmann::json serializeBossPhase(const BossPhaseConfig& config) {
+            nlohmann::json j;
+            
+            j["phase"] = config.phase;
+            j["healthThreshold"] = config.healthThreshold;
+            j["pattern"] = config.pattern;
+            j["moveSpeed"] = config.moveSpeed;
+            
+            return j;
+        }
+
+        /**
+         * @brief Serialize BossSectionConfig to JSON
+         */
+        static nlohmann::json serializeBossSection(const BossSectionConfig& config) {
+            nlohmann::json j;
+            
+            j["enabled"] = config.enabled;
+            j["triggerDelay"] = config.triggerDelay;
+            j["musicChange"] = config.musicChange;
+            j["boss"] = serializeEnemy(config.boss);
+            
+            j["phases"] = nlohmann::json::array();
+            for (const auto& phase : config.phases) {
+                j["phases"].push_back(serializeBossPhase(phase));
+            }
             
             return j;
         }

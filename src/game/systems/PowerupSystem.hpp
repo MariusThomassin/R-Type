@@ -52,10 +52,18 @@ namespace rtype::ecs {
                     trySpawnPowerup(e.x, e.y);
                 }
             );
+            
+            // Subscribe to timed powerup spawn events from level system
+            m_powerupSpawnSubId = m_eventBus.subscribe<events::PowerupSpawned>(
+                [this](const events::PowerupSpawned& e) {
+                    completePowerupSpawn(e.powerupEntity, static_cast<PowerupType>(e.powerupType));
+                }
+            );
         }
 
         ~PowerupSystem() override {
             m_eventBus.unsubscribe<events::EnemyDestroyed>(m_enemyDeathSubId);
+            m_eventBus.unsubscribe<events::PowerupSpawned>(m_powerupSpawnSubId);
         }
 
         /**
@@ -138,6 +146,36 @@ namespace rtype::ecs {
         float m_spawnChance;
         std::mt19937 m_rng;
         size_t m_enemyDeathSubId = 0;
+        size_t m_powerupSpawnSubId = 0;
+
+        /**
+         * @brief Complete a powerup spawn by adding remaining components
+         * Called when EnemySpawnerSystem creates the entity but needs PowerupSystem to finish it
+         */
+        void completePowerupSpawn(EntityId entityId, PowerupType type) {
+            if (!m_registry) return;
+            if (entityId == NULL_ENTITY) return;
+            
+            Entity entity(entityId);
+            
+            // Add PowerupComponent if not already present
+            if (!m_registry->hasComponent<PowerupComponent>(entity)) {
+                m_registry->addComponent(entity, PowerupComponent(type, getDuration(type), getValue(type)));
+            }
+            
+            // Add collision for pickup detection
+            if (!m_registry->hasComponent<ColliderComponent>(entity)) {
+                ColliderComponent collision(24.0f, 24.0f, CollisionLayer::Powerup);
+                collision.mask = CollisionLayer::Player;
+                collision.isTrigger = true;
+                m_registry->addComponent(entity, collision);
+            }
+            
+            // Auto-despawn after 15 seconds
+            if (!m_registry->hasComponent<LifetimeComponent>(entity)) {
+                m_registry->addComponent(entity, LifetimeComponent(15.0f));
+            }
+        }
 
         /**
          * @brief Try to spawn a powerup with configured probability
