@@ -639,9 +639,10 @@ namespace rtype::ecs::debug {
 
         void loadLevel(int index) {
             if (index < 0 || index >= static_cast<int>(m_levelFiles.size())) return;
+            if (!m_eventBus) return;
             
             auto levelConfig = LevelLoader::loadFromFile(m_levelFiles[index]);
-            if (levelConfig && m_eventBus) {
+            if (levelConfig) {
                 // Prepend base path to asset paths
                 std::string bgPath = levelConfig->background;
                 std::string stagePath = levelConfig->stageMusic;
@@ -657,7 +658,7 @@ namespace rtype::ecs::debug {
                     bossPath = m_basePath + "/" + bossPath;
                 }
                 
-                // Emit level assets loaded first
+                // Emit level assets loaded first (for background/music)
                 m_eventBus->emit(events::LevelAssetsLoaded{
                     bgPath,
                     stagePath,
@@ -667,10 +668,16 @@ namespace rtype::ecs::debug {
                     !bossPath.empty()
                 });
                 
-                // Then emit level loaded
+                // Emit level loaded info
                 m_eventBus->emit(events::LevelLoaded{
                     static_cast<int>(levelConfig->waves.size()),
                     levelConfig->difficulty
+                });
+                
+                // Emit load level request to trigger enemy spawning
+                // This will be picked up by EnemySpawnerSystem
+                m_eventBus->emit(events::LoadLevelRequest{
+                    m_levelFiles[index]
                 });
             }
         }

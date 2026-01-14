@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "EnemySpawnerSystem.hpp"
+#include "game/systems/LevelConfig.hpp"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <filesystem>

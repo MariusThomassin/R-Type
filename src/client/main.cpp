@@ -32,6 +32,9 @@
 #include "../shared/SettingsManager.hpp"
 #include "../engine/ecs/events/InputUtils.hpp"
 #include "NetworkClient.hpp"
+#include "LocalServer.hpp"
+#include "ProfileManager.hpp"
+#include "ScoreManager.hpp"
 
 using namespace rtype::ecs;
 using rtype::ecs::BulletType;
@@ -222,6 +225,28 @@ int main(int argc, char* argv[]) {
     // Connection happens through the multiplayer menu when user selects a server
     rtype::client::NetworkClient networkClient(registry);
 
+    // ==================== Local Server (for Solo Mode) ====================
+    // LocalServer runs a full GameServer in a background thread
+    // This ensures solo mode uses the same authoritative game logic as multiplayer
+    rtype::client::LocalServer localServer;
+    bool isLocalGame = false;  // Track if we're running a local server
+
+    // ==================== Profile & Score Management ====================
+    rtype::client::ProfileManager profileManager;
+    rtype::client::ScoreManager scoreManager;
+    
+    // Set up network callbacks for score tracking
+    rtype::client::NetworkCallbacks netCallbacks;
+    netCallbacks.onScoreUpdate = [&scoreManager, &networkClient](const rtype::network::ScoreUpdateMessage& msg) {
+        if (msg.clientId == networkClient.getClientId()) {
+            scoreManager.updateSessionScore(msg.newScore);
+        }
+    };
+    netCallbacks.onLevelComplete = [&scoreManager](const rtype::network::LevelCompleteMessage& msg) {
+        scoreManager.setSessionProgress(msg.levelIndex + 1, msg.nextLevelIndex < msg.levelIndex);
+    };
+    networkClient.setCallbacks(netCallbacks);
+
     // ==================== Settings Panel Setup ====================
     
     // Create settings widget with initial configuration
@@ -296,9 +321,46 @@ int main(int argc, char* argv[]) {
 
     // Set up callbacks for main menu events
     rtype::ui::MainMenuCallbacks menuCallbacks;
-    menuCallbacks.onPlay = [&gameState, &mainMenuWidget]() {
+    menuCallbacks.onSoloPlay = [&gameState, &mainMenuWidget, &localServer, &networkClient, &isLocalGame, &scoreManager, &profileManager]() {
+        std::cout << "[Main] Starting solo game..." << std::endl;
+        
+        // Start local server (Quake-style: solo games run on a local server)
+        constexpr uint16_t LOCAL_PORT = 4243;
+        if (!localServer.start(true, LOCAL_PORT)) {  // allowSinglePlayer = true
+            std::cerr << "[Main] Failed to start local server!" << std::endl;
+            return;
+        }
+        
+        // Wait for server to be ready
+        if (!localServer.waitUntilReady(3000)) {
+            std::cerr << "[Main] Local server failed to become ready!" << std::endl;
+            localServer.stop();
+            return;
+        }
+        
+        std::cout << "[Main] Local server ready on port " << localServer.getPort() << std::endl;
+        
+        // Connect to local server
+        if (!networkClient.connect("127.0.0.1", localServer.getPort())) {
+            std::cerr << "[Main] Failed to connect to local server!" << std::endl;
+            localServer.stop();
+            return;
+        }
+        
+        // Send profile to server
+        const auto& profile = profileManager.getProfile();
+        networkClient.sendPlayerProfile(profile.name, profile.avatarId, profile.colorScheme);
+        
+        // Send player ready (starts game immediately in single player)
+        networkClient.sendPlayerReady();
+        
+        isLocalGame = true;
+        scoreManager.resetSession();
+        
         gameState = GameState::PLAYING;
-        mainMenuWidget->hide(); // Fix: Hide main menu when starting game
+        mainMenuWidget->hide();
+        
+        std::cout << "[Main] Solo game started!" << std::endl;
     };
 
     menuCallbacks.onMultiplayer = [&gameState, &showingMultiplayer]() {
@@ -314,7 +376,18 @@ int main(int argc, char* argv[]) {
         mainMenuWidget->hide();
     };
 
-    menuCallbacks.onExit = [&shouldExit]() {
+    menuCallbacks.onExit = [&shouldExit, &localServer, &networkClient, &isLocalGame, &scoreManager, &profileManager]() {
+        // Save session score as high score if applicable
+        if (isLocalGame) {
+            const auto& profile = profileManager.getProfile();
+            scoreManager.finishSession(profile.name);
+        }
+        
+        // Clean up local server if running
+        if (localServer.isRunning()) {
+            networkClient.disconnect();
+            localServer.stop();
+        }
         shouldExit = true;
     };
 
@@ -516,6 +589,12 @@ int main(int argc, char* argv[]) {
     auto* stressTestSystem = systems.addSystem<StressTestSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* renderSystem = systems.addSystem<RenderSystem>(SCREEN_WIDTH, SCREEN_HEIGHT);
     
+    // ==================== Enemy Systems Setup ====================
+    auto* enemySpawnerSystem = systems.addSystem<EnemySpawnerSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
+    auto* enemyAISystem = systems.addSystem<EnemyAISystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
+    (void)enemySpawnerSystem;  // Event-driven, updates via SystemManager
+    (void)enemyAISystem;       // Event-driven, updates via SystemManager
+    
     // ==================== Background System Setup ====================
     rtype::ecs::BackgroundSystem backgroundSystem(registry, eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     backgroundSystem.createDefaultBackground();  // Start with default procedural background
@@ -670,11 +749,31 @@ int main(int argc, char* argv[]) {
         if (gameState == GameState::PAUSED) {
             if (IsKeyPressed(KEY_M)) {
                 std::cout << "Returning to menu..." << std::endl;
+                
+                // Clean up local server if running
+                if (isLocalGame && localServer.isRunning()) {
+                    // Save score before closing
+                    scoreManager.finishSession(profileManager.getProfile().name);
+                    
+                    networkClient.disconnect();
+                    localServer.stop();
+                    isLocalGame = false;
+                    std::cout << "[Main] Local server stopped" << std::endl;
+                }
+                
                 gameState = GameState::MENU;
                 mainMenuWidget->show(); // Fix: Show main menu when returning from pause
             }
             if (IsKeyPressed(KEY_Q)) {
                 std::cout << "Quitting game..." << std::endl;
+                
+                // Clean up local server if running
+                if (isLocalGame && localServer.isRunning()) {
+                    scoreManager.finishSession(profileManager.getProfile().name);
+                    networkClient.disconnect();
+                    localServer.stop();
+                }
+                
                 shouldExit = true;
             }
             if (IsKeyPressed(KEY_S)) {
