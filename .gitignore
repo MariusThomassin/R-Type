@@ -55,3 +55,5 @@ doc/doxygen/man/
 doc/doxygen/rtf/
 !doc/*.md
 !doc/generate_docs.sh
+
+CLAUDE.md
