@@ -2,16 +2,29 @@
   "name": "Deep Space",
   "difficulty": 2,
   "waveDelay": 2.0,
+  "background": "assets/backgrounds/26212.png",
+  "stageMusic": "assets/sound/music/Sketchbook 2024-10-14.ogg",
+  "bossMusic": "assets/sound/music/Sketchbook 2024-10-23.ogg",
+  "powerupSpawns": [
+    {"type": 2, "x": 1300, "y": 200, "triggerTime": 10.0},
+    {"type": 0, "x": 1300, "y": 400, "triggerTime": 25.0},
+    {"type": 4, "x": 1300, "y": 300, "triggerTime": 40.0},
+    {"type": 3, "x": 1300, "y": 500, "triggerTime": 55.0}
+  ],
+  "bombSpawns": [
+    {"x": 1300, "y": 360, "triggerTime": 70.0}
+  ],
   "waves": [
     {
       "delayBefore": 1.0,
       "spawnInterval": 0.5,
+      "ordered": true,
       "simultaneous": false,
       "enemies": [
-        {"type": "shooter", "x": 1300, "y": 150, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250},
-        {"type": "shooter", "x": 1300, "y": 300, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250},
-        {"type": "shooter", "x": 1300, "y": 450, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250},
-        {"type": "shooter", "x": 1300, "y": 600, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250}
+        {"type": "shooter", "x": 1300, "y": 150, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250, "spawnDelay": 0.0, "shootsAtPlayer": true, "fireRate": 1.8},
+        {"type": "shooter", "x": 1300, "y": 300, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250, "spawnDelay": 0.5, "shootsAtPlayer": true, "fireRate": 1.8},
+        {"type": "shooter", "x": 1300, "y": 450, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250, "spawnDelay": 1.0, "shootsAtPlayer": true, "fireRate": 1.8},
+        {"type": "shooter", "x": 1300, "y": 600, "vx": -90, "vy": 0, "health": 2, "scoreValue": 250, "spawnDelay": 1.5, "shootsAtPlayer": true, "fireRate": 1.8}
       ]
     },
     {
@@ -33,9 +46,9 @@
       "simultaneous": false,
       "enemies": [
         {"type": "dive_bomber", "x": 1300, "y": 100, "vx": -80, "vy": 0, "health": 2, "scoreValue": 300},
-        {"type": "basic", "x": 1300, "y": 250, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "basic", "x": 1300, "y": 250, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100, "shootsAtPlayer": true, "fireRate": 3.0},
         {"type": "dive_bomber", "x": 1300, "y": 400, "vx": -80, "vy": 0, "health": 2, "scoreValue": 300},
-        {"type": "basic", "x": 1300, "y": 550, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100},
+        {"type": "basic", "x": 1300, "y": 550, "vx": -120, "vy": 0, "health": 1, "scoreValue": 100, "shootsAtPlayer": true, "fireRate": 3.0},
         {"type": "dive_bomber", "x": 1300, "y": 650, "vx": -80, "vy": 0, "health": 2, "scoreValue": 300}
       ]
     },
@@ -47,8 +60,8 @@
         {"type": "circular", "x": 1300, "y": 180, "vx": -70, "vy": 0, "health": 2, "scoreValue": 275},
         {"type": "circular", "x": 1300, "y": 360, "vx": -70, "vy": 0, "health": 2, "scoreValue": 275},
         {"type": "circular", "x": 1300, "y": 540, "vx": -70, "vy": 0, "health": 2, "scoreValue": 275},
-        {"type": "shooter", "x": 1300, "y": 270, "vx": -60, "vy": 0, "health": 3, "scoreValue": 300},
-        {"type": "shooter", "x": 1300, "y": 450, "vx": -60, "vy": 0, "health": 3, "scoreValue": 300}
+        {"type": "shooter", "x": 1300, "y": 270, "vx": -60, "vy": 0, "health": 3, "scoreValue": 300, "shootsAtPlayer": true, "fireRate": 1.5},
+        {"type": "shooter", "x": 1300, "y": 450, "vx": -60, "vy": 0, "health": 3, "scoreValue": 300, "shootsAtPlayer": true, "fireRate": 1.5}
       ]
     },
     {
@@ -69,9 +82,9 @@
       "spawnInterval": 0.5,
       "simultaneous": false,
       "enemies": [
-        {"type": "tank", "x": 1300, "y": 200, "vx": -50, "vy": 0, "health": 6, "scoreValue": 600},
+        {"type": "tank", "x": 1300, "y": 200, "vx": -50, "vy": 0, "health": 6, "scoreValue": 600, "shootsAtPlayer": true, "fireRate": 2.5},
         {"type": "follow", "x": 1300, "y": 360, "vx": -100, "vy": 0, "health": 2, "scoreValue": 350},
-        {"type": "tank", "x": 1300, "y": 520, "vx": -50, "vy": 0, "health": 6, "scoreValue": 600}
+        {"type": "tank", "x": 1300, "y": 520, "vx": -50, "vy": 0, "health": 6, "scoreValue": 600, "shootsAtPlayer": true, "fireRate": 2.5}
       ]
     },
     {
@@ -79,12 +92,33 @@
       "spawnInterval": 0.4,
       "simultaneous": false,
       "enemies": [
-        {"type": "shooter", "x": 1300, "y": 150, "vx": -80, "vy": 0, "health": 3, "scoreValue": 300},
+        {"type": "shooter", "x": 1300, "y": 150, "vx": -80, "vy": 0, "health": 3, "scoreValue": 300, "shootsAtPlayer": true, "fireRate": 1.2},
         {"type": "fast", "x": 1300, "y": 250, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
         {"type": "follow", "x": 1300, "y": 360, "vx": -90, "vy": 0, "health": 2, "scoreValue": 350},
         {"type": "fast", "x": 1300, "y": 470, "vx": -200, "vy": 0, "health": 1, "scoreValue": 200},
-        {"type": "shooter", "x": 1300, "y": 570, "vx": -80, "vy": 0, "health": 3, "scoreValue": 300}
+        {"type": "shooter", "x": 1300, "y": 570, "vx": -80, "vy": 0, "health": 3, "scoreValue": 300, "shootsAtPlayer": true, "fireRate": 1.2}
       ]
     }
-  ]
+  ],
+  "bossSection": {
+    "enabled": true,
+    "triggerDelay": 2.5,
+    "musicChange": true,
+    "boss": {
+      "type": "boss",
+      "x": 1100,
+      "y": 360,
+      "vx": -25,
+      "vy": 0,
+      "health": 50,
+      "scoreValue": 8000,
+      "shootsAtPlayer": true,
+      "fireRate": 0.8
+    },
+    "phases": [
+      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 50.0},
+      {"phase": 2, "healthThreshold": 0.6, "pattern": "spiral", "moveSpeed": 70.0},
+      {"phase": 3, "healthThreshold": 0.3, "pattern": "desperate", "moveSpeed": 100.0}
+    ]
+  }
 }

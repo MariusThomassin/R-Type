@@ -32,16 +32,60 @@ namespace rtype::ecs {
         float vx = -100.0f, vy = 0.0f;
         int health = 1;
         int scoreValue = 100;
+        float spawnDelay = 0.0f;        // Per-enemy delay offset for ordered spawning
+        bool shootsAtPlayer = false;    // Override shooting behavior
+        float fireRate = 1.5f;          // Custom fire rate if shootsAtPlayer
     };
 
     /**
      * @brief Configuration for a wave of enemies
      */
     struct WaveConfig {
-        float delayBefore = 0.0f;      // Delay before wave starts
+        float delayBefore = 0.0f;       // Delay before wave starts
         std::vector<EnemySpawnConfig> enemies;
         float spawnInterval = 0.5f;     // Time between each enemy spawn
         bool simultaneous = false;      // Spawn all at once vs sequential
+        bool ordered = false;           // Respect spawnDelay offsets for precise ordering
+    };
+
+    /**
+     * @brief Configuration for a powerup spawn in level
+     */
+    struct PowerupSpawnConfig {
+        int type = 0;                   // PowerupType as int
+        float x = 0.0f, y = 0.0f;
+        float triggerTime = 0.0f;       // When to spawn (seconds from level start)
+        bool spawned = false;           // Track if already spawned
+    };
+
+    /**
+     * @brief Configuration for a bomb spawn in level
+     */
+    struct BombSpawnConfig {
+        float x = 0.0f, y = 0.0f;
+        float triggerTime = 0.0f;       // When to spawn (seconds from level start)
+        bool spawned = false;           // Track if already spawned
+    };
+
+    /**
+     * @brief Boss phase configuration
+     */
+    struct BossPhaseConfig {
+        int phase = 1;                  // Phase number
+        float healthThreshold = 1.0f;   // Health percentage to trigger (0.0-1.0)
+        std::string pattern;            // Attack pattern identifier
+        float moveSpeed = 50.0f;        // Movement speed in this phase
+    };
+
+    /**
+     * @brief Boss section configuration
+     */
+    struct BossSectionConfig {
+        bool enabled = false;
+        EnemySpawnConfig boss;          // Boss spawn configuration
+        std::vector<BossPhaseConfig> phases;
+        float triggerDelay = 2.0f;      // Delay after waves complete before boss spawns
+        bool musicChange = true;        // Switch to boss music when triggered
     };
 
     /**
@@ -51,6 +95,19 @@ namespace rtype::ecs {
         std::vector<WaveConfig> waves;
         float waveDelay = 2.0f;         // Default delay between waves
         int difficulty = 1;
+        
+        // Level assets
+        std::string name;               // Level name
+        std::string background;         // Path to background image
+        std::string stageMusic;         // Path to stage music
+        std::string bossMusic;          // Path to boss music
+        
+        // Powerup and bomb spawns
+        std::vector<PowerupSpawnConfig> powerupSpawns;
+        std::vector<BombSpawnConfig> bombSpawns;
+        
+        // Boss section
+        BossSectionConfig bossSection;
     };
 
     /**
@@ -89,13 +146,19 @@ namespace rtype::ecs {
             if (!m_registry || !m_active) return;
 
             m_timer += dt;
+            m_levelTimer += dt;
+
+            // Update timed powerup/bomb spawns
+            updateTimedSpawns();
 
             // Check for wave completion
             if (m_currentWave >= 0 && m_currentWave < static_cast<int>(m_level.waves.size())) {
                 updateCurrentWave(dt);
             } else if (m_currentWave >= static_cast<int>(m_level.waves.size())) {
-                // All waves complete - loop or wait
-                if (m_looping) {
+                // All waves complete - check for boss section
+                if (m_level.bossSection.enabled && !m_bossSpawned) {
+                    updateBossSection(dt);
+                } else if (m_looping && !m_level.bossSection.enabled) {
                     startLevel();
                 }
             }
@@ -110,8 +173,21 @@ namespace rtype::ecs {
             m_waveTimer = 0.0f;
             m_spawnTimer = 0.0f;
             m_timer = 0.0f;
+            m_levelTimer = 0.0f;
             m_waveStarted = false;
             m_active = true;
+            m_bossSpawned = false;
+            m_bossTriggered = false;
+            m_bossTriggerTimer = 0.0f;
+            m_bossEntity = Entity();  // Reset to invalid entity
+            
+            // Reset timed spawns
+            for (auto& spawn : m_level.powerupSpawns) {
+                spawn.spawned = false;
+            }
+            for (auto& spawn : m_level.bombSpawns) {
+                spawn.spawned = false;
+            }
 
             m_eventBus.emit(events::WaveStarted{1, getWaveEnemyCount(0)});
         }
@@ -229,8 +305,9 @@ namespace rtype::ecs {
             m_registry->addComponent(enemy, collision);
 
             // Weapon for shooting enemies
-            if (config.type == EnemyType::Shooter || config.type == EnemyType::Turret || config.type == EnemyType::Boss) {
-                WeaponComponent weapon(1.5f, 10);  // Slower fire rate for enemies
+            if (config.type == EnemyType::Shooter || config.type == EnemyType::Turret || 
+                config.type == EnemyType::Boss || config.shootsAtPlayer) {
+                WeaponComponent weapon(config.fireRate, 10);  // Use custom fire rate
                 weapon.projectileSpeed = 400.0f;
                 m_registry->addComponent(enemy, weapon);
             }
@@ -245,6 +322,27 @@ namespace rtype::ecs {
             return enemy;
         }
 
+        /**
+         * @brief Check if boss section is active
+         */
+        bool isBossFight() const {
+            return m_bossTriggered && !m_bossDefeated;
+        }
+
+        /**
+         * @brief Check if boss has been defeated
+         */
+        bool isBossDefeated() const {
+            return m_bossDefeated;
+        }
+
+        /**
+         * @brief Get boss entity (if spawned)
+         */
+        Entity getBossEntity() const {
+            return m_bossEntity;
+        }
+
         SystemPhase getPhase() const override { return SystemPhase::GameLogic; }
 
     private:
@@ -257,11 +355,22 @@ namespace rtype::ecs {
         int m_currentWave = -1;
         int m_currentEnemy = 0;
         float m_timer = 0.0f;
+        float m_levelTimer = 0.0f;          // Total time since level start
         float m_waveTimer = 0.0f;
         float m_spawnTimer = 0.0f;
         bool m_waveStarted = false;
         bool m_active = false;
         bool m_looping = true;
+        
+        // Boss section state
+        bool m_bossTriggered = false;
+        bool m_bossSpawned = false;
+        bool m_bossDefeated = false;
+        float m_bossTriggerTimer = 0.0f;
+        Entity m_bossEntity;  // Default constructor sets id to NULL_ENTITY
+        
+        // Ordered spawning state
+        std::vector<float> m_orderedSpawnTimers;  // Per-enemy timers for ordered waves
 
         /**
          * @brief Create default level with sample waves
@@ -334,7 +443,7 @@ namespace rtype::ecs {
                 return;
             }
 
-            const WaveConfig& wave = m_level.waves[m_currentWave];
+            WaveConfig& wave = m_level.waves[m_currentWave];
 
             // Wait for delay before wave starts
             if (!m_waveStarted) {
@@ -342,6 +451,12 @@ namespace rtype::ecs {
                 if (m_waveTimer >= wave.delayBefore) {
                     m_waveStarted = true;
                     m_spawnTimer = wave.spawnInterval;  // Spawn first enemy immediately
+                    
+                    // Initialize ordered spawn timers if needed
+                    if (wave.ordered) {
+                        m_orderedSpawnTimers.clear();
+                        m_orderedSpawnTimers.resize(wave.enemies.size(), 0.0f);
+                    }
                 }
                 return;
             }
@@ -356,6 +471,19 @@ namespace rtype::ecs {
                         spawnEnemy(config);
                     }
                     m_currentEnemy = static_cast<int>(wave.enemies.size());
+                } else if (wave.ordered) {
+                    // Ordered spawning with per-enemy delays
+                    float waveElapsed = m_spawnTimer;
+                    for (size_t i = 0; i < wave.enemies.size(); ++i) {
+                        if (m_orderedSpawnTimers[i] < 0.0f) continue;  // Already spawned
+                        
+                        float spawnTime = wave.enemies[i].spawnDelay;
+                        if (waveElapsed >= spawnTime && m_orderedSpawnTimers[i] >= 0.0f) {
+                            spawnEnemy(wave.enemies[i]);
+                            m_orderedSpawnTimers[i] = -1.0f;  // Mark as spawned
+                            m_currentEnemy++;
+                        }
+                    }
                 } else {
                     // Sequential spawning
                     if (m_spawnTimer >= wave.spawnInterval) {
@@ -373,12 +501,108 @@ namespace rtype::ecs {
                 m_waveTimer = 0.0f;
                 m_spawnTimer = 0.0f;
                 m_waveStarted = false;
+                m_orderedSpawnTimers.clear();
 
                 if (m_currentWave < static_cast<int>(m_level.waves.size())) {
                     m_eventBus.emit(events::WaveStarted{
                         m_currentWave + 1, 
                         getWaveEnemyCount(m_currentWave)
                     });
+                }
+            }
+        }
+
+        /**
+         * @brief Update timed powerup and bomb spawns
+         */
+        void updateTimedSpawns() {
+            // Spawn powerups at their trigger times
+            for (auto& spawn : m_level.powerupSpawns) {
+                if (!spawn.spawned && m_levelTimer >= spawn.triggerTime) {
+                    spawnTimedPowerup(spawn);
+                    spawn.spawned = true;
+                }
+            }
+            
+            // Spawn bombs at their trigger times
+            for (auto& spawn : m_level.bombSpawns) {
+                if (!spawn.spawned && m_levelTimer >= spawn.triggerTime) {
+                    spawnTimedBomb(spawn);
+                    spawn.spawned = true;
+                }
+            }
+        }
+
+        /**
+         * @brief Spawn a timed powerup
+         */
+        void spawnTimedPowerup(const PowerupSpawnConfig& config) {
+            if (!m_registry) return;
+            
+            Entity powerup = m_registry->createEntity();
+            
+            float spawnX = config.x > 0 ? config.x : m_screenWidth + 50.0f;
+            float spawnY = config.y > 0 ? config.y : m_screenHeight / 2.0f;
+            
+            m_registry->addComponent(powerup, TransformComponent(spawnX, spawnY, 0.0f, 1.0f, 1.0f));
+            m_registry->addComponent(powerup, VelocityComponent(-80.0f, 0.0f, 100.0f));  // Float left
+            
+            // Import PowerupComponent - assume type is properly cast
+            // The PowerupSystem will handle the actual pickup logic
+            m_eventBus.emit(events::PowerupSpawned{
+                static_cast<EntityId>(powerup),
+                config.type,
+                spawnX, spawnY
+            });
+        }
+
+        /**
+         * @brief Spawn a timed bomb powerup
+         */
+        void spawnTimedBomb(const BombSpawnConfig& config) {
+            if (!m_registry) return;
+            
+            Entity bomb = m_registry->createEntity();
+            
+            float spawnX = config.x > 0 ? config.x : m_screenWidth + 50.0f;
+            float spawnY = config.y > 0 ? config.y : m_screenHeight / 2.0f;
+            
+            m_registry->addComponent(bomb, TransformComponent(spawnX, spawnY, 0.0f, 1.0f, 1.0f));
+            m_registry->addComponent(bomb, VelocityComponent(-80.0f, 0.0f, 100.0f));  // Float left
+            
+            // Emit bomb spawn event (type 6 = BOMB)
+            m_eventBus.emit(events::PowerupSpawned{
+                static_cast<EntityId>(bomb),
+                6,  // PowerupType::BOMB
+                spawnX, spawnY
+            });
+        }
+
+        /**
+         * @brief Update boss section after all waves complete
+         */
+        void updateBossSection(float dt) {
+            if (!m_level.bossSection.enabled) return;
+            
+            if (!m_bossTriggered) {
+                m_bossTriggerTimer += dt;
+                
+                if (m_bossTriggerTimer >= m_level.bossSection.triggerDelay) {
+                    m_bossTriggered = true;
+                    
+                    // Emit boss music change event if enabled
+                    if (m_level.bossSection.musicChange) {
+                        m_eventBus.emit(events::BossFightStarted{
+                            0,  // Will be updated after spawn
+                            static_cast<int>(m_level.bossSection.phases.size())
+                        });
+                    }
+                    
+                    // Spawn the boss
+                    EnemySpawnConfig bossConfig = m_level.bossSection.boss;
+                    bossConfig.type = EnemyType::Boss;
+                    m_bossEntity = spawnEnemy(bossConfig);
+                    m_bossSpawned = true;
                 }
             }
         }

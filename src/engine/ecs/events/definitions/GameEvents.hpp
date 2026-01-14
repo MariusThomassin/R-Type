@@ -259,4 +259,34 @@ namespace rtype::ecs::events {
         std::string levelPath;
     };
 
+    // ==================== Boss Events ====================
+
+    /**
+     * @brief Boss fight started
+     */
+    struct BossFightStarted {
+        EntityId bossEntity;
+        int totalPhases;
+    };
+
+    /**
+     * @brief Boss defeated
+     */
+    struct BossDefeated {
+        EntityId bossEntity;
+        int scoreValue;
+        float timeTaken;
+    };
+
+    // ==================== Powerup Spawn Events ====================
+
+    /**
+     * @brief Powerup spawned (timed or from enemy)
+     */
+    struct PowerupSpawned {
+        EntityId powerupEntity;
+        int powerupType;
+        float x, y;
+    };
+
 } // namespace rtype::ecs::events

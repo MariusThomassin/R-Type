@@ -2,6 +2,17 @@
   "name": "Training Grounds",
   "difficulty": 1,
   "waveDelay": 2.5,
+  "background": "assets/backgrounds/26211.png",
+  "stageMusic": "assets/sound/music/Sketchbook 2024-10-13.ogg",
+  "bossMusic": "assets/sound/music/Sketchbook 2024-10-16.ogg",
+  "powerupSpawns": [
+    {"type": 2, "x": 1300, "y": 300, "triggerTime": 15.0},
+    {"type": 4, "x": 1300, "y": 400, "triggerTime": 30.0},
+    {"type": 0, "x": 1300, "y": 250, "triggerTime": 45.0}
+  ],
+  "bombSpawns": [
+    {"x": 1300, "y": 360, "triggerTime": 55.0}
+  ],
   "waves": [
     {
       "delayBefore": 1.0,
@@ -40,13 +51,14 @@
     {
       "delayBefore": 3.0,
       "spawnInterval": 0.4,
+      "ordered": true,
       "simultaneous": false,
       "enemies": [
-        {"type": "shooter", "x": 1300, "y": 200, "vx": -80, "vy": 0, "health": 2, "scoreValue": 250},
-        {"type": "basic", "x": 1300, "y": 300, "vx": -100, "vy": 0, "health": 1, "scoreValue": 100},
-        {"type": "basic", "x": 1300, "y": 420, "vx": -100, "vy": 0, "health": 1, "scoreValue": 100},
-        {"type": "shooter", "x": 1300, "y": 520, "vx": -80, "vy": 0, "health": 2, "scoreValue": 250},
-        {"type": "sine_wave", "x": 1300, "y": 360, "vx": -90, "vy": 0, "health": 1, "scoreValue": 150}
+        {"type": "shooter", "x": 1300, "y": 200, "vx": -80, "vy": 0, "health": 2, "scoreValue": 250, "spawnDelay": 0.0, "shootsAtPlayer": true, "fireRate": 2.0},
+        {"type": "basic", "x": 1300, "y": 300, "vx": -100, "vy": 0, "health": 1, "scoreValue": 100, "spawnDelay": 0.5},
+        {"type": "basic", "x": 1300, "y": 420, "vx": -100, "vy": 0, "health": 1, "scoreValue": 100, "spawnDelay": 1.0},
+        {"type": "shooter", "x": 1300, "y": 520, "vx": -80, "vy": 0, "health": 2, "scoreValue": 250, "spawnDelay": 1.5, "shootsAtPlayer": true, "fireRate": 2.0},
+        {"type": "sine_wave", "x": 1300, "y": 360, "vx": -90, "vy": 0, "health": 1, "scoreValue": 150, "spawnDelay": 2.0}
       ]
     },
     {
@@ -69,5 +81,26 @@
         {"type": "tank", "x": 1300, "y": 360, "vx": -60, "vy": 0, "health": 5, "scoreValue": 500}
       ]
     }
-  ]
+  ],
+  "bossSection": {
+    "enabled": true,
+    "triggerDelay": 3.0,
+    "musicChange": true,
+    "boss": {
+      "type": "boss",
+      "x": 1100,
+      "y": 360,
+      "vx": -30,
+      "vy": 0,
+      "health": 30,
+      "scoreValue": 5000,
+      "shootsAtPlayer": true,
+      "fireRate": 1.0
+    },
+    "phases": [
+      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 40.0},
+      {"phase": 2, "healthThreshold": 0.66, "pattern": "aggressive", "moveSpeed": 60.0},
+      {"phase": 3, "healthThreshold": 0.33, "pattern": "desperate", "moveSpeed": 90.0}
+    ]
+  }
 }

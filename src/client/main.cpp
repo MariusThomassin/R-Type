@@ -17,6 +17,9 @@
 #include "../game/Systems.hpp"
 #include "../game/systems/WindowedDebugSystem.hpp"
 #include "../game/systems/DebugSystem.hpp"
+#include "../engine/ecs/systems/MusicSystem.hpp"
+#include "../engine/ecs/systems/BackgroundSystem.hpp"
+#include "../engine/ecs/components/ImageBackgroundComponent.hpp"
 #include "../engine/ui/UIManager.hpp"
 #include "../engine/ui/widgets/ButtonWidget.hpp"
 #include "../engine/ui/widgets/TextWidget.hpp"
@@ -39,34 +42,16 @@ constexpr int SCREEN_WIDTH = 1280;
 constexpr int SCREEN_HEIGHT = 720;
 constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;  // 60 Hz game logic
 
-// Music system variables
-static Music backgroundMusic = {};
-static bool musicLoaded = false;
-static bool musicEnabled = true;
-static float musicVolume = 0.75f;
-static std::string currentMusicPath = "assets/sound/music/Sketchbook 2024-10-13.ogg";
+// MusicSystem pointer for callbacks (set in main)
+static rtype::ecs::MusicSystem* g_musicSystem = nullptr;
 
 /**
- * @brief Initialize and load background music
+ * @brief Initialize music system (called after MusicSystem is created)
  */
 void initializeMusic() {
-    if (!IsAudioDeviceReady()) {
-        std::cout << "Audio device not ready, cannot load music" << std::endl;
-        return;
-    }
-    
-    backgroundMusic = LoadMusicStream(currentMusicPath.c_str());
-    if (backgroundMusic.frameCount > 0) {
-        musicLoaded = true;
-        SetMusicVolume(backgroundMusic, musicVolume);
-        std::cout << "Background music loaded: " << currentMusicPath << std::endl;
-        
-        if (musicEnabled) {
-            PlayMusicStream(backgroundMusic);
-            std::cout << "Background music started" << std::endl;
-        }
-    } else {
-        std::cout << "Failed to load background music: " << currentMusicPath << std::endl;
+    // MusicSystem handles initialization automatically
+    if (g_musicSystem) {
+        std::cout << "MusicSystem initialized and ready" << std::endl;
     }
 }
 
@@ -74,29 +59,21 @@ void initializeMusic() {
  * @brief Update music playback (call every frame)
  */
 void updateMusic() {
-    if (musicLoaded && musicEnabled) {
-        UpdateMusicStream(backgroundMusic);
-        
-        // Loop the music when it finishes
-        if (!IsMusicStreamPlaying(backgroundMusic)) {
-            PlayMusicStream(backgroundMusic);
-        }
-    }
+    // MusicSystem::update() is called via SystemManager
+    // This function kept for compatibility
 }
 
 /**
  * @brief Set music enabled/disabled state
  */
 void setMusicEnabled(bool enabled) {
-    musicEnabled = enabled;
-    if (musicLoaded) {
+    if (g_musicSystem) {
         if (enabled) {
-            PlayMusicStream(backgroundMusic);
-            std::cout << "Background music resumed" << std::endl;
+            g_musicSystem->resume();
         } else {
-            PauseMusicStream(backgroundMusic);
-            std::cout << "Background music paused" << std::endl;
+            g_musicSystem->pause();
         }
+        std::cout << "Music " << (enabled ? "enabled" : "disabled") << std::endl;
     }
 }
 
@@ -104,9 +81,8 @@ void setMusicEnabled(bool enabled) {
  * @brief Set music volume (0.0 to 1.0)
  */
 void setMusicVolume(float volume) {
-    musicVolume = volume;
-    if (musicLoaded) {
-        SetMusicVolume(backgroundMusic, musicVolume);
+    if (g_musicSystem) {
+        g_musicSystem->setMasterVolume(volume);
     }
 }
 
@@ -114,11 +90,8 @@ void setMusicVolume(float volume) {
  * @brief Clean up music resources
  */
 void cleanupMusic() {
-    if (musicLoaded) {
-        UnloadMusicStream(backgroundMusic);
-        musicLoaded = false;
-        std::cout << "Background music unloaded" << std::endl;
-    }
+    // MusicSystem handles cleanup in destructor
+    std::cout << "Music cleanup handled by MusicSystem" << std::endl;
 }
 
 /**
@@ -150,7 +123,8 @@ Entity createPlayer(Registry& registry, int playerId) {
 }
 
 /**
- * @brief Create the scrolling background entity
+ * @brief Create the scrolling background entity (legacy - use BackgroundSystem instead)
+ * @deprecated Use BackgroundSystem::createDefaultBackground() instead
  */
 Entity createBackground(Registry& registry, int screenWidth, int screenHeight) {
     Entity bg = registry.createEntity();
@@ -158,7 +132,7 @@ Entity createBackground(Registry& registry, int screenWidth, int screenHeight) {
     registry.addComponent(bg, TransformComponent(0, 0));
     
     BackgroundComponent background(screenWidth, screenHeight, 200, 100.0f);
-    background.layer = 0;  // Render behind everything
+    background.layer = -100;  // Render behind everything
     registry.addComponent(bg, background);
     
     return bg;
@@ -244,13 +218,9 @@ int main(int argc, char* argv[]) {
     bool shouldExit = false;
 
     // ==================== Network Setup ====================
+    // NetworkClient is created but NOT connected at startup
+    // Connection happens through the multiplayer menu when user selects a server
     rtype::client::NetworkClient networkClient(registry);
-
-    // Connect to server with command-line arguments
-    if (!networkClient.connect(serverIp, serverPort)) {
-        std::cerr << "[Main] Failed to connect to " << serverIp << ":" << serverPort
-                  << ", continuing in offline mode" << std::endl;
-    }
 
     // ==================== Settings Panel Setup ====================
     
@@ -273,11 +243,14 @@ int main(int argc, char* argv[]) {
     std::cout << "- Use button->setClickSound(\"path\") to customize individual button sounds" << std::endl;
     std::cout << "- Use button->setClickSoundEnabled(false) to disable sound for specific buttons" << std::endl;
 
-    // ==================== Background Music Setup ====================
-    // Initialize music system with initial settings
-    ::musicEnabled = initialConfig.musicEnabled;
-    ::musicVolume = initialConfig.musicVolume / 100.0f;
-    initializeMusic();
+    // ==================== Music System Setup ====================
+    rtype::ecs::MusicSystem musicSystem(eventBus);
+    g_musicSystem = &musicSystem;
+    musicSystem.setMasterVolume(initialConfig.musicVolume / 100.0f);
+    
+    // Play default music for menu
+    musicSystem.playTrack("assets/sound/music/Sketchbook 2024-10-13.ogg", 1.0f, true);
+    std::cout << "MusicSystem initialized with default track" << std::endl;
     
     auto settingsWidget = std::make_shared<rtype::ui::SettingsWidget>(initialConfig);
     settingsWidget->setPosition(SCREEN_WIDTH / 2.0f - 400, SCREEN_HEIGHT / 2.0f - 275); // Match multiplayer positioning
@@ -345,10 +318,8 @@ int main(int argc, char* argv[]) {
         shouldExit = true;
     };
 
-    // Send PLAYER_READY to server
-    if (networkClient.isConnected()) {
-        networkClient.sendPlayerReady();
-    }
+    // NOTE: sendPlayerReady is now called when connecting via the multiplayer menu
+    // We no longer connect at startup, so this is removed
 
     mainMenuWidget->setCallbacks(menuCallbacks);
     uiManager.addWidget(mainMenuWidget);
@@ -365,10 +336,11 @@ int main(int argc, char* argv[]) {
     // ==================== Multiplayer Widget Setup ====================
     
     // Create multiplayer widget
+    // Use command-line arguments as defaults (if provided), otherwise use hardcoded defaults
     rtype::ui::MultiplayerConfig multiplayerConfig;
-    multiplayerConfig.title = "MULTIPLAYER";
-    multiplayerConfig.defaultIP = "127.0.0.1";
-    multiplayerConfig.defaultPort = 4242;
+    multiplayerConfig.title = "CONNECT TO SERVER";
+    multiplayerConfig.defaultIP = serverIp;  // Use command-line argument or default (127.0.0.1)
+    multiplayerConfig.defaultPort = serverPort;  // Use command-line argument or default (4242)
 
     auto multiplayerWidget = std::make_shared<rtype::ui::MultiplayerWidget>(multiplayerConfig);
     multiplayerWidget->setPosition(SCREEN_WIDTH / 2.0f - 400, SCREEN_HEIGHT / 2.0f - 300);
@@ -395,9 +367,32 @@ int main(int argc, char* argv[]) {
         std::cout << "Returning to main menu from multiplayer..." << std::endl;
     };
 
-    multiplayerCallbacks.onJoinServer = [&gameState, &showingMultiplayer, &showingLobby, &lobbyWidget, &networkClient](const std::string& ip, int port) {
-        // TODO: User will implement this callback
-        std::cout << "Join server callback called with " << ip << ":" << port << std::endl;
+    multiplayerCallbacks.onJoinServer = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const std::string& ip, int port) {
+        std::cout << "[Main] Attempting to connect to " << ip << ":" << port << std::endl;
+        
+        // Disconnect if already connected to a different server
+        if (networkClient.isConnected()) {
+            networkClient.disconnect();
+        }
+        
+        // Connect to the specified server
+        if (networkClient.connect(ip, static_cast<uint16_t>(port))) {
+            std::cout << "[Main] Connected to server " << ip << ":" << port << std::endl;
+            
+            // Send player ready message
+            networkClient.sendPlayerReady();
+            
+            // Go to lobby state
+            gameState = GameState::LOBBY;
+            showingMultiplayer = false;
+            showingLobby = true;
+            multiplayerWidget->hide();
+            lobbyWidget->show();
+            std::cout << "[Main] Entering lobby..." << std::endl;
+        } else {
+            std::cerr << "[Main] Failed to connect to " << ip << ":" << port << std::endl;
+            // Show error message in multiplayer widget (if it has that capability)
+        }
     };
 
     multiplayerCallbacks.onCreateRoom = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const rtype::ui::RoomSettings& settings) {
@@ -521,6 +516,10 @@ int main(int argc, char* argv[]) {
     auto* stressTestSystem = systems.addSystem<StressTestSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* renderSystem = systems.addSystem<RenderSystem>(SCREEN_WIDTH, SCREEN_HEIGHT);
     
+    // ==================== Background System Setup ====================
+    rtype::ecs::BackgroundSystem backgroundSystem(registry, eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
+    backgroundSystem.createDefaultBackground();  // Start with default procedural background
+    
     // Both debug systems available - can toggle between them
     auto* windowedDebugSystem = systems.addSystem<WindowedDebugSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
     auto* classicDebugSystem = systems.addSystem<DebugSystem>(eventBus, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -611,13 +610,12 @@ int main(int argc, char* argv[]) {
     renderSystem->setGameStatePtr(&gameState);
 
     // ==================== Create Game Entities ====================
-    Entity background = createBackground(registry, SCREEN_WIDTH, SCREEN_HEIGHT);
-    (void)background;
+    // Background is now managed by BackgroundSystem (created above)
+    // Legacy: Entity background = createBackground(registry, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    // Create a local player for testing (when not connected to server)
-    // In production, player is created by the server via network
-    Entity player = createPlayer(registry, 1);
-    (void)player;
+    // NOTE: Player entity is NO LONGER created locally
+    // The server creates and synchronizes player entities when connected
+    // This ensures the game can only be played with a server connection
 
     // ==================== Game Loop (Fixed Timestep) ====================
     float accumulator = 0.0f;
@@ -628,8 +626,11 @@ int main(int argc, char* argv[]) {
 
         inputManager.pollInput();
         
-        // Update background music
-        updateMusic();
+        // Update music system (handles playback)
+        musicSystem.update(frameTime);
+        
+        // Update background system (handles starfield animation)
+        backgroundSystem.update(frameTime);
 
         // Update UI in menu, multiplayer, lobby states, and paused when showing settings
         if (gameState == GameState::MENU || gameState == GameState::MULTIPLAYER || gameState == GameState::LOBBY || 

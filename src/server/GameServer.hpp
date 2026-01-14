@@ -48,8 +48,9 @@ namespace rtype::server {
     public:
         /**
          * @brief Construct a new Game Server object
+         * @param port Server port to listen on (default: 4242)
          */
-        GameServer();
+        explicit GameServer(uint16_t port = 4242);
 
         /**
          * @brief Destroy the Game Server object
@@ -207,6 +208,9 @@ namespace rtype::server {
         static constexpr float RESPAWN_DELAY = 3.0f; // Respawn delay in seconds
         static constexpr int SCREEN_WIDTH = 1280;
         static constexpr int SCREEN_HEIGHT = 720;
+
+        // Server configuration
+        uint16_t m_port;
 
         // Demo spawn state
         int m_demoSpawnCounter;
