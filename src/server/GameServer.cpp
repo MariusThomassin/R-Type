@@ -29,6 +29,7 @@
 #include "engine/ecs/components/HealthComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include "game/components/PlayerComponent.hpp"
+#include "game/components/EnemyComponent.hpp"
 // Note: SpritesheetComponent removed - not needed on headless server
 #include "game/components/bullets/TrajectoryComponent.hpp"
 #include "game/components/bullets/SpinComponent.hpp"
@@ -76,6 +77,9 @@ namespace rtype::server {
 
     void GameServer::initialize() {
         std::cout << "[GameServer] Initializing headless game simulation..." << std::endl;
+
+        // Initialize component factories for dynamic component creation
+        initializeComponentFactories();
 
         // Initialize network managers
         m_networkIdManager = std::make_unique<NetworkIdManager>();
@@ -142,6 +146,10 @@ namespace rtype::server {
             }
         );
 
+        LevelParser parser;
+        LevelConfig levelConfig = parser.parseLevel(defaultLevelPath);
+        loadLevelFromConfig(levelConfig);
+
         // Start network
         m_networkManager->start();
 
@@ -176,6 +184,251 @@ namespace rtype::server {
         m_lifetimeSystem->setScreenSize(SCREEN_WIDTH, SCREEN_HEIGHT);
 
         std::cout << "[GameServer] Registered " << m_systemManager.getSystemCount() << " systems" << std::endl;
+    }
+
+    void GameServer::initializeComponentFactories() {
+        // Factory for PROJECTILE entities
+        m_componentFactories[network::EntityType::PROJECTILE] = 
+            [](ecs::Registry& registry, ecs::Entity entity, const LevelElement& /*element*/) {
+                // Add projectile-specific components
+                registry.addComponent(entity, ecs::ProjectileComponent(ecs::NULL_ENTITY, 10, false));
+                registry.addComponent(entity, ecs::VelocityComponent(-200.0f, 0.0f, 300.0f));
+                registry.addComponent(entity, ecs::LifetimeComponent(8.0f));
+                
+                // Add collider for collision detection
+                ecs::ColliderComponent collider;
+                collider.width = 16.0f;
+                collider.height = 16.0f;
+                collider.layer = ecs::CollisionLayer::EnemyShot;
+                collider.mask = static_cast<ecs::CollisionLayer>(
+                    static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::Wall)
+                );
+                registry.addComponent(entity, collider);
+            };
+
+        // Factory for POWERUP entities
+        m_componentFactories[network::EntityType::POWERUP] = 
+            [](ecs::Registry& registry, ecs::Entity entity, const LevelElement& element) {
+                // Add powerup component with variant-based type
+                ecs::PowerupComponent powerup;
+                powerup.type = static_cast<ecs::PowerupType>(element.variant);
+                registry.addComponent(entity, powerup);
+                
+                // Add basic physics
+                registry.addComponent(entity, ecs::VelocityComponent(-50.0f, 0.0f, 100.0f));
+                
+                // Add collider for pickup detection
+                ecs::ColliderComponent collider;
+                collider.width = 32.0f;
+                collider.height = 32.0f;
+                collider.layer = ecs::CollisionLayer::Powerup;
+                collider.mask = static_cast<ecs::CollisionLayer>(
+                    static_cast<uint32_t>(ecs::CollisionLayer::Player)
+                );
+                registry.addComponent(entity, collider);
+            };
+
+        // Factory for ENEMY entities
+        m_componentFactories[network::EntityType::ENEMY] = 
+            [](ecs::Registry& registry, ecs::Entity entity, const LevelElement& element) {
+                // Add enemy component
+                ecs::EnemyComponent enemy;
+                enemy.type = static_cast<ecs::EnemyType>(element.variant % 4);  // Ensure valid enum value
+                enemy.difficultyLevel = 1;
+                enemy.scoreValue = 100;
+                registry.addComponent(entity, enemy);
+                
+                // Add health
+                registry.addComponent(entity, ecs::HealthComponent(30, 30));
+                
+                // Add basic movement
+                registry.addComponent(entity, ecs::VelocityComponent(-150.0f, 0.0f, 200.0f));
+                
+                // Add collider for combat
+                ecs::ColliderComponent collider;
+                collider.width = 48.0f;
+                collider.height = 48.0f;
+                collider.layer = ecs::CollisionLayer::Enemy;
+                collider.mask = static_cast<ecs::CollisionLayer>(
+                    static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::Wall)
+                );
+                registry.addComponent(entity, collider);
+            };
+
+        // Factory for BOSS entities
+        m_componentFactories[network::EntityType::BOSS] = 
+            [](ecs::Registry& registry, ecs::Entity entity, const LevelElement& /*element*/) {
+                // Add enemy component with boss type
+                ecs::EnemyComponent enemy;
+                enemy.type = ecs::EnemyType::Boss;
+                enemy.difficultyLevel = 3;
+                enemy.scoreValue = 5000;
+                registry.addComponent(entity, enemy);
+                
+                // Add high health for boss
+                registry.addComponent(entity, ecs::HealthComponent(500, 500));
+                
+                // Add slower movement for boss
+                registry.addComponent(entity, ecs::VelocityComponent(-50.0f, 0.0f, 100.0f));
+                
+                // Add large collider for boss
+                ecs::ColliderComponent collider;
+                collider.width = 128.0f;
+                collider.height = 128.0f;
+                collider.layer = ecs::CollisionLayer::Enemy;
+                collider.mask = static_cast<ecs::CollisionLayer>(
+                    static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::Wall)
+                );
+                registry.addComponent(entity, collider);
+            };
+
+        // Factory for WALL_BLOCK entities (static level geometry)
+        m_componentFactories[network::EntityType::WALL_BLOCK] = 
+            [](ecs::Registry& registry, ecs::Entity entity, const LevelElement& /*element*/) {
+                // Add collider for walls (no other components needed)
+                ecs::ColliderComponent collider;
+                collider.width = 32.0f;
+                collider.height = 32.0f;
+                collider.layer = ecs::CollisionLayer::Wall;
+                collider.mask = static_cast<ecs::CollisionLayer>(
+                    static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::Enemy)
+                );
+                registry.addComponent(entity, collider);
+            };
+
+        // Factory for DESTRUCTIBLE entities (breakable blocks)
+        m_componentFactories[network::EntityType::DESTRUCTIBLE] = 
+            [](ecs::Registry& registry, ecs::Entity entity, const LevelElement& element) {
+                // Add health for destructible blocks
+                registry.addComponent(entity, ecs::HealthComponent(10, 10));
+                
+                // Add collider
+                ecs::ColliderComponent collider;
+                collider.width = 32.0f;
+                collider.height = 32.0f;
+                collider.layer = ecs::CollisionLayer::Wall;
+                collider.mask = static_cast<ecs::CollisionLayer>(
+                    static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot) |
+                    static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot)
+                );
+                registry.addComponent(entity, collider);
+            };
+
+        // Factory for GOAL entities (level objectives)
+        m_componentFactories[network::EntityType::GOAL] = 
+            [](ecs::Registry& registry, ecs::Entity entity, const LevelElement& /*element*/) {
+                // Add collider for goal detection (using Player layer for now)
+                ecs::ColliderComponent collider;
+                collider.width = 64.0f;
+                collider.height = 64.0f;
+                collider.layer = ecs::CollisionLayer::Player;  // Will need proper Pickup layer
+                collider.mask = static_cast<ecs::CollisionLayer>(
+                    static_cast<uint32_t>(ecs::CollisionLayer::Player)
+                );
+                registry.addComponent(entity, collider);
+            };
+
+        std::cout << "[GameServer] Initialized " << m_componentFactories.size() 
+                  << " component factories" << std::endl;
+    }
+
+    network::EntitySpawnMessage GameServer::createEntitySpawnMessage(ecs::Entity entity, const LevelElement& element, uint32_t networkId) {
+        network::EntitySpawnMessage spawnMsg{};
+        
+        // Basic entity info
+        spawnMsg.networkId = networkId;
+        spawnMsg.entityType = element.type;
+        spawnMsg.x = element.x;
+        spawnMsg.y = element.y;
+        spawnMsg.rotation = 0.0f;
+        
+        // Get velocity if available
+        auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(entity);
+        if (velocity) {
+            spawnMsg.vx = velocity->vx;
+            spawnMsg.vy = velocity->vy;
+        } else {
+            spawnMsg.vx = 0.0f;
+            spawnMsg.vy = 0.0f;
+        }
+        
+        // Get collider info if available
+        auto* collider = m_registry.tryGetComponent<ecs::ColliderComponent>(entity);
+        if (collider) {
+            spawnMsg.colliderWidth = collider->width;
+            spawnMsg.colliderHeight = collider->height;
+            spawnMsg.collisionLayer = static_cast<uint32_t>(collider->layer);
+            spawnMsg.collisionMask = static_cast<uint32_t>(collider->mask);
+        } else {
+            spawnMsg.colliderWidth = 32.0f;
+            spawnMsg.colliderHeight = 32.0f;
+            spawnMsg.collisionLayer = 0;
+            spawnMsg.collisionMask = 0;
+        }
+        
+        // Get lifetime if available
+        auto* lifetime = m_registry.tryGetComponent<ecs::LifetimeComponent>(entity);
+        if (lifetime) {
+            spawnMsg.maxLifetime = lifetime->timeRemaining + lifetime->elapsedTime;
+        } else {
+            spawnMsg.maxLifetime = -1.0f;  // Infinite lifetime for static objects
+        }
+        
+        // Trajectory and spin (mostly for projectiles, set defaults for level objects)
+        spawnMsg.trajectoryType = 0;  // Linear/None
+        spawnMsg.trajectoryParam1 = 0.0f;
+        spawnMsg.trajectoryParam2 = 0.0f;
+        spawnMsg.spinSpeed = 0.0f;
+        
+        return spawnMsg;
+    }
+
+    void GameServer::loadLevelFromConfig(const LevelConfig& config)
+    {
+        std::cout << "[GameServer] Loading level: " << config.levelName << std::endl;
+
+        for (const auto& element : config.elements) {
+            ecs::Entity entity = m_registry.createEntity();
+
+            // Set position (always required)
+            m_registry.addComponent(entity, ecs::TransformComponent(element.x, element.y));
+
+            // Get entity type name for logging
+            const char* typeName = network::getEntityTypeName(element.type);
+            std::cout << "[GameServer] Creating entity of type: " << typeName 
+                      << " at (" << element.x << ", " << element.y << ")" << std::endl;
+
+            // Use component factory to create type-specific components
+            auto factoryIt = m_componentFactories.find(element.type);
+            if (factoryIt != m_componentFactories.end()) {
+                // Call the factory function to add appropriate components
+                factoryIt->second(m_registry, entity, element);
+                
+                // Add network component and broadcast to clients
+                uint32_t networkId = m_networkIdManager->allocate(entity);
+                m_registry.addComponent(entity, ecs::NetworkComponent(networkId, false));
+                
+                // Create and send EntitySpawnMessage to clients
+                network::EntitySpawnMessage spawnMsg = createEntitySpawnMessage(entity, element, networkId);
+                m_networkManager->broadcastEntitySpawn(spawnMsg);
+                
+                std::cout << "  - Broadcasted to clients [networkId=" << networkId << "]" << std::endl;
+            } else {
+                std::cout << "[GameServer] Warning: No component factory for entity type " 
+                          << typeName << " (" << static_cast<int>(element.type) << ")" << std::endl;
+            }
+        }
+
+        std::cout << "[GameServer] Level loaded with " << config.elements.size() << " elements." << std::endl;
     }
 
     void GameServer::run() {

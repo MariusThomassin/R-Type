@@ -7,6 +7,7 @@ set(SERVER_SOURCES
     main.cpp
     Server.cpp
     GameServer.cpp
+    LevelParser.cpp
     NetworkManager.cpp
     PlayerManager.cpp
 )

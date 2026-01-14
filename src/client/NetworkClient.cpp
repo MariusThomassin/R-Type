@@ -17,6 +17,8 @@
 #include "game/components/PlayerShipComponent.hpp"
 #include "game/components/WeaponComponent.hpp"
 #include "game/components/WeaponConstants.hpp"
+#include "game/components/EnemyComponent.hpp"
+#include "game/components/PowerupComponent.hpp"
 
 namespace rtype::client {
 
@@ -306,6 +308,155 @@ namespace rtype::client {
             }
 
             // Collider
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+        }
+        else if (message.entityType == network::EntityType::ENEMY) {
+            // Add enemy component
+            m_registry.addComponent(entity, ecs::EnemyComponent());
+            
+            // Add rendering: Green enemy sprite
+            ecs::SpritesheetComponent sprite;
+            sprite.frameX = 0;
+            sprite.frameY = 0;
+            sprite.frameWidth = 48;
+            sprite.frameHeight = 48;
+            sprite.tintR = 100;
+            sprite.tintG = 255;
+            sprite.tintB = 100;
+            sprite.layer = 50;  // Render behind projectiles
+            m_registry.addComponent(entity, sprite);
+
+            // Add collider if specified
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+        }
+        else if (message.entityType == network::EntityType::POWERUP) {
+            // Add powerup component
+            m_registry.addComponent(entity, ecs::PowerupComponent());
+            
+            // Add rendering: Yellow powerup sprite
+            ecs::SpritesheetComponent sprite;
+            sprite.frameX = 0;
+            sprite.frameY = 0;
+            sprite.frameWidth = 32;
+            sprite.frameHeight = 32;
+            sprite.tintR = 255;
+            sprite.tintG = 255;
+            sprite.tintB = 100;
+            sprite.layer = 60;
+            m_registry.addComponent(entity, sprite);
+
+            // Add collider if specified
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+        }
+        else if (message.entityType == network::EntityType::BOSS) {
+            // Add enemy component for boss
+            ecs::EnemyComponent boss;
+            boss.type = ecs::EnemyType::Boss;
+            m_registry.addComponent(entity, boss);
+            
+            // Add rendering: Large red boss sprite
+            ecs::SpritesheetComponent sprite;
+            sprite.frameX = 0;
+            sprite.frameY = 0;
+            sprite.frameWidth = 128;
+            sprite.frameHeight = 128;
+            sprite.tintR = 255;
+            sprite.tintG = 50;
+            sprite.tintB = 50;
+            sprite.layer = 40;
+            m_registry.addComponent(entity, sprite);
+
+            // Add collider if specified
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+        }
+        else if (message.entityType == network::EntityType::WALL_BLOCK) {
+            // Add rendering: Gray wall block
+            ecs::SpritesheetComponent sprite;
+            sprite.frameX = 0;
+            sprite.frameY = 0;
+            sprite.frameWidth = 32;
+            sprite.frameHeight = 32;
+            sprite.tintR = 128;
+            sprite.tintG = 128;
+            sprite.tintB = 128;
+            sprite.layer = 10;  // Render behind everything
+            m_registry.addComponent(entity, sprite);
+
+            // Add collider if specified
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+        }
+        else if (message.entityType == network::EntityType::DESTRUCTIBLE) {
+            // Add rendering: Brown destructible block
+            ecs::SpritesheetComponent sprite;
+            sprite.frameX = 0;
+            sprite.frameY = 0;
+            sprite.frameWidth = 32;
+            sprite.frameHeight = 32;
+            sprite.tintR = 200;
+            sprite.tintG = 150;
+            sprite.tintB = 100;
+            sprite.layer = 20;
+            m_registry.addComponent(entity, sprite);
+
+            // Add collider if specified
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+        }
+        else if (message.entityType == network::EntityType::GOAL) {
+            // Add rendering: Blue goal sprite
+            ecs::SpritesheetComponent sprite;
+            sprite.frameX = 0;
+            sprite.frameY = 0;
+            sprite.frameWidth = 64;
+            sprite.frameHeight = 64;
+            sprite.tintR = 100;
+            sprite.tintG = 100;
+            sprite.tintB = 255;
+            sprite.layer = 30;
+            m_registry.addComponent(entity, sprite);
+
+            // Add collider if specified
             if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
                 ecs::ColliderComponent collider;
                 collider.width = message.colliderWidth;

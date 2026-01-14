@@ -1,0 +1,7 @@
+# Simple test level - just a few entities to test each type
+2,1000,300,1
+3,800,200,0
+4,1200,360,0
+5,600,300,0
+6,700,250,0
+7,100,360,0

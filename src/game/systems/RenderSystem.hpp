@@ -116,37 +116,38 @@ namespace rtype::ecs {
                         background.render(transform, ctx);
                     }
                 );
-
-                // Optimization: Use struct to cache layer during collection (avoids repeated lookups during sort)
-                struct RenderItem {
-                    EntityId entity;
-                    int layer;
-                };
                 
-                std::vector<RenderItem> entities;
-                entities.reserve(m_lastEntityCount > 0 ? m_lastEntityCount + 64 : 256);
-                
-                // Collect SpritesheetComponent entities (most common - bullets)
-                m_registry->forEach<TransformComponent, SpritesheetComponent>(
-                    [this, &entities](EntityId e) {
-                        const auto& sheet = m_registry->getComponent<SpritesheetComponent>(e);
-                        entities.push_back({e, sheet.getRenderLayer()});
-                    }
-                );
-                
-                // Collect SpriteComponent entities (fewer)
-                m_registry->forEach<TransformComponent, SpriteComponent>(
-                    [this, &entities](EntityId e) {
-                        if (!m_registry->hasComponent<SpritesheetComponent>(e)) {
-                            const auto& sprite = m_registry->getComponent<SpriteComponent>(e);
-                            entities.push_back({e, sprite.getRenderLayer()});
+                if (m_gameState && *m_gameState == GameState::PLAYING) {
+                    // Optimization: Use struct to cache layer during collection (avoids repeated lookups during sort)
+                    struct RenderItem {
+                        EntityId entity;
+                        int layer;
+                    };
+                    
+                    std::vector<RenderItem> entities;
+                    entities.reserve(m_lastEntityCount > 0 ? m_lastEntityCount + 64 : 256);
+                    
+                    // Collect SpritesheetComponent entities (most common - bullets)
+                    m_registry->forEach<TransformComponent, SpritesheetComponent>(
+                        [this, &entities](EntityId e) {
+                            const auto& sheet = m_registry->getComponent<SpritesheetComponent>(e);
+                            entities.push_back({e, sheet.getRenderLayer()});
                         }
-                    }
-                );
-                
-                // Collect PlayerShipComponent entities (rare)
-                m_registry->forEach<TransformComponent, PlayerShipComponent>(
-                    [this, &entities](EntityId e) {
+                    );
+                    
+                    // Collect SpriteComponent entities (fewer)
+                    m_registry->forEach<TransformComponent, SpriteComponent>(
+                        [this, &entities](EntityId e) {
+                            if (!m_registry->hasComponent<SpritesheetComponent>(e)) {
+                                const auto& sprite = m_registry->getComponent<SpriteComponent>(e);
+                                entities.push_back({e, sprite.getRenderLayer()});
+                            }
+                        }
+                    );
+                    
+                    // Collect PlayerShipComponent entities (rare)
+                    m_registry->forEach<TransformComponent, PlayerShipComponent>(
+                        [this, &entities](EntityId e) {
                         if (!m_registry->hasComponent<SpriteComponent>(e) && 
                             !m_registry->hasComponent<SpritesheetComponent>(e)) {
                             const auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
@@ -156,17 +157,6 @@ namespace rtype::ecs {
                 );
 
                 m_lastEntityCount = entities.size();
-
-                // Log entity collection for debugging
-                static size_t logCounter = 0;
-                static bool hasLogged = false;
-                if (++logCounter % 60 == 0) {
-                    std::cout << "[RenderSystem] Collected " << entities.size() << " entities to render (registry size: " << m_registry->getEntityCount() << ")" << std::endl;
-                    if (entities.size() > 0 && !hasLogged) {
-                        std::cout << "[RenderSystem] First time seeing entities! Registry might have been empty before." << std::endl;
-                        hasLogged = true;
-                    }
-                }
 
                 // Sort using cached layer values (O(n log n) but with fast comparisons)
                 std::sort(entities.begin(), entities.end(), [](const RenderItem& a, const RenderItem& b) {
@@ -208,6 +198,7 @@ namespace rtype::ecs {
                         }
                     }
                 }
+                } // End of PLAYING state check
 
                 drawUI();
                 

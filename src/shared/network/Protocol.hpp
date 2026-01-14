@@ -46,7 +46,11 @@ namespace rtype::network {
         PROJECTILE = 0,
         PLAYER = 1,
         ENEMY = 2,
-        POWERUP = 3
+        POWERUP = 3,
+        BOSS = 4,           // major enemy entity
+        WALL_BLOCK = 5,     // indestructible level geometry
+        DESTRUCTIBLE = 6,   // block that the player can destroy
+        GOAL = 7            // end of level goal
     };
 
     /**
@@ -332,6 +336,23 @@ namespace rtype::network {
 
         std::memcpy(&outMessage, buffer.data() + sizeof(MessageHeader), sizeof(T));
         return true;
+    }
+
+    /**
+     * @brief Get entity type name for logging and dynamic component creation
+     */
+    inline const char* getEntityTypeName(EntityType type) {
+        switch (type) {
+            case EntityType::PROJECTILE: return "PROJECTILE";
+            case EntityType::PLAYER: return "PLAYER";
+            case EntityType::ENEMY: return "ENEMY";
+            case EntityType::POWERUP: return "POWERUP";
+            case EntityType::BOSS: return "BOSS";
+            case EntityType::WALL_BLOCK: return "WALL_BLOCK";
+            case EntityType::DESTRUCTIBLE: return "DESTRUCTIBLE";
+            case EntityType::GOAL: return "GOAL";
+            default: return "UNKNOWN";
+        }
     }
 
     /**

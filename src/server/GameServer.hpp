@@ -10,6 +10,7 @@
 #include "engine/ecs/core/EventBus.hpp"
 #include "engine/ecs/core/SystemManager.hpp"
 #include "engine/ecs/events/definitions/GameEvents.hpp"
+#include "server/LevelParser.hpp"
 
 #include <memory>
 #include <chrono>
@@ -31,6 +32,26 @@ namespace rtype::server {
     class NetworkManager;
     class NetworkIdManager;
     class PlayerManager;
+
+    struct LevelElement {
+        float x;
+        float y;
+        network::EntityType type;
+        uint8_t variant;            // (ex: which powerup type)
+    };
+
+    struct LevelConfig {
+        std::string levelName;
+        float width;
+        float height;
+        std::vector<LevelElement> elements;
+    };
+
+    /**
+     * @brief Component factory function type
+     * Creates components based on EntityType and adds them to an entity
+     */
+    using ComponentFactory = std::function<void(ecs::Registry&, ecs::Entity, const LevelElement&)>;
 
     /**
      * @brief Server-side game simulation
@@ -225,6 +246,31 @@ namespace rtype::server {
         // Respawn system
         std::vector<RespawnState> m_pendingRespawns;
         std::atomic<bool> m_gameOver{false};
-    };
 
+        /**
+         * @brief Load level configuration and spawn entities
+         * @param config Level configuration data
+         */
+        void loadLevelFromConfig(const LevelConfig& config);
+
+        /**
+         * @brief Default level path
+         */
+        std::string defaultLevelPath = "../assets/levels/simple_test.txt";
+
+        /**
+         * @brief Component factory mapping for dynamic component creation
+         */
+        std::unordered_map<network::EntityType, ComponentFactory> m_componentFactories;
+
+        /**
+         * @brief Initialize component factory mappings
+         */
+        void initializeComponentFactories();
+
+        /**
+         * @brief Create EntitySpawnMessage for broadcasting to clients
+         */
+        network::EntitySpawnMessage createEntitySpawnMessage(ecs::Entity entity, const LevelElement& element, uint32_t networkId);
+    };
 } // namespace rtype::server

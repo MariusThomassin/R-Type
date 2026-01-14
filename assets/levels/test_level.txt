@@ -1,0 +1,27 @@
+# Test level for dynamic component creation
+# Format: EntityType,X,Y,Variant
+# EntityType: 0=PROJECTILE, 1=PLAYER, 2=ENEMY, 3=POWERUP, 4=BOSS, 5=WALL_BLOCK, 6=DESTRUCTIBLE, 7=GOAL
+
+# Some basic enemies
+2,1200,200,0
+2,1200,300,1
+2,1200,400,2
+
+# A boss
+4,1400,360,0
+
+# Some powerups
+3,800,100,0
+3,800,500,1
+
+# Wall blocks for level geometry
+5,400,300,0
+5,432,300,0
+5,464,300,0
+
+# Destructible blocks
+6,600,200,0
+6,600,232,0
+
+# Goal at the end
+7,100,360,0
