@@ -23,11 +23,11 @@ namespace rtype::server {
     struct ClientInfo {
         uint32_t clientId;
         asio::ip::udp::endpoint endpoint;
-        float lastHeartbeat;
+        std::chrono::steady_clock::time_point lastHeartbeat;
         bool isActive;
 
         ClientInfo(uint32_t id, const asio::ip::udp::endpoint& ep)
-            : clientId(id), endpoint(ep), lastHeartbeat(0.0f), isActive(true) {}
+            : clientId(id), endpoint(ep), lastHeartbeat(std::chrono::steady_clock::now()), isActive(true) {}
     };
 
     /**
@@ -222,6 +222,9 @@ namespace rtype::server {
         // Network update rate
         static constexpr float NETWORK_UPDATE_RATE = 0.05f;  // 20 Hz (50ms)
         float m_timeSinceLastUpdate;
+
+        // Client timeout
+        static constexpr int CLIENT_TIMEOUT = 10;  // seconds
 
         // Server port
         uint16_t m_port;

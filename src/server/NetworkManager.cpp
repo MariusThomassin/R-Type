@@ -62,6 +62,35 @@ namespace rtype::server {
     void NetworkManager::update(float dt) {
         m_timeSinceLastUpdate += dt;
 
+        // Check for timed-out clients
+        auto now = std::chrono::steady_clock::now();
+        std::vector<uint32_t> timedOutClients;
+
+        {
+            std::lock_guard<std::mutex> lock(m_clientsMutex);
+            for (auto& client : m_clients) {
+                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - client.lastHeartbeat);
+                if (elapsed.count() > CLIENT_TIMEOUT) {
+                    timedOutClients.push_back(client.clientId);
+                }
+            }
+
+            // Remove timed-out clients
+            m_clients.erase(std::remove_if(m_clients.begin(), m_clients.end(),
+                [now](const ClientInfo& c) {
+                    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - c.lastHeartbeat);
+                    return elapsed.count() > CLIENT_TIMEOUT;
+                }), m_clients.end());
+        }
+
+        // Notify callbacks outside the lock
+        for (uint32_t clientId : timedOutClients) {
+            std::cout << "[NetworkManager] Client " << clientId << " timed out" << std::endl;
+            if (m_onClientDisconnected) {
+                m_onClientDisconnected(clientId);
+            }
+        }
+
         // Send state updates at 20 Hz (50ms interval)
         if (m_timeSinceLastUpdate >= NETWORK_UPDATE_RATE) {
             m_timeSinceLastUpdate = 0.0f;
@@ -146,6 +175,15 @@ namespace rtype::server {
         if (!network::deserializeHeader(buffer, header)) {
             std::cerr << "[NetworkManager] Failed to deserialize header" << std::endl;
             return;
+        }
+
+        // Update lastHeartbeat for existing clients (except CLIENT_HELLO which creates new clients)
+        if (header.type != network::MessageType::CLIENT_HELLO) {
+            std::lock_guard<std::mutex> lock(m_clientsMutex);
+            ClientInfo* client = findClient(senderEndpoint);
+            if (client) {
+                client->lastHeartbeat = std::chrono::steady_clock::now();
+            }
         }
 
         // Process based on message type
