@@ -81,9 +81,6 @@ namespace rtype::client {
             msg.clientId = m_clientId;
             auto buffer = network::serializeMessage(network::MessageType::CLIENT_DISCONNECT, msg);
             sendToServer(buffer);
-
-            // Give the message time to be sent before closing socket
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         m_running = false;
