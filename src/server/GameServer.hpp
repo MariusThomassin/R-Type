@@ -256,7 +256,7 @@ namespace rtype::server {
         /**
          * @brief Default level path
          */
-        std::string defaultLevelPath = "../assets/levels/simple_test.txt";
+        std::string defaultLevelPath = "assets/levels/simple_test.txt";
 
         /**
          * @brief Component factory mapping for dynamic component creation
