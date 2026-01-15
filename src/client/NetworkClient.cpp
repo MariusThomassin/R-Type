@@ -81,11 +81,17 @@ namespace rtype::client {
             msg.clientId = m_clientId;
             auto buffer = network::serializeMessage(network::MessageType::CLIENT_DISCONNECT, msg);
             sendToServer(buffer);
+
+            // Give the message time to be sent before closing socket
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         m_running = false;
         m_connected = false;
         m_welcomeReceived = false;
+
+        // Clear pending state updates to prevent memory leaks
+        m_pendingStateUpdates.clear();
 
         // Close socket to interrupt blocking receive
         asio::error_code ec;
@@ -399,7 +405,11 @@ namespace rtype::client {
         // Find entity by network ID
         auto it = m_networkIdToEntity.find(message.networkId);
         if (it == m_networkIdToEntity.end()) {
-            // Entity not found (might have been destroyed or not yet spawned)
+            // Entity not found - might arrive before spawn message
+            // Queue the update for when entity spawns
+            std::cout << "[NetworkClient] Entity " << message.networkId
+                      << " not found, queueing state update" << std::endl;
+            m_pendingStateUpdates[message.networkId] = message;
             return;
         }
 
@@ -564,6 +574,29 @@ namespace rtype::client {
         ecs::PlayerShipComponent shipComp(ecs::PlayerShipComponent::ShipStyle::Classic);
         shipComp.layer = 10;
         m_registry.addComponent(entity, shipComp);
+
+        // DEBUG: Verify component state
+        std::cout << "[NetworkClient] PlayerShipComponent state: isVisible=" << shipComp.isVisible
+                  << ", isInvincible=" << shipComp.isInvincible << ", layer=" << shipComp.layer << std::endl;
+
+        // Apply any pending state updates that arrived before spawn
+        auto pendingIt = m_pendingStateUpdates.find(message.networkId);
+        if (pendingIt != m_pendingStateUpdates.end()) {
+            std::cout << "[NetworkClient] Applying pending state update for entity "
+                      << message.networkId << std::endl;
+            auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(entity);
+            if (transform) {
+                transform->x = pendingIt->second.x;
+                transform->y = pendingIt->second.y;
+                transform->rotation = pendingIt->second.rotation;
+            }
+            auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(entity);
+            if (velocity) {
+                velocity->vx = pendingIt->second.vx;
+                velocity->vy = pendingIt->second.vy;
+            }
+            m_pendingStateUpdates.erase(pendingIt);
+        }
 
         // Map networkId → entity
         m_networkIdToEntity[message.networkId] = entity;

@@ -192,9 +192,18 @@ namespace rtype::ecs {
                         if (!ship.isRenderable()) {
                             static bool loggedShip = false;
                             if (!loggedShip) {
-                                std::cerr << "[RenderSystem] PlayerShip entity " << e << " has isVisible=false" << std::endl;
+                                std::cerr << "[RenderSystem] PlayerShip entity " << e
+                                          << " has isVisible=false, isInvincible=" << ship.isInvincible << std::endl;
                                 loggedShip = true;
                             }
+                        } else if (ship.isInvincible) {
+                            // Log when ship is invincible (flashing)
+                            static int invincibleCount = 0;
+                            if (++invincibleCount <= 3) {  // Log first 3 times only
+                                std::cout << "[RenderSystem] PlayerShip " << e << " is invincible (flashing)" << std::endl;
+                            }
+                            ship.updateAnimation(dt);
+                            ship.render(transform, ctx);
                         } else {
                             ship.updateAnimation(dt);
                             ship.render(transform, ctx);

@@ -236,6 +236,9 @@ namespace rtype::client {
         // Network ID mapping (networkId → local Entity)
         std::unordered_map<uint32_t, ecs::Entity> m_networkIdToEntity;
 
+        // Pending state updates for entities that haven't spawned yet (networkId → EntityState)
+        std::unordered_map<uint32_t, network::EntityStateMessage> m_pendingStateUpdates;
+
         // Input sequence number
         uint32_t m_inputSequence;
 

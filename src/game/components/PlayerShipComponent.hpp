@@ -40,9 +40,21 @@ namespace rtype::ecs {
         bool isInvincible = false;
         float invincibleTimer = 0.0f;
 
-        PlayerShipComponent() = default;
+        PlayerShipComponent()
+            : mainR(100), mainG(150), mainB(255),
+              cockpitR(200), cockpitG(230), cockpitB(255),
+              engineR(255), engineG(200), engineB(100),
+              layer(10), pixelScale(2.0f), isVisible(true),
+              shieldActive(false), shieldPulse(0.0f),
+              isInvincible(false), invincibleTimer(0.0f) {}
 
-        PlayerShipComponent(ShipStyle style) {
+        PlayerShipComponent(ShipStyle style)
+            : mainR(100), mainG(150), mainB(255),
+              cockpitR(200), cockpitG(230), cockpitB(255),
+              engineR(255), engineG(200), engineB(100),
+              layer(10), pixelScale(2.0f), isVisible(true),
+              shieldActive(false), shieldPulse(0.0f),
+              isInvincible(false), invincibleTimer(0.0f) {
             switch (style) {
                 case ShipStyle::Classic:
                     mainR = 100; mainG = 150; mainB = 255;
@@ -62,7 +74,12 @@ namespace rtype::ecs {
         }
 
         PlayerShipComponent(unsigned char r, unsigned char g, unsigned char b)
-            : mainR(r), mainG(g), mainB(b) {}
+            : mainR(r), mainG(g), mainB(b),
+              cockpitR(200), cockpitG(230), cockpitB(255),
+              engineR(255), engineG(200), engineB(100),
+              layer(10), pixelScale(2.0f), isVisible(true),
+              shieldActive(false), shieldPulse(0.0f),
+              isInvincible(false), invincibleTimer(0.0f) {}
 
         std::string getTypeName() const override {
             return "PlayerShipComponent";
