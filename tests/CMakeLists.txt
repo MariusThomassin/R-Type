@@ -12,6 +12,7 @@ add_executable(rtype_tests
     # Server source files (needed for tests)
     ${CMAKE_SOURCE_DIR}/src/server/NetworkManager.cpp
     ${CMAKE_SOURCE_DIR}/src/server/PlayerManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/RoomManager.cpp
 )
 
 # Include directories

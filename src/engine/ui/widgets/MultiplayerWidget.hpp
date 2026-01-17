@@ -178,21 +178,9 @@ private:
      */
     std::shared_ptr<InputFieldWidget> _portInput;
     /**
-     * @brief Room name label for joining
-     */
-    std::shared_ptr<TextWidget> _roomNameJoinLabel;
-    /**
-     * @brief Room name input field for joining
-     */
-    std::shared_ptr<InputFieldWidget> _roomNameJoinInput;
-    /**
-     * @brief Join Server buttons
+     * @brief Join Server button
      */
     std::shared_ptr<ButtonWidget> _joinServerButton;
-    /**
-     * @brief Join Room button
-     */
-    std::shared_ptr<ButtonWidget> _joinRoomButton;
     /**
      * @brief Room list panel
      */

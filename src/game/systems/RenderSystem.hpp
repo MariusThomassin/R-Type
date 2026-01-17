@@ -171,7 +171,6 @@ namespace rtype::ecs {
                 static size_t logCounter = 0;
                 static bool hasLogged = false;
                 if (++logCounter % 60 == 0) {
-                    std::cout << "[RenderSystem] Collected " << entities.size() << " entities to render (registry size: " << m_registry->getEntityCount() << ")" << std::endl;
                     if (entities.size() > 0 && !hasLogged) {
                         std::cout << "[RenderSystem] First time seeing entities! Registry might have been empty before." << std::endl;
                         hasLogged = true;

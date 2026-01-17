@@ -8,7 +8,6 @@ namespace rtype::ui {
 
     MultiplayerWidget::MultiplayerWidget(const MultiplayerConfig& config) : Widget(), _config(config), _initialized(false), _currentTab(MultiplayerTab::JOIN)
     {
-        // Set larger size for more spacious panels
         setSize(1200.0f, 650.0f);
     }
 
@@ -24,22 +23,18 @@ namespace rtype::ui {
         createCreateInterface();
         createNavigation();
 
-        // Create error message widget
         rtype::ui::ErrorMessageConfig errorConfig;
         errorConfig.title = "CONNECTION ERROR";
-        errorConfig.autoCloseDelay = 0.0f; // Don't auto-close
+        errorConfig.autoCloseDelay = 0.0f;
         _errorMessageWidget = std::make_shared<ErrorMessageWidget>("", errorConfig);
         _errorMessageWidget->setVisible(false);
-        
+
         rtype::ui::ErrorMessageCallbacks errorCallbacks;
-        errorCallbacks.onClose = [this]() {
-            // Error dialog closed, no additional action needed
-        };
+        errorCallbacks.onClose = [this]() {};
         _errorMessageWidget->setCallbacks(errorCallbacks);
         _errorMessageWidget->initialize();
         addChild(_errorMessageWidget);
 
-        // Start with Join tab
         switchTab(MultiplayerTab::JOIN);
 
         _initialized = true;
@@ -54,10 +49,9 @@ namespace rtype::ui {
         _mainPanel->setBorderColor(UIColor(100, 150, 255, 255));
         _mainPanel->setBorderWidth(3.0f);
         _mainPanel->setTitle("MULTIPLAYER");
-        
+
         addChild(_mainPanel);
 
-        // Title
         auto contentBounds = _mainPanel->getContentBounds();
         _titleText = std::make_shared<TextWidget>(_config.title, _config.titleFontSize);
         _titleText->setPosition(contentBounds.width / 2.0f - 120, 20.0f);
@@ -69,7 +63,6 @@ namespace rtype::ui {
 
     void MultiplayerWidget::createTabButtons() {
         auto contentBounds = _mainPanel->getContentBounds();
-        // Join tab button
         _joinTabButton = std::make_shared<ButtonWidget>("JOIN SERVER");
         _joinTabButton->setPosition(100.0f, 90.0f);
         _joinTabButton->setSize(200.0f, 50.0f);
@@ -79,7 +72,6 @@ namespace rtype::ui {
         });
         _mainPanel->addChild(_joinTabButton);
 
-        // Create tab button
         _createTabButton = std::make_shared<ButtonWidget>("CREATE ROOM");
         _createTabButton->setPosition(320.0f, 90.0f);
         _createTabButton->setSize(200.0f, 50.0f);
@@ -92,7 +84,6 @@ namespace rtype::ui {
 
     void MultiplayerWidget::createJoinInterface() {
         auto contentBounds = _mainPanel->getContentBounds();
-        // Join panel
         _joinPanel = std::make_shared<PanelWidget>();
         _joinPanel->setPosition(30.0f, 160.0f);
         _joinPanel->setSize(contentBounds.width - 60.0f, 340.0f);
@@ -101,7 +92,6 @@ namespace rtype::ui {
         _joinPanel->setBorderWidth(1.0f);
         _mainPanel->addChild(_joinPanel);
 
-        // Instructions
         _joinInstructionsText = std::make_shared<TextWidget>("Enter server details or select a room from the list:", _config.textFontSize);
         _joinInstructionsText->setPosition(20.0f, 20.0f);
         _joinInstructionsText->setSize(500.0f, 30.0f);
@@ -109,7 +99,6 @@ namespace rtype::ui {
         _joinInstructionsText->setTextColor(UIColor(200, 220, 255, 255));
         _joinPanel->addChild(_joinInstructionsText);
 
-        // IP Address input
         _ipLabel = std::make_shared<TextWidget>("Server IP:", _config.textFontSize);
         _ipLabel->setPosition(20.0f, 70.0f);
         _ipLabel->setSize(120.0f, 30.0f);
@@ -124,7 +113,6 @@ namespace rtype::ui {
         _ipInput->setVisible(true);
         _joinPanel->addChild(_ipInput);
 
-        // Port input
         _portLabel = std::make_shared<TextWidget>("Port:", _config.textFontSize);
         _portLabel->setPosition(20.0f, 130.0f);
         _portLabel->setSize(120.0f, 30.0f);
@@ -139,25 +127,9 @@ namespace rtype::ui {
         _portInput->setVisible(true);
         _joinPanel->addChild(_portInput);
 
-        // Room name input for direct room joining
-        _roomNameJoinLabel = std::make_shared<TextWidget>("Room Name:", _config.textFontSize);
-        _roomNameJoinLabel->setPosition(20.0f, 190.0f);
-        _roomNameJoinLabel->setSize(120.0f, 30.0f);
-        _roomNameJoinLabel->setBackgroundColor(UIColor::Transparent());
-        _roomNameJoinLabel->setTextColor(UIColor(180, 200, 255, 255));
-        _joinPanel->addChild(_roomNameJoinLabel);
-
-        _roomNameJoinInput = std::make_shared<InputFieldWidget>("Enter room name");
-        _roomNameJoinInput->setPosition(150.0f, 185.0f);
-        _roomNameJoinInput->setSize(250.0f, 40.0f);
-        _roomNameJoinInput->setText("");
-        _roomNameJoinInput->setVisible(true);
-        _joinPanel->addChild(_roomNameJoinInput);
-
-        // Join by server button
         _joinServerButton = std::make_shared<ButtonWidget>("JOIN SERVER");
-        _joinServerButton->setPosition(150.0f, 280.0f);
-        _joinServerButton->setSize(150.0f, 40.0f);
+        _joinServerButton->setPosition(150.0f, 200.0f);
+        _joinServerButton->setSize(200.0f, 50.0f);
         _joinServerButton->setBackgroundColor(UIColor(0, 120, 180, 200));
         _joinServerButton->setBorderColor(UIColor(0, 150, 220, 255));
         _joinServerButton->setBorderWidth(2.0f);
@@ -178,29 +150,6 @@ namespace rtype::ui {
         });
         _joinPanel->addChild(_joinServerButton);
 
-        // Join by room name button
-        _joinRoomButton = std::make_shared<ButtonWidget>("JOIN ROOM");
-        _joinRoomButton->setPosition(320.0f, 280.0f);
-        _joinRoomButton->setSize(150.0f, 40.0f);
-        _joinRoomButton->setBackgroundColor(UIColor(0, 150, 0, 200));
-        _joinRoomButton->setBorderColor(UIColor(0, 255, 0, 255));
-        _joinRoomButton->setBorderWidth(2.0f);
-        _joinRoomButton->setTextColor(UIColor::White());
-        _joinRoomButton->setOnClick([this]() {
-            std::string roomName = _roomNameJoinInput->getText();
-            
-            if (roomName.empty()) {
-                std::cout << "Please enter a room name" << std::endl;
-                return;
-            }
-            
-            std::cout << "Joining room: " << roomName << std::endl;
-            // For now, use default server settings when joining by room name
-            if (_callbacks.onJoinServer) {
-                _callbacks.onJoinServer(_config.defaultIP, _config.defaultPort);
-            }
-        });
-        _joinPanel->addChild(_joinRoomButton);
         // Room list panel (right side)
         _roomListPanel = std::make_shared<PanelWidget>();
         _roomListPanel->setPosition(480.0f, 60.0f);
@@ -328,22 +277,19 @@ namespace rtype::ui {
             colorButton->setBackgroundColor(colorOptions[i]);
             colorButton->setBorderColor(UIColor::White());
             colorButton->setBorderWidth(2.0f);
-            
-            // Capture color by value in lambda
+
             UIColor selectedColor = colorOptions[i];
             colorButton->setOnClick([this, selectedColor]() {
                 _currentRoomSettings.backgroundColor = selectedColor;
                 if (_colorPreview) {
                     _colorPreview->setBackgroundColor(selectedColor);
                 }
-                std::cout << "Selected room color: " << selectedColor.getRed() << "," << selectedColor.getGreen() << "," << selectedColor.getBlue() << std::endl;
             });
-            
+
             _createPanel->addChild(colorButton);
             _colorButtons.push_back(colorButton);
         }
 
-        // Create room button
         _createRoomButton = std::make_shared<ButtonWidget>("CREATE ROOM");
         _createRoomButton->setPosition(contentBounds.width - 275.0f, 355.0f);
         _createRoomButton->setSize(200.0f, 50.0f);
@@ -386,7 +332,6 @@ namespace rtype::ui {
     void MultiplayerWidget::createNavigation() {
         auto contentBounds = _mainPanel->getContentBounds();
 
-        // Back button
         _joinBackButton = std::make_shared<ButtonWidget>("BACK TO MENU");
         _joinBackButton->setPosition(contentBounds.width - 270.0f, 270.0f);
         _joinBackButton->setSize(200.0f, 50.0f);
@@ -402,7 +347,6 @@ namespace rtype::ui {
         });
         _joinPanel->addChild(_joinBackButton);
 
-        // Back button
         _createBackButton = std::make_shared<ButtonWidget>("BACK TO MENU");
         _createBackButton->setPosition(15.0f, 355.0f);
         _createBackButton->setSize(200.0f, 50.0f);
@@ -426,29 +370,26 @@ namespace rtype::ui {
     }
 
     void MultiplayerWidget::updateTabButtons() {
-        // Update join tab button
         if (_currentTab == MultiplayerTab::JOIN) {
-            _joinTabButton->setBackgroundColor(UIColor(0, 100, 200, 255)); // Active blue
+            _joinTabButton->setBackgroundColor(UIColor(0, 100, 200, 255));
             _joinTabButton->setBorderColor(UIColor(0, 150, 255, 255));
         } else {
-            _joinTabButton->setBackgroundColor(UIColor(60, 60, 80, 200)); // Inactive gray
+            _joinTabButton->setBackgroundColor(UIColor(60, 60, 80, 200));
             _joinTabButton->setBorderColor(UIColor(100, 100, 120, 255));
         }
         _joinTabButton->setBorderWidth(2.0f);
 
-        // Update create tab button
         if (_currentTab == MultiplayerTab::CREATE) {
-            _createTabButton->setBackgroundColor(UIColor(0, 100, 200, 255)); // Active blue
+            _createTabButton->setBackgroundColor(UIColor(0, 100, 200, 255));
             _createTabButton->setBorderColor(UIColor(0, 150, 255, 255));
         } else {
-            _createTabButton->setBackgroundColor(UIColor(60, 60, 80, 200)); // Inactive gray
+            _createTabButton->setBackgroundColor(UIColor(60, 60, 80, 200));
             _createTabButton->setBorderColor(UIColor(100, 100, 120, 255));
         }
         _createTabButton->setBorderWidth(2.0f);
     }
 
     void MultiplayerWidget::updateTabContent() {
-        // Show/hide panels based on current tab
         _joinPanel->setVisible(_currentTab == MultiplayerTab::JOIN);
         _createPanel->setVisible(_currentTab == MultiplayerTab::CREATE);
     }
@@ -457,7 +398,7 @@ namespace rtype::ui {
         setVisible(true);
         if (_mainPanel) {
             _mainPanel->setVisible(true);
-            updateTabContent(); // Ensure correct tab content is visible
+            updateTabContent();
         }
     }
 

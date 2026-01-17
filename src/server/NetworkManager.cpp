@@ -19,8 +19,20 @@ namespace rtype::server {
         , m_nextClientId(1)
         , m_timeSinceLastUpdate(0.0f)
         , m_port(port)
+        , m_roomManager()
     {
         std::cout << "[NetworkManager] Initialized on port " << port << std::endl;
+
+        // Set up RoomManager callbacks
+        m_roomManager.setBroadcastCallback([this](uint32_t clientId, const std::vector<uint8_t>& data) {
+            sendToClient(clientId, data);
+        });
+
+        m_roomManager.setHostStartCallback([this](const std::string& roomName, uint32_t hostClientId, uint8_t levelIndex) {
+            if (m_onHostStartGame) {
+                m_onHostStartGame(roomName, hostClientId, levelIndex);
+            }
+        });
     }
 
     NetworkManager::~NetworkManager() {
@@ -86,6 +98,10 @@ namespace rtype::server {
         // Notify callbacks outside the lock
         for (uint32_t clientId : timedOutClients) {
             std::cout << "[NetworkManager] Client " << clientId << " timed out" << std::endl;
+            
+            // Handle room disconnect (host migration if needed)
+            m_roomManager.handleClientDisconnect(clientId);
+            
             if (m_onClientDisconnected) {
                 m_onClientDisconnected(clientId);
             }
@@ -140,11 +156,8 @@ namespace rtype::server {
 
                 if (ec) {
                     if (ec == asio::error::operation_aborted || ec == asio::error::bad_descriptor) {
-                        // Socket closed, exit loop
                         break;
                     }
-                    // Other errors, log and continue
-                    std::cerr << "[NetworkManager] Receive error: " << ec.message() << std::endl;
                     continue;
                 }
 
@@ -159,9 +172,7 @@ namespace rtype::server {
                 processMessage(buffer, m_remoteEndpoint);
 
             } catch (const std::exception& e) {
-                if (m_running) {
-                    std::cerr << "[NetworkManager] Exception in receive loop: " << e.what() << std::endl;
-                }
+                // Silently handle exceptions in receive loop
             }
         }
 
@@ -220,9 +231,48 @@ namespace rtype::server {
                 break;
             }
 
+            // Room/Lobby messages
+            case network::MessageType::CREATE_ROOM: {
+                network::CreateRoomMessage msg;
+                if (network::deserializeMessage(buffer, msg)) {
+                    handleCreateRoom(msg, senderEndpoint);
+                }
+                break;
+            }
+
+            case network::MessageType::JOIN_ROOM: {
+                network::JoinRoomMessage msg;
+                if (network::deserializeMessage(buffer, msg)) {
+                    handleJoinRoom(msg, senderEndpoint);
+                }
+                break;
+            }
+
+            case network::MessageType::LEAVE_ROOM: {
+                network::LeaveRoomMessage msg;
+                if (network::deserializeMessage(buffer, msg)) {
+                    handleLeaveRoom(msg, senderEndpoint);
+                }
+                break;
+            }
+
+            case network::MessageType::ROOM_LIST_REQUEST: {
+                network::RoomListRequestMessage msg;
+                if (network::deserializeMessage(buffer, msg)) {
+                    handleRoomListRequest(msg, senderEndpoint);
+                }
+                break;
+            }
+
+            case network::MessageType::HOST_START_GAME: {
+                network::HostStartGameMessage msg;
+                if (network::deserializeMessage(buffer, msg)) {
+                    handleHostStartGame(msg, senderEndpoint);
+                }
+                break;
+            }
+
             default:
-                std::cerr << "[NetworkManager] Unknown message type: "
-                         << static_cast<int>(header.type) << std::endl;
                 break;
         }
     }
@@ -288,7 +338,11 @@ namespace rtype::server {
             }
         } // Release lock here
 
-        // Notify via callback OUTSIDE the lock to avoid deadlock
+        // Handle room disconnect (host migration if needed)
+        if (found) {
+            m_roomManager.handleClientDisconnect(message.clientId);
+        }
+
         if (found && m_onClientDisconnected) {
             m_onClientDisconnected(message.clientId);
         }
@@ -296,14 +350,11 @@ namespace rtype::server {
 
     void NetworkManager::handleClientInput(const network::ClientInputMessage& message,
                                           const asio::ip::udp::endpoint& senderEndpoint) {
-        // Find client by endpoint
         ClientInfo* client = findClient(senderEndpoint);
         if (!client) {
-            std::cerr << "[NetworkManager] Received input from unknown client: " << senderEndpoint << std::endl;
             return;
         }
 
-        // Notify via callback
         if (m_onClientInput) {
             m_onClientInput(client->clientId, message);
         }
@@ -311,7 +362,6 @@ namespace rtype::server {
 
     void NetworkManager::handlePlayerReady(const network::PlayerReadyMessage& message,
                                           const asio::ip::udp::endpoint& senderEndpoint) {
-        // Find client by endpoint
         ClientInfo* client = findClient(senderEndpoint);
         if (!client) {
             std::cerr << "[NetworkManager] Received PLAYER_READY from unknown client: " << senderEndpoint << std::endl;
@@ -330,8 +380,7 @@ namespace rtype::server {
         auto buffer = network::serializeMessage(network::MessageType::ENTITY_SPAWN, message);
         broadcast(buffer);
 
-        std::cout << "[NetworkManager] Broadcasting ENTITY_SPAWN (networkId=" << message.networkId
-                 << ", type=" << static_cast<int>(message.entityType) << ")" << std::endl;
+
     }
 
     void NetworkManager::broadcastEntityState(const network::EntityStateMessage& message) {
@@ -348,7 +397,6 @@ namespace rtype::server {
         auto buffer = network::serializeMessage(network::MessageType::ENTITY_DESTROY, message);
         broadcast(buffer);
 
-        std::cout << "[NetworkManager] Broadcasting ENTITY_DESTROY (networkId=" << networkId << ")" << std::endl;
     }
 
     void NetworkManager::sendSnapshotToClient(const ClientInfo& client) {
@@ -456,6 +504,134 @@ namespace rtype::server {
     size_t NetworkManager::getClientCount() const {
         std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(m_clientsMutex));
         return m_clients.size();
+    }
+
+    void NetworkManager::sendToClient(uint32_t clientId, const std::vector<uint8_t>& buffer) {
+        std::lock_guard<std::mutex> lock(m_clientsMutex);
+        ClientInfo* client = findClient(clientId);
+        if (client && client->isActive) {
+            sendTo(buffer, client->endpoint);
+        }
+    }
+
+    void NetworkManager::handleCreateRoom(const network::CreateRoomMessage& message,
+                                          const asio::ip::udp::endpoint& senderEndpoint) {
+        ClientInfo* client = findClient(senderEndpoint);
+        if (!client) {
+            std::cerr << "[NetworkManager] CREATE_ROOM from unknown client" << std::endl;
+            return;
+        }
+
+        std::string roomName(message.roomName);
+        std::string playerName = "Player" + std::to_string(client->clientId); // Default name
+
+        network::RoomError error = m_roomManager.createRoom(
+            client->clientId, roomName, playerName, message.maxPlayers);
+
+        if (error != network::RoomError::NONE) {
+            // Send error response
+            network::RoomErrorMessage errorMsg{};
+            errorMsg.error = error;
+            switch (error) {
+                case network::RoomError::ALREADY_IN_ROOM:
+                    std::strncpy(errorMsg.message, "Already in a room", sizeof(errorMsg.message) - 1);
+                    break;
+                case network::RoomError::INVALID_ROOM_NAME:
+                    std::strncpy(errorMsg.message, "Invalid room name or name already taken", sizeof(errorMsg.message) - 1);
+                    break;
+                default:
+                    std::strncpy(errorMsg.message, "Failed to create room", sizeof(errorMsg.message) - 1);
+                    break;
+            }
+            auto buffer = network::serializeMessage(network::MessageType::ROOM_ERROR, errorMsg);
+            sendTo(buffer, senderEndpoint);
+        }
+    }
+
+    void NetworkManager::handleJoinRoom(const network::JoinRoomMessage& message,
+                                        const asio::ip::udp::endpoint& senderEndpoint) {
+        ClientInfo* client = findClient(senderEndpoint);
+        if (!client) {
+            std::cerr << "[NetworkManager] JOIN_ROOM from unknown client" << std::endl;
+            return;
+        }
+
+        std::string roomName(message.roomName);
+        std::string playerName = "Player" + std::to_string(client->clientId);
+
+        network::RoomError error = m_roomManager.joinRoom(client->clientId, roomName, playerName);
+
+        if (error != network::RoomError::NONE) {
+            network::RoomErrorMessage errorMsg{};
+            errorMsg.error = error;
+            switch (error) {
+                case network::RoomError::ROOM_NOT_FOUND:
+                    std::strncpy(errorMsg.message, "Room not found", sizeof(errorMsg.message) - 1);
+                    break;
+                case network::RoomError::ROOM_FULL:
+                    std::strncpy(errorMsg.message, "Room is full", sizeof(errorMsg.message) - 1);
+                    break;
+                case network::RoomError::ALREADY_IN_ROOM:
+                    std::strncpy(errorMsg.message, "Already in a room", sizeof(errorMsg.message) - 1);
+                    break;
+                case network::RoomError::GAME_ALREADY_STARTED:
+                    std::strncpy(errorMsg.message, "Game already in progress", sizeof(errorMsg.message) - 1);
+                    break;
+                default:
+                    std::strncpy(errorMsg.message, "Failed to join room", sizeof(errorMsg.message) - 1);
+                    break;
+            }
+            auto buffer = network::serializeMessage(network::MessageType::ROOM_ERROR, errorMsg);
+            sendTo(buffer, senderEndpoint);
+        }
+    }
+
+    void NetworkManager::handleLeaveRoom(const network::LeaveRoomMessage& message,
+                                         const asio::ip::udp::endpoint& senderEndpoint) {
+        ClientInfo* client = findClient(senderEndpoint);
+        if (!client) {
+            return;
+        }
+
+        m_roomManager.leaveRoom(client->clientId);
+    }
+
+    void NetworkManager::handleRoomListRequest(const network::RoomListRequestMessage& message,
+                                               const asio::ip::udp::endpoint& senderEndpoint) {
+        (void)message; // Unused
+
+        network::RoomListMessage listMsg = m_roomManager.buildRoomListMessage();
+        auto buffer = network::serializeMessage(network::MessageType::ROOM_LIST, listMsg);
+        sendTo(buffer, senderEndpoint);
+    }
+
+    void NetworkManager::handleHostStartGame(const network::HostStartGameMessage& message,
+                                             const asio::ip::udp::endpoint& senderEndpoint) {
+        ClientInfo* client = findClient(senderEndpoint);
+        if (!client) {
+            std::cerr << "[NetworkManager] HOST_START_GAME from unknown client" << std::endl;
+            return;
+        }
+
+        network::RoomError error = m_roomManager.hostStartGame(client->clientId, message.levelIndex);
+
+        if (error != network::RoomError::NONE) {
+            network::RoomErrorMessage errorMsg{};
+            errorMsg.error = error;
+            switch (error) {
+                case network::RoomError::NOT_HOST:
+                    std::strncpy(errorMsg.message, "Only the host can start the game", sizeof(errorMsg.message) - 1);
+                    break;
+                case network::RoomError::GAME_ALREADY_STARTED:
+                    std::strncpy(errorMsg.message, "Game already started", sizeof(errorMsg.message) - 1);
+                    break;
+                default:
+                    std::strncpy(errorMsg.message, "Failed to start game", sizeof(errorMsg.message) - 1);
+                    break;
+            }
+            auto buffer = network::serializeMessage(network::MessageType::ROOM_ERROR, errorMsg);
+            sendTo(buffer, senderEndpoint);
+        }
     }
 
 } // namespace rtype::server

@@ -10,6 +10,7 @@
 #include "engine/ecs/core/EventBus.hpp"
 #include "engine/ecs/core/SystemManager.hpp"
 #include "engine/ecs/events/definitions/GameEvents.hpp"
+#include "game/systems/LevelConfig.hpp"
 
 #include <memory>
 #include <chrono>
@@ -20,6 +21,7 @@
 #include <atomic>
 #include <vector>
 #include <string>
+#include <optional>
 
 #include "shared/network/Protocol.hpp"
 
@@ -110,20 +112,6 @@ namespace rtype::server {
          * @brief Initialize all ECS systems
          */
         void initializeSystems();
-
-        /**
-         * @brief Spawn demo projectiles periodically
-         *
-         * Spawns bullets with different trajectories:
-         * - Linear
-         * - Sinusoidal
-         * - Spiral
-         * - Homing
-         * - Circular
-         * - Zigzag
-         * - Figure8
-         */
-        void spawnDemoProjectiles();
 
         /**
          * @brief Update game simulation by one tick
@@ -219,6 +207,16 @@ namespace rtype::server {
         void broadcastWaveStart(uint8_t waveNumber, uint8_t enemyCount);
 
         /**
+         * @brief Update level waves - spawn enemies based on level config
+         */
+        void updateLevelWaves(float dt);
+
+        /**
+         * @brief Spawn an enemy entity based on config
+         */
+        void spawnEnemy(const ecs::EnemySpawnConfig& config);
+
+        /**
          * @brief Update player score and broadcast
          */
         void updatePlayerScore(uint32_t clientId, int32_t delta, network::ScoreReason reason);
@@ -257,11 +255,9 @@ namespace rtype::server {
         bool m_running;
         uint64_t m_tickCount;
         float m_gameTime;
-        float m_demoSpawnTimer;
 
         // Constants
         static constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;
-        static constexpr float DEMO_SPAWN_INTERVAL = 2.0f; // Spawn demo bullets every 2 seconds
         static constexpr float LOG_INTERVAL = 5.0f; // Log status every 5 seconds
         static constexpr float RESPAWN_DELAY = 3.0f; // Respawn delay in seconds
         static constexpr int SCREEN_WIDTH = 1280;
@@ -272,8 +268,7 @@ namespace rtype::server {
         uint16_t m_port;
         bool m_allowSinglePlayer;  // Allow game to start with 1 player
 
-        // Demo spawn state
-        int m_demoSpawnCounter;
+        // Status logging
         float m_logTimer;
         std::atomic<bool> m_gameStarted;  // True when clients ready and game can spawn
 
@@ -305,6 +300,16 @@ namespace rtype::server {
             "config/levels/level2.json", 
             "config/levels/level3.json"
         };
+
+        // Level wave state
+        std::optional<ecs::LevelConfig> m_currentLevelConfig;  // Loaded level config
+        size_t m_currentWaveIndex = 0;           // Current wave being spawned
+        float m_waveTimer = 0.0f;                // Time since wave started
+        float m_levelTimer = 0.0f;               // Time since level started
+        size_t m_enemiesSpawnedInWave = 0;       // Enemies spawned in current wave
+        float m_enemySpawnTimer = 0.0f;          // Timer for sequential enemy spawns
+        bool m_waveActive = false;               // Is a wave currently spawning
+        size_t m_enemiesAlive = 0;               // Track alive enemies for wave completion
 
         // Player scores (clientId → score)
         std::map<uint32_t, uint32_t> m_playerScores;

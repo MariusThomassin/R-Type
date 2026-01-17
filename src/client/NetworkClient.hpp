@@ -28,6 +28,9 @@ namespace rtype::client {
      * @brief Callbacks for level and game events
      */
     struct NetworkCallbacks {
+        // Connection callback - called when client receives welcome from server
+        std::function<void(uint32_t clientId)> onWelcome;
+        
         std::function<void(const network::LevelInfoMessage&)> onLevelInfo;
         std::function<void(const network::LevelStartMessage&)> onLevelStart;
         std::function<void(const network::LevelCompleteMessage&)> onLevelComplete;
@@ -37,6 +40,15 @@ namespace rtype::client {
         std::function<void(const network::BossDefeatedMessage&)> onBossDefeated;
         std::function<void(const network::DifficultyChangeMessage&)> onDifficultyChange;
         std::function<void(const network::ScoreUpdateMessage&)> onScoreUpdate;
+        
+        // Room/Lobby callbacks
+        std::function<void(const network::RoomCreatedMessage&)> onRoomCreated;
+        std::function<void(const network::RoomJoinedMessage&)> onRoomJoined;
+        std::function<void(const network::RoomLeftMessage&)> onRoomLeft;
+        std::function<void(const network::RoomListMessage&)> onRoomList;
+        std::function<void(const network::RoomInfoMessage&)> onRoomInfo;
+        std::function<void(const network::HostChangedMessage&)> onHostChanged;
+        std::function<void(const network::RoomErrorMessage&)> onRoomError;
     };
 
     /**
@@ -112,17 +124,26 @@ namespace rtype::client {
          * @brief Create a room on the server
          *
          * @param roomName Name of the room to create
-         * @param maxPlayers Maximum players allowed
-         * @param hasPassword Whether the room requires a password
+         * @param maxPlayers Maximum players allowed (2-4)
          */
-        void createRoom(const std::string& roomName, int maxPlayers = 4, bool hasPassword = false);
+        void createRoom(const std::string& roomName, uint8_t maxPlayers = 4);
+
+        /**
+         * @brief Join an existing room
+         *
+         * @param roomName Name of the room to join
+         */
+        void joinRoom(const std::string& roomName);
+
+        /**
+         * @brief Leave current room
+         */
+        void leaveRoom();
 
         /**
          * @brief Request list of available rooms from server
-         *
-         * @return Vector of room information (empty if not implemented on server)
          */
-        std::vector<std::string> requestRoomList();
+        void requestRoomList();
 
         /**
          * @brief Set callbacks for level and game events
@@ -137,6 +158,28 @@ namespace rtype::client {
          * @param levelIndex Level to request (0-based)
          */
         void sendLoadLevelRequest(uint8_t levelIndex);
+
+        /**
+         * @brief Host starts the game (only works if this client is the host)
+         *
+         * @param levelIndex Level to start (0-based)
+         */
+        void hostStartGame(uint8_t levelIndex = 0);
+
+        /**
+         * @brief Check if this client is the host of the current room
+         */
+        bool isHost() const { return m_isHost; }
+
+        /**
+         * @brief Get current room name
+         */
+        const std::string& getCurrentRoomName() const { return m_currentRoomName; }
+
+        /**
+         * @brief Check if in a room
+         */
+        bool isInRoom() const { return !m_currentRoomName.empty(); }
 
         /**
          * @brief Send player profile to server
@@ -204,6 +247,15 @@ namespace rtype::client {
         void handleDifficultyChange(const network::DifficultyChangeMessage& message);
         void handleScoreUpdate(const network::ScoreUpdateMessage& message);
 
+        // Room message handlers
+        void handleRoomCreated(const network::RoomCreatedMessage& message);
+        void handleRoomJoined(const network::RoomJoinedMessage& message);
+        void handleRoomLeft(const network::RoomLeftMessage& message);
+        void handleRoomList(const network::RoomListMessage& message);
+        void handleRoomInfo(const network::RoomInfoMessage& message);
+        void handleHostChanged(const network::HostChangedMessage& message);
+        void handleRoomError(const network::RoomErrorMessage& message);
+
         /**
          * @brief Send CLIENT_HELLO to server
          */
@@ -244,6 +296,11 @@ namespace rtype::client {
 
         // Callbacks for level/game events
         NetworkCallbacks m_callbacks;
+
+        // Room/Lobby state
+        std::string m_currentRoomName;
+        bool m_isHost = false;
+        uint8_t m_playerSlot = 0;
     };
 
 } // namespace rtype::client

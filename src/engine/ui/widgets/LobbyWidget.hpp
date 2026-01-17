@@ -7,8 +7,31 @@
 #include "TextWidget.hpp"
 #include <memory>
 #include <functional>
+#include <vector>
+#include <string>
 
 namespace rtype::ui {
+
+/**
+ * @brief Information about a player in the lobby
+ */
+struct LobbyPlayerInfo {
+    std::string name;
+    uint8_t slot = 0;
+    bool isHost = false;
+    bool isReady = false;
+    bool isLocal = false;  // Is this the local player?
+};
+
+/**
+ * @brief Information about a room for the room list
+ */
+struct LobbyRoomInfo {
+    std::string name;
+    uint8_t playerCount = 0;
+    uint8_t maxPlayers = 4;
+    bool isPlaying = false;
+};
 
 /**
  * @brief Configuration structure for lobby
@@ -18,6 +41,7 @@ struct LobbyConfig {
     std::string roomName = "Room #1";
     int titleFontSize = 48;
     int textFontSize = 20;
+    bool isHost = false;
 };
 
 /**
@@ -26,6 +50,9 @@ struct LobbyConfig {
 struct LobbyCallbacks {
     std::function<void()> onBack;
     std::function<void()> onStartGame;
+    std::function<void(const std::string& roomName)> onJoinRoom;
+    std::function<void(const std::string& roomName)> onCreateRoom;
+    std::function<void()> onRefreshRooms;
 };
 
 /**
@@ -90,6 +117,30 @@ class LobbyWidget : public Widget {
          * @param color New background color
          */
         void setBackgroundColor(const UIColor& color);
+
+        /**
+         * @brief Update the players list
+         * @param players List of players in the room
+         */
+        void updatePlayersList(const std::vector<LobbyPlayerInfo>& players);
+
+        /**
+         * @brief Update the room list (for room browser mode)
+         * @param rooms List of available rooms
+         */
+        void updateRoomList(const std::vector<LobbyRoomInfo>& rooms);
+
+        /**
+         * @brief Set whether this client is the host
+         * @param isHost True if this client is the host
+         */
+        void setIsHost(bool isHost);
+
+        /**
+         * @brief Set the connection info text
+         * @param info Connection info string
+         */
+        void setConnectionInfo(const std::string& info);
 
     private:
         /**
