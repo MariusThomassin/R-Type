@@ -1,6 +1,6 @@
 /*
 ** R-Type - GameServer Implementation
-** Headless game simulation with demo projectile spawning
+** Headless game simulation with level-based enemy spawning
 */
 
 #include "GameServer.hpp"
@@ -14,11 +14,10 @@
 // System includes (only in .cpp to avoid Raylib dependencies in header)
 #include "engine/ecs/systems/MovementSystem.hpp"
 #include "engine/ecs/systems/LifetimeSystem.hpp"
-// Note: BulletSystem and PatternSystem removed from server (not needed, server spawns manually)
-// Both use SpritesheetComponent which causes Raylib linking errors
 #include "game/systems/TrajectorySystem.hpp"
 #include "game/systems/SpinSystem.hpp"
 #include "game/systems/CollisionSystem.hpp"
+#include "game/systems/LevelLoader.hpp"
 
 // Component includes
 #include "engine/ecs/components/TransformComponent.hpp"
@@ -29,6 +28,7 @@
 #include "engine/ecs/components/HealthComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include "game/components/PlayerComponent.hpp"
+#include "game/components/EnemyComponent.hpp"
 // Note: SpritesheetComponent removed - not needed on headless server
 #include "game/components/bullets/TrajectoryComponent.hpp"
 #include "game/components/bullets/SpinComponent.hpp"
@@ -65,8 +65,6 @@ namespace rtype::server {
         , m_running(false)
         , m_tickCount(0)
         , m_gameTime(0.0f)
-        , m_demoSpawnTimer(0.0f)
-        , m_demoSpawnCounter(0)
         , m_logTimer(0.0f)
         , m_gameStarted{false}
         , m_port(port)
@@ -94,13 +92,21 @@ namespace rtype::server {
 
         // Set up network callbacks for player management
         m_networkManager->setOnClientConnected([this](uint32_t clientId) {
-            std::cout << "[GameServer] Client connected: " << clientId << ", spawning player..." << std::endl;
+            std::cout << "[GameServer] Client connected: " << clientId << std::endl;
+            // Note: Player spawning now happens when game starts via host
+            // For now, spawn player immediately for compatibility
             m_playerManager->spawnPlayer(clientId);
         });
 
         m_networkManager->setOnClientDisconnected([this](uint32_t clientId) {
             std::cout << "[GameServer] Client disconnected: " << clientId << ", removing player..." << std::endl;
             m_playerManager->removePlayer(clientId);
+            
+            // Remove from ready clients
+            {
+                std::lock_guard<std::mutex> lock(m_readyClientsMutex);
+                m_readyClients.erase(clientId);
+            }
         });
 
         m_networkManager->setOnClientInput([this](uint32_t clientId, const network::ClientInputMessage& input) {
@@ -113,25 +119,39 @@ namespace rtype::server {
             // Initialize player score
             m_playerScores[clientId] = 0;
             
-            // Get player count outside mutex to avoid potential lock ordering issues
-            // Note: There's a potential race if a player disconnects between this call
-            // and the check below, but this is a safe race (we might just delay game start)
-            size_t playerCount = m_playerManager->getPlayerCount();
-            
             {
                 std::lock_guard<std::mutex> lock(m_readyClientsMutex);
                 m_readyClients.insert(clientId);
-                size_t readyCount = m_readyClients.size();
+            }
 
-                // Minimum players needed: 1 for single-player mode, 2 for multiplayer
-                size_t minPlayers = m_allowSinglePlayer ? 1 : 2;
+            // Update room manager ready state
+            m_networkManager->getRoomManager().setPlayerReady(clientId, true);
 
-                // Check if game should start (enough players, all ready)
-                if (!m_gameStarted.load() && playerCount >= minPlayers && readyCount >= playerCount) {
-                    m_gameStarted.store(true);
-                    std::cout << "[GameServer] Game started! " << readyCount << " players ready." << std::endl;
-                    
-                    // Auto-load level 1 and start
+            // In single-player mode (local server), auto-start when ready
+            if (m_allowSinglePlayer && !m_gameStarted.load()) {
+                m_gameStarted.store(true);
+                std::cout << "[GameServer] Single-player mode: Auto-starting game!" << std::endl;
+                if (loadLevel(0)) {
+                    startLevel();
+                }
+            }
+            // In multiplayer mode, wait for host to start via HOST_START_GAME
+        });
+
+        // Set up host start game callback
+        m_networkManager->setOnHostStartGame([this](const std::string& roomName, uint32_t hostClientId, uint8_t levelIndex) {
+            std::cout << "[GameServer] Host " << hostClientId << " starting game in room '" 
+                      << roomName << "' (level " << static_cast<int>(levelIndex) << ")" << std::endl;
+            
+            if (!m_gameStarted.load()) {
+                m_gameStarted.store(true);
+                
+                // Load and start the level
+                if (loadLevel(levelIndex)) {
+                    startLevel();
+                } else {
+                    std::cerr << "[GameServer] Failed to load level " << static_cast<int>(levelIndex) << std::endl;
+                    // Fallback to level 0
                     if (loadLevel(0)) {
                         startLevel();
                     }
@@ -166,7 +186,6 @@ namespace rtype::server {
         std::cout << "[GameServer] Initialized successfully!" << std::endl;
         std::cout << "[GameServer] - Fixed timestep: " << FIXED_TIMESTEP << "s (60 Hz)" << std::endl;
         std::cout << "[GameServer] - Screen size: " << SCREEN_WIDTH << "x" << SCREEN_HEIGHT << std::endl;
-        std::cout << "[GameServer] - Demo spawn interval: " << DEMO_SPAWN_INTERVAL << "s" << std::endl;
     }
 
     void GameServer::initializeSystems() {
@@ -237,7 +256,6 @@ namespace rtype::server {
     void GameServer::tick(float dt) {
         m_tickCount++;
         m_gameTime += dt;
-        m_demoSpawnTimer += dt;
         m_logTimer += dt;
 
         // Don't update game if game over
@@ -254,10 +272,9 @@ namespace rtype::server {
         // Update pending respawns
         updateRespawns(dt);
 
-        // Spawn demo projectiles periodically (only if game has started)
-        if (m_gameStarted.load() && m_demoSpawnTimer >= DEMO_SPAWN_INTERVAL) {
-            spawnDemoProjectiles();
-            m_demoSpawnTimer = 0.0f;
+        // Update level waves (spawn enemies based on level config)
+        if (m_gameStarted.load() && m_levelActive) {
+            updateLevelWaves(dt);
         }
 
         // Update all systems (SystemManager handles phase ordering)
@@ -268,120 +285,6 @@ namespace rtype::server {
             logStatus();
             m_logTimer = 0.0f;
         }
-    }
-
-    void GameServer::spawnDemoProjectiles() {
-        m_demoSpawnCounter++;
-
-        std::cout << "[GameServer] Spawning demo projectiles (batch #" << m_demoSpawnCounter << ")..." << std::endl;
-
-        // Define spawn positions (spread across screen)
-        struct SpawnDef {
-            float x, y;
-            float velX, velY;
-            ecs::TrajectoryType trajectory;
-            const char* name;
-        };
-
-        SpawnDef spawns[] = {
-            // Linear (left to right) - Moved away from player corners
-            {50.0f, 250.0f, 300.0f, 0.0f, ecs::TrajectoryType::Linear, "Linear"},
-
-            // Sinusoidal (wavy motion) - Safe center-left position
-            {50.0f, 350.0f, 250.0f, 0.0f, ecs::TrajectoryType::Sinusoidal, "Sinusoidal"},
-
-            // Spiral (expanding spiral) - Center of screen
-            {640.0f, 360.0f, 200.0f, 0.0f, ecs::TrajectoryType::Spiral, "Spiral"},
-
-            // Circular (orbit motion) - Center-right
-            {900.0f, 400.0f, 150.0f, 0.0f, ecs::TrajectoryType::Circular, "Circular"},
-
-            // Zigzag (sharp turns) - Bottom center-left, away from corners
-            {300.0f, 500.0f, 280.0f, 0.0f, ecs::TrajectoryType::Zigzag, "Zigzag"},
-
-            // Figure8 (infinity symbol) - Right side center
-            {1000.0f, 360.0f, 100.0f, 0.0f, ecs::TrajectoryType::Figure8, "Figure8"},
-
-            // Pendulum (swinging) - Bottom center
-            {500.0f, 600.0f, 200.0f, 0.0f, ecs::TrajectoryType::Pendulum, "Pendulum"},
-
-            // Whip (accelerate then decelerate) - Center top, away from corners
-            {640.0f, 50.0f, 150.0f, 100.0f, ecs::TrajectoryType::Whip, "Whip"}
-        };
-
-        for (const auto& spawn : spawns) {
-            ecs::Entity bullet = m_registry.createEntity();
-
-            // Transform
-            m_registry.addComponent(bullet, ecs::TransformComponent(spawn.x, spawn.y));
-
-            // Velocity
-            m_registry.addComponent(bullet, ecs::VelocityComponent(spawn.velX, spawn.velY, 500.0f));
-
-            // Projectile (use constructor instead of designated initializers)
-            m_registry.addComponent(bullet, ecs::ProjectileComponent(ecs::NULL_ENTITY, 10, false));
-
-            // Collider (for collision detection)
-            ecs::ColliderComponent collider;
-            collider.width = 16.0f;
-            collider.height = 16.0f;
-            collider.layer = ecs::CollisionLayer::EnemyShot;
-            collider.mask = static_cast<ecs::CollisionLayer>(
-                static_cast<uint32_t>(ecs::CollisionLayer::Player) |
-                static_cast<uint32_t>(ecs::CollisionLayer::Wall)
-            );
-            m_registry.addComponent(bullet, collider);
-
-            // Trajectory (if not Linear)
-            if (spawn.trajectory != ecs::TrajectoryType::Linear) {
-                ecs::TrajectoryComponent traj;
-                traj.type = spawn.trajectory;
-                traj.initialized = false;
-                // Note: TrajectoryComponent uses named parameters, not param1/param2
-                // The trajectory updaters will initialize parameters automatically
-                m_registry.addComponent(bullet, traj);
-            }
-
-            // Spin (set spinSpeed after default construction)
-            ecs::SpinComponent spin;
-            spin.spinSpeed = 90.0f;  // 90 degrees per second
-            m_registry.addComponent(bullet, spin);
-
-            // Lifetime (auto-destroy after 10 seconds)
-            m_registry.addComponent(bullet, ecs::LifetimeComponent(10.0f));
-
-            // Network - Allocate network ID and add NetworkComponent
-            uint32_t networkId = m_networkIdManager->allocate(bullet);
-            m_registry.addComponent(bullet, ecs::NetworkComponent(networkId, false));
-
-            // Send ENTITY_SPAWN to all clients
-            network::EntitySpawnMessage spawnMsg{};
-            spawnMsg.networkId = networkId;
-            spawnMsg.entityType = network::EntityType::PROJECTILE;
-            spawnMsg.x = spawn.x;
-            spawnMsg.y = spawn.y;
-            spawnMsg.rotation = 0.0f;
-            spawnMsg.vx = spawn.velX;
-            spawnMsg.vy = spawn.velY;
-            spawnMsg.trajectoryType = static_cast<uint8_t>(spawn.trajectory);
-            spawnMsg.trajectoryParam1 = 0.0f;  // Will be initialized by trajectory system
-            spawnMsg.trajectoryParam2 = 0.0f;
-            spawnMsg.spinSpeed = 90.0f;
-            spawnMsg.maxLifetime = 10.0f;
-            spawnMsg.colliderWidth = 16.0f;
-            spawnMsg.colliderHeight = 16.0f;
-            spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot);
-            spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Player) |
-                                     static_cast<uint32_t>(ecs::CollisionLayer::Wall);
-
-            m_networkManager->broadcastEntitySpawn(spawnMsg);
-
-            std::cout << "  - Spawned " << spawn.name << " bullet at ("
-                      << spawn.x << ", " << spawn.y << ") [networkId=" << networkId << "]" << std::endl;
-        }
-
-        std::cout << "[GameServer] Spawned " << sizeof(spawns) / sizeof(spawns[0])
-                  << " demo projectiles" << std::endl;
     }
 
     void GameServer::stop() {
@@ -412,7 +315,6 @@ namespace rtype::server {
     }
 
     void GameServer::handlePlayerCollision(const ecs::CollisionEvent& event) {
-        // Determine which entity is the player and which is the projectile
         ecs::EntityId playerEntityId = ecs::NULL_ENTITY;
         ecs::EntityId projectileEntityId = ecs::NULL_ENTITY;
 
@@ -428,21 +330,18 @@ namespace rtype::server {
             playerEntityId = event.entityB;
             projectileEntityId = event.entityA;
         } else {
-            // Not a player-projectile collision, ignore
             return;
         }
 
-        // Get components
         auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(playerEntityId);
         auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(playerEntityId);
         auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(playerEntityId);
         auto* projectile = m_registry.tryGetComponent<ecs::ProjectileComponent>(projectileEntityId);
 
         if (!health || !transform || !network || !projectile) {
-            return; // Missing components
+            return;
         }
 
-        // Apply damage
         int damage = projectile->damage;
         health->currentHealth -= damage;
         if (health->currentHealth < 0) {
@@ -452,7 +351,6 @@ namespace rtype::server {
         std::cout << "[GameServer] Player hit! NetworkID=" << network->networkId
                   << " Health: " << health->currentHealth << "/" << health->maxHealth << std::endl;
 
-        // Broadcast PLAYER_HIT message to all clients
         network::PlayerHitMessage hitMsg;
         hitMsg.networkId = network->networkId;
         hitMsg.newHealth = static_cast<float>(health->currentHealth);
@@ -462,7 +360,6 @@ namespace rtype::server {
         auto buffer = network::serializeMessage(network::MessageType::PLAYER_HIT, hitMsg);
         m_networkManager->broadcast(buffer);
 
-        // Remove projectile from network ID manager before destroying
         auto* projectileNetwork = m_registry.tryGetComponent<ecs::NetworkComponent>(projectileEntityId);
         if (projectileNetwork) {
             ecs::Entity projectileEntity(projectileEntityId);
@@ -470,10 +367,8 @@ namespace rtype::server {
             m_networkManager->broadcastEntityDestroy(projectileNetwork->networkId);
         }
 
-        // Destroy the projectile
         m_registry.destroyEntity(projectileEntityId);
 
-        // Handle player death
         if (health->currentHealth <= 0) {
             handlePlayerDeath(playerEntityId);
         }
@@ -489,18 +384,15 @@ namespace rtype::server {
             return;
         }
 
-        // Lose a life
         bool hasLivesRemaining = player->loseLife();
 
         std::cout << "[GameServer] Player died! NetworkID=" << network->networkId
                   << " Lives remaining: " << player->lives << std::endl;
 
-        // Remove collider to prevent further collisions while dead
         if (collider) {
             m_registry.removeComponent<ecs::ColliderComponent>(playerEntityId);
         }
 
-        // Broadcast PLAYER_DEATH message
         network::PlayerDeathMessage deathMsg;
         deathMsg.networkId = network->networkId;
         deathMsg.remainingLives = static_cast<uint8_t>(player->lives);
@@ -511,13 +403,11 @@ namespace rtype::server {
         m_networkManager->broadcast(buffer);
 
         if (hasLivesRemaining) {
-            // Add to respawn queue
             uint32_t clientId = player->networkClientId;
             m_pendingRespawns.emplace_back(clientId, RESPAWN_DELAY, player->slot);
             std::cout << "[GameServer] Player will respawn in " << RESPAWN_DELAY << " seconds" << std::endl;
         } else {
             std::cout << "[GameServer] Player has no lives remaining!" << std::endl;
-            // Remove from player manager (disconnects the player effectively)
             m_playerManager->removePlayer(player->networkClientId);
             checkGameOver();
         }
@@ -717,8 +607,26 @@ namespace rtype::server {
         m_currentLevelIndex = levelIndex;
         
         std::cout << "[GameServer] Loading level " << static_cast<int>(levelIndex + 1) 
-                  << " (loop " << static_cast<int>(m_loopCount) << ", difficulty x" 
-                  << m_difficultyMultiplier << ")" << std::endl;
+                  << " from " << m_levelPaths[levelIndex] << std::endl;
+
+        // Load level config from JSON file
+        m_currentLevelConfig = ecs::LevelLoader::loadFromFile(m_levelPaths[levelIndex]);
+        if (!m_currentLevelConfig) {
+            std::cerr << "[GameServer] Failed to load level config!" << std::endl;
+            return false;
+        }
+
+        // Reset wave state
+        m_currentWaveIndex = 0;
+        m_waveTimer = 0.0f;
+        m_levelTimer = 0.0f;
+        m_enemiesSpawnedInWave = 0;
+        m_enemySpawnTimer = 0.0f;
+        m_waveActive = false;
+        m_enemiesAlive = 0;
+
+        std::cout << "[GameServer] Loaded level '" << m_currentLevelConfig->name 
+                  << "' with " << m_currentLevelConfig->waves.size() << " waves" << std::endl;
 
         // Broadcast level info to clients
         broadcastLevelInfo();
@@ -740,8 +648,11 @@ namespace rtype::server {
         auto buffer = network::serializeMessage(network::MessageType::LEVEL_START, startMsg);
         m_networkManager->broadcast(buffer);
 
-        // Broadcast first wave start
-        broadcastWaveStart(1, 5);  // TODO: Get actual enemy count from level config
+        // Start first wave
+        if (m_currentLevelConfig && !m_currentLevelConfig->waves.empty()) {
+            size_t enemyCount = m_currentLevelConfig->waves[0].enemies.size();
+            broadcastWaveStart(1, static_cast<uint8_t>(enemyCount));
+        }
     }
 
     void GameServer::handleWaveComplete(int waveNumber) {
@@ -839,23 +750,31 @@ namespace rtype::server {
         infoMsg.loopCount = m_loopCount;
         infoMsg.difficultyMultiplier = m_difficultyMultiplier;
         
-        // Set level name based on index
-        const char* levelNames[] = {"Training Grounds", "Deep Space", "Alien Hive"};
-        if (m_currentLevelIndex < 3) {
-            std::strncpy(infoMsg.levelName, levelNames[m_currentLevelIndex], sizeof(infoMsg.levelName) - 1);
+        // Use level config if available
+        if (m_currentLevelConfig) {
+            std::strncpy(infoMsg.levelName, m_currentLevelConfig->name.c_str(), sizeof(infoMsg.levelName) - 1);
+            std::strncpy(infoMsg.backgroundPath, m_currentLevelConfig->background.c_str(), sizeof(infoMsg.backgroundPath) - 1);
+            std::strncpy(infoMsg.stageMusicPath, m_currentLevelConfig->stageMusic.c_str(), sizeof(infoMsg.stageMusicPath) - 1);
+            std::strncpy(infoMsg.bossMusicPath, m_currentLevelConfig->bossMusic.c_str(), sizeof(infoMsg.bossMusicPath) - 1);
+            infoMsg.totalWaves = static_cast<uint8_t>(m_currentLevelConfig->waves.size());
+            infoMsg.difficulty = static_cast<uint8_t>(m_currentLevelConfig->difficulty);
+            infoMsg.bossEnabled = m_currentLevelConfig->bossSection.enabled ? 1 : 0;
         } else {
-            snprintf(infoMsg.levelName, sizeof(infoMsg.levelName), "Level %d", m_currentLevelIndex + 1);
+            // Fallback to defaults
+            const char* levelNames[] = {"Training Grounds", "Deep Space", "Alien Hive"};
+            if (m_currentLevelIndex < 3) {
+                std::strncpy(infoMsg.levelName, levelNames[m_currentLevelIndex], sizeof(infoMsg.levelName) - 1);
+            } else {
+                snprintf(infoMsg.levelName, sizeof(infoMsg.levelName), "Level %d", m_currentLevelIndex + 1);
+            }
+            std::strncpy(infoMsg.backgroundPath, "assets/backgrounds/26211.png", sizeof(infoMsg.backgroundPath) - 1);
+            std::strncpy(infoMsg.stageMusicPath, "assets/sound/music/Sketchbook 2024-10-13.ogg", sizeof(infoMsg.stageMusicPath) - 1);
+            std::strncpy(infoMsg.bossMusicPath, "assets/sound/music/Sketchbook 2024-10-16.ogg", sizeof(infoMsg.bossMusicPath) - 1);
+            infoMsg.totalWaves = 6;
+            infoMsg.difficulty = static_cast<uint8_t>(m_currentLevelIndex + 1);
+            infoMsg.bossEnabled = 1;
         }
         infoMsg.levelName[sizeof(infoMsg.levelName) - 1] = '\0';
-        
-        // Set asset paths (these are relative paths the client will load)
-        std::strncpy(infoMsg.backgroundPath, "assets/backgrounds/26211.png", sizeof(infoMsg.backgroundPath) - 1);
-        std::strncpy(infoMsg.stageMusicPath, "assets/sound/music/Sketchbook 2024-10-13.ogg", sizeof(infoMsg.stageMusicPath) - 1);
-        std::strncpy(infoMsg.bossMusicPath, "assets/sound/music/Sketchbook 2024-10-16.ogg", sizeof(infoMsg.bossMusicPath) - 1);
-        
-        infoMsg.totalWaves = 6;  // TODO: Get from level config
-        infoMsg.difficulty = static_cast<uint8_t>(m_currentLevelIndex + 1);
-        infoMsg.bossEnabled = 1;  // TODO: Get from level config
 
         auto buffer = network::serializeMessage(network::MessageType::LEVEL_INFO, infoMsg);
         m_networkManager->broadcast(buffer);
@@ -866,13 +785,15 @@ namespace rtype::server {
     void GameServer::broadcastWaveStart(uint8_t waveNumber, uint8_t enemyCount) {
         network::WaveStartMessage waveMsg;
         waveMsg.waveNumber = waveNumber;
-        waveMsg.totalWaves = 6;  // TODO: Get from level config
+        waveMsg.totalWaves = m_currentLevelConfig ? 
+            static_cast<uint8_t>(m_currentLevelConfig->waves.size()) : 6;
         waveMsg.enemyCount = enemyCount;
 
         auto buffer = network::serializeMessage(network::MessageType::WAVE_START, waveMsg);
         m_networkManager->broadcast(buffer);
 
-        std::cout << "[GameServer] Wave " << static_cast<int>(waveNumber) << " starting with " 
+        std::cout << "[GameServer] Wave " << static_cast<int>(waveNumber) << "/" 
+                  << static_cast<int>(waveMsg.totalWaves) << " starting with " 
                   << static_cast<int>(enemyCount) << " enemies" << std::endl;
     }
 
@@ -889,6 +810,147 @@ namespace rtype::server {
 
         auto buffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
         m_networkManager->broadcast(buffer);
+    }
+
+    void GameServer::updateLevelWaves(float dt) {
+        if (!m_currentLevelConfig) return;
+        
+        m_levelTimer += dt;
+        
+        const auto& waves = m_currentLevelConfig->waves;
+        
+        // Check if all waves are complete
+        if (m_currentWaveIndex >= waves.size()) {
+            // Level complete - could trigger boss or next level
+            return;
+        }
+        
+        const auto& currentWave = waves[m_currentWaveIndex];
+        
+        // Wait for wave delay before starting
+        if (!m_waveActive) {
+            m_waveTimer += dt;
+            if (m_waveTimer >= currentWave.delayBefore) {
+                m_waveActive = true;
+                m_enemiesSpawnedInWave = 0;
+                m_enemySpawnTimer = 0.0f;
+                std::cout << "[GameServer] Wave " << (m_currentWaveIndex + 1) << " starting!" << std::endl;
+            }
+            return;
+        }
+        
+        // Spawn enemies for current wave
+        const auto& enemies = currentWave.enemies;
+        
+        if (currentWave.simultaneous) {
+            // Spawn all enemies at once
+            if (m_enemiesSpawnedInWave == 0) {
+                for (const auto& enemyConfig : enemies) {
+                    spawnEnemy(enemyConfig);
+                    m_enemiesAlive++;
+                }
+                m_enemiesSpawnedInWave = enemies.size();
+            }
+        } else {
+            // Sequential spawning
+            m_enemySpawnTimer += dt;
+            
+            while (m_enemiesSpawnedInWave < enemies.size() && 
+                   m_enemySpawnTimer >= currentWave.spawnInterval) {
+                spawnEnemy(enemies[m_enemiesSpawnedInWave]);
+                m_enemiesAlive++;
+                m_enemiesSpawnedInWave++;
+                m_enemySpawnTimer -= currentWave.spawnInterval;
+            }
+        }
+        
+        // Check if wave is complete (all enemies spawned)
+        if (m_enemiesSpawnedInWave >= enemies.size()) {
+            // Move to next wave
+            m_currentWaveIndex++;
+            m_waveActive = false;
+            m_waveTimer = 0.0f;
+            
+            if (m_currentWaveIndex < waves.size()) {
+                size_t nextEnemyCount = waves[m_currentWaveIndex].enemies.size();
+                broadcastWaveStart(static_cast<uint8_t>(m_currentWaveIndex + 1), 
+                                   static_cast<uint8_t>(nextEnemyCount));
+            } else {
+                std::cout << "[GameServer] All waves complete!" << std::endl;
+                // TODO: Spawn boss if enabled
+            }
+        }
+    }
+
+    void GameServer::spawnEnemy(const ecs::EnemySpawnConfig& config) {
+        ecs::Entity enemy = m_registry.createEntity();
+        
+        // Transform
+        m_registry.addComponent(enemy, ecs::TransformComponent(config.x, config.y));
+        
+        // Velocity
+        m_registry.addComponent(enemy, ecs::VelocityComponent(config.vx, config.vy, 300.0f));
+        
+        // Health
+        int scaledHealth = static_cast<int>(config.health * m_difficultyMultiplier);
+        m_registry.addComponent(enemy, ecs::HealthComponent(scaledHealth));
+        
+        // Enemy component
+        ecs::EnemyComponent enemyComp;
+        enemyComp.type = config.type;
+        enemyComp.scoreValue = config.scoreValue;
+        m_registry.addComponent(enemy, enemyComp);
+        
+        // Collider
+        ecs::ColliderComponent collider;
+        collider.width = 32.0f;
+        collider.height = 32.0f;
+        collider.layer = ecs::CollisionLayer::Enemy;
+        collider.mask = static_cast<ecs::CollisionLayer>(
+            static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+            static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot)
+        );
+        m_registry.addComponent(enemy, collider);
+        
+        // Add trajectory based on enemy type
+        // Chaser enemies follow sinusoidal path, others go linear
+        if (config.type == ecs::EnemyType::Chaser) {
+            ecs::TrajectoryComponent traj;
+            traj.type = ecs::TrajectoryType::Sinusoidal;
+            traj.initialized = false;
+            m_registry.addComponent(enemy, traj);
+        }
+        
+        // Network - Allocate network ID
+        uint32_t networkId = m_networkIdManager->allocate(enemy);
+        m_registry.addComponent(enemy, ecs::NetworkComponent(networkId, false));
+        
+        // Broadcast spawn to clients
+        network::EntitySpawnMessage spawnMsg{};
+        spawnMsg.networkId = networkId;
+        spawnMsg.entityType = network::EntityType::ENEMY;
+        spawnMsg.x = config.x;
+        spawnMsg.y = config.y;
+        spawnMsg.rotation = 0.0f;
+        spawnMsg.vx = config.vx;
+        spawnMsg.vy = config.vy;
+        spawnMsg.colliderWidth = 32.0f;
+        spawnMsg.colliderHeight = 32.0f;
+        spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::Enemy);
+        spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                                 static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot);
+        
+        // Set trajectory info based on enemy type
+        if (config.type == ecs::EnemyType::Chaser) {
+            spawnMsg.trajectoryType = static_cast<uint8_t>(ecs::TrajectoryType::Sinusoidal);
+        } else {
+            spawnMsg.trajectoryType = static_cast<uint8_t>(ecs::TrajectoryType::Linear);
+        }
+        
+        m_networkManager->broadcastEntitySpawn(spawnMsg);
+        
+        std::cout << "[GameServer] Spawned enemy type " << static_cast<int>(config.type) 
+                  << " at (" << config.x << ", " << config.y << ") [networkId=" << networkId << "]" << std::endl;
     }
 
 } // namespace rtype::server

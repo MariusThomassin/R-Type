@@ -7,6 +7,7 @@
 
 #include "shared/network/Protocol.hpp"
 #include "engine/ecs/core/Registry.hpp"
+#include "RoomManager.hpp"
 #include <asio.hpp>
 #include <thread>
 #include <mutex>
@@ -137,6 +138,24 @@ namespace rtype::server {
         }
 
         /**
+         * @brief Set callback for host starting the game
+         * @param callback Function called when host sends HOST_START_GAME (roomName, hostClientId, levelIndex)
+         */
+        void setOnHostStartGame(std::function<void(const std::string&, uint32_t, uint8_t)> callback) {
+            m_onHostStartGame = callback;
+        }
+
+        /**
+         * @brief Get the room manager
+         */
+        RoomManager& getRoomManager() { return m_roomManager; }
+
+        /**
+         * @brief Send message to a specific client by ID
+         */
+        void sendToClient(uint32_t clientId, const std::vector<uint8_t>& buffer);
+
+        /**
          * @brief Broadcast to all clients (public for PlayerManager)
          */
         void broadcast(const std::vector<uint8_t>& buffer);
@@ -178,6 +197,36 @@ namespace rtype::server {
          */
         void handlePlayerReady(const network::PlayerReadyMessage& message,
                               const asio::ip::udp::endpoint& senderEndpoint);
+
+        /**
+         * @brief Handle CREATE_ROOM message
+         */
+        void handleCreateRoom(const network::CreateRoomMessage& message,
+                             const asio::ip::udp::endpoint& senderEndpoint);
+
+        /**
+         * @brief Handle JOIN_ROOM message
+         */
+        void handleJoinRoom(const network::JoinRoomMessage& message,
+                           const asio::ip::udp::endpoint& senderEndpoint);
+
+        /**
+         * @brief Handle LEAVE_ROOM message
+         */
+        void handleLeaveRoom(const network::LeaveRoomMessage& message,
+                            const asio::ip::udp::endpoint& senderEndpoint);
+
+        /**
+         * @brief Handle ROOM_LIST_REQUEST message
+         */
+        void handleRoomListRequest(const network::RoomListRequestMessage& message,
+                                   const asio::ip::udp::endpoint& senderEndpoint);
+
+        /**
+         * @brief Handle HOST_START_GAME message
+         */
+        void handleHostStartGame(const network::HostStartGameMessage& message,
+                                const asio::ip::udp::endpoint& senderEndpoint);
 
         /**
          * @brief Send message to specific endpoint
@@ -234,6 +283,10 @@ namespace rtype::server {
         std::function<void(uint32_t)> m_onClientDisconnected;
         std::function<void(uint32_t, const network::ClientInputMessage&)> m_onClientInput;
         std::function<void(uint32_t)> m_onPlayerReady;
+        std::function<void(const std::string&, uint32_t, uint8_t)> m_onHostStartGame;
+
+        // Room manager
+        RoomManager m_roomManager;
     };
 
 } // namespace rtype::server

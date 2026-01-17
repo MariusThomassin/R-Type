@@ -7,6 +7,7 @@ set(SERVER_CORE_SOURCES
     GameServer.cpp
     NetworkManager.cpp
     PlayerManager.cpp
+    RoomManager.cpp
 )
 
 # Game systems sources (shared between client and server, no Raylib dependency)

@@ -106,7 +106,6 @@ namespace rtype::client {
     }
 
     void NetworkClient::update() {
-        // Process all pending messages from receive thread
         std::lock_guard<std::mutex> lock(m_queueMutex);
 
         while (!m_messageQueue.empty()) {
@@ -235,9 +234,64 @@ namespace rtype::client {
                     break;
                 }
 
+                // Room/Lobby messages
+                case network::MessageType::ROOM_CREATED: {
+                    network::RoomCreatedMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleRoomCreated(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::ROOM_JOINED: {
+                    network::RoomJoinedMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleRoomJoined(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::ROOM_LEFT: {
+                    network::RoomLeftMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleRoomLeft(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::ROOM_LIST: {
+                    network::RoomListMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleRoomList(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::ROOM_INFO: {
+                    network::RoomInfoMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleRoomInfo(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::HOST_CHANGED: {
+                    network::HostChangedMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleHostChanged(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::ROOM_ERROR: {
+                    network::RoomErrorMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handleRoomError(msg);
+                    }
+                    break;
+                }
+
                 default:
-                    std::cerr << "[NetworkClient] Unknown message type: "
-                             << static_cast<int>(pending.type) << std::endl;
                     break;
             }
 
@@ -261,10 +315,8 @@ namespace rtype::client {
 
                 if (ec) {
                     if (ec == asio::error::operation_aborted || ec == asio::error::bad_descriptor) {
-                        // Socket closed, exit loop
                         break;
                     }
-                    std::cerr << "[NetworkClient] Receive error: " << ec.message() << std::endl;
                     continue;
                 }
 
@@ -279,9 +331,6 @@ namespace rtype::client {
                 onMessageReceived(buffer);
 
             } catch (const std::exception& e) {
-                if (m_running) {
-                    std::cerr << "[NetworkClient] Exception in receive loop: " << e.what() << std::endl;
-                }
             }
         }
 
@@ -314,6 +363,11 @@ namespace rtype::client {
                      << " stale entity mappings from previous session" << std::endl;
             m_networkIdToEntity.clear();
         }
+        
+        // Notify that we're fully connected with a valid client ID
+        if (m_callbacks.onWelcome) {
+            m_callbacks.onWelcome(m_clientId);
+        }
     }
 
     void NetworkClient::handleEntitySpawn(const network::EntitySpawnMessage& message) {
@@ -330,41 +384,31 @@ namespace rtype::client {
         ecs::Entity entity = m_registry.createEntity();
 
         // Add components based on message data
-        // Transform
         m_registry.addComponent(entity, ecs::TransformComponent(message.x, message.y, message.rotation));
 
-        // Velocity
         m_registry.addComponent(entity, ecs::VelocityComponent(message.vx, message.vy, 500.0f));
 
-        // Network
         m_registry.addComponent(entity, ecs::NetworkComponent(message.networkId, false));
 
-        // Entity type specific components
         if (message.entityType == network::EntityType::PROJECTILE) {
-            // Determine if this is a player projectile based on collision layer
             bool isPlayerProjectile = (message.collisionLayer == static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot));
 
-            // Projectile
             m_registry.addComponent(entity, ecs::ProjectileComponent(ecs::NULL_ENTITY, 10, isPlayerProjectile));
 
-            // Spritesheet (for rendering)
             ecs::SpritesheetComponent sprite;
             if (isPlayerProjectile) {
-                // Player bullets: cyan rice bullets pointing right
                 sprite.setBullet(ecs::BulletType::Rice, ecs::BulletColor::Cyan);
-                sprite.rotation = -90.0f;  // Point to the right
+                sprite.rotation = -90.0f;
                 sprite.tintR = 80;
                 sprite.tintG = 240;
                 sprite.tintB = 255;
-                sprite.layer = 100;  // Render on top
+                sprite.layer = 100;
             } else {
-                // Enemy bullets: red balls
                 sprite.setBullet(ecs::BulletType::Ball, ecs::BulletColor::Red);
                 sprite.layer = 99;
             }
             m_registry.addComponent(entity, sprite);
 
-            // Trajectory
             if (message.trajectoryType != 0) {
                 ecs::TrajectoryComponent traj;
                 traj.type = static_cast<ecs::TrajectoryType>(message.trajectoryType);
@@ -372,19 +416,16 @@ namespace rtype::client {
                 m_registry.addComponent(entity, traj);
             }
 
-            // Spin
             if (message.spinSpeed != 0.0f) {
                 ecs::SpinComponent spin;
                 spin.spinSpeed = message.spinSpeed;
                 m_registry.addComponent(entity, spin);
             }
 
-            // Lifetime
             if (message.maxLifetime > 0.0f) {
                 m_registry.addComponent(entity, ecs::LifetimeComponent(message.maxLifetime));
             }
 
-            // Collider
             if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
                 ecs::ColliderComponent collider;
                 collider.width = message.colliderWidth;
@@ -395,18 +436,14 @@ namespace rtype::client {
             }
         }
 
-        // Map networkId → entity
         m_networkIdToEntity[message.networkId] = entity;
 
         std::cout << "[NetworkClient] Created entity " << entity << " for networkId " << message.networkId << std::endl;
     }
 
     void NetworkClient::handleEntityState(const network::EntityStateMessage& message) {
-        // Find entity by network ID
         auto it = m_networkIdToEntity.find(message.networkId);
         if (it == m_networkIdToEntity.end()) {
-            // Entity not found - might arrive before spawn message
-            // Queue the update for when entity spawns
             std::cout << "[NetworkClient] Entity " << message.networkId
                       << " not found, queueing state update" << std::endl;
             m_pendingStateUpdates[message.networkId] = message;
@@ -415,7 +452,6 @@ namespace rtype::client {
 
         ecs::Entity entity = it->second;
 
-        // Update transform
         auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(entity);
         if (transform) {
             transform->x = message.x;
@@ -423,7 +459,6 @@ namespace rtype::client {
             transform->rotation = message.rotation;
         }
 
-        // Update velocity
         auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(entity);
         if (velocity) {
             velocity->vx = message.vx;
@@ -500,62 +535,183 @@ namespace rtype::client {
         std::cout << "[NetworkClient] Sent PLAYER_READY to server (clientId=" << m_clientId << ")" << std::endl;
     }
 
-    void NetworkClient::createRoom(const std::string& roomName, int maxPlayers, bool hasPassword) {
+    void NetworkClient::createRoom(const std::string& roomName, uint8_t maxPlayers) {
         if (!m_connected) {
             std::cerr << "[NetworkClient] Cannot create room - not connected!" << std::endl;
             return;
         }
 
-        // For now, just log the room creation since the server doesn't have room management yet
-        // TODO: Implement actual room creation protocol when server supports it
-        std::cout << "[NetworkClient] Requesting room creation: '" << roomName 
-                  << "' (max players: " << maxPlayers << ", password: " << (hasPassword ? "yes" : "no") << ")" << std::endl;
+        std::cout << "[NetworkClient] Creating room: '" << roomName 
+                  << "' (max players: " << static_cast<int>(maxPlayers) << ")" << std::endl;
         
-        // This would send a CREATE_ROOM message to the server when implemented
-        // network::CreateRoomMessage msg;
-        // msg.clientId = m_clientId;
-        // msg.roomName = roomName;
-        // msg.maxPlayers = maxPlayers;
-        // msg.hasPassword = hasPassword;
-        // auto buffer = network::serializeMessage(network::MessageType::CREATE_ROOM, msg);
-        // sendToServer(buffer);
+        network::CreateRoomMessage msg{};
+        msg.clientId = m_clientId;
+        std::strncpy(msg.roomName, roomName.c_str(), sizeof(msg.roomName) - 1);
+        msg.maxPlayers = maxPlayers;
+        auto buffer = network::serializeMessage(network::MessageType::CREATE_ROOM, msg);
+        sendToServer(buffer);
     }
 
-    std::vector<std::string> NetworkClient::requestRoomList() {
-        std::vector<std::string> rooms;
-        
+    void NetworkClient::joinRoom(const std::string& roomName) {
+        if (!m_connected) {
+            std::cerr << "[NetworkClient] Cannot join room - not connected!" << std::endl;
+            return;
+        }
+
+        std::cout << "[NetworkClient] Joining room: '" << roomName << "'" << std::endl;
+
+        network::JoinRoomMessage msg{};
+        msg.clientId = m_clientId;
+        std::strncpy(msg.roomName, roomName.c_str(), sizeof(msg.roomName) - 1);
+        auto buffer = network::serializeMessage(network::MessageType::JOIN_ROOM, msg);
+        sendToServer(buffer);
+    }
+
+    void NetworkClient::leaveRoom() {
+        if (!m_connected) {
+            return;
+        }
+
+        std::cout << "[NetworkClient] Leaving room: '" << m_currentRoomName << "'" << std::endl;
+
+        network::LeaveRoomMessage msg{};
+        msg.clientId = m_clientId;
+        auto buffer = network::serializeMessage(network::MessageType::LEAVE_ROOM, msg);
+        sendToServer(buffer);
+    }
+
+    void NetworkClient::requestRoomList() {
         if (!m_connected) {
             std::cerr << "[NetworkClient] Cannot request room list - not connected!" << std::endl;
-            return rooms;
+            return;
         }
 
         std::cout << "[NetworkClient] Requesting room list from server..." << std::endl;
-        
-        // TODO: Implement actual room list request when server supports it
-        // This would send a GET_ROOM_LIST message and wait for response
-        // For now, return empty list since server doesn't have room management
-        
-        return rooms;
+
+        network::RoomListRequestMessage msg{};
+        msg.clientId = m_clientId;
+        auto buffer = network::serializeMessage(network::MessageType::ROOM_LIST_REQUEST, msg);
+        sendToServer(buffer);
+    }
+
+    void NetworkClient::hostStartGame(uint8_t levelIndex) {
+        if (!m_connected) {
+            std::cerr << "[NetworkClient] Cannot start game - not connected!" << std::endl;
+            return;
+        }
+
+        if (!m_isHost) {
+            std::cerr << "[NetworkClient] Cannot start game - not the host!" << std::endl;
+            return;
+        }
+
+        std::cout << "[NetworkClient] Host starting game (level " << static_cast<int>(levelIndex) << ")" << std::endl;
+
+        network::HostStartGameMessage msg{};
+        msg.clientId = m_clientId;
+        msg.levelIndex = levelIndex;
+        auto buffer = network::serializeMessage(network::MessageType::HOST_START_GAME, msg);
+        sendToServer(buffer);
+    }
+
+    // Room message handlers
+    void NetworkClient::handleRoomCreated(const network::RoomCreatedMessage& message) {
+        std::cout << "[NetworkClient] Room created: '" << message.roomName 
+                  << "' (host: " << message.hostClientId << ")" << std::endl;
+
+        if (m_callbacks.onRoomCreated) {
+            m_callbacks.onRoomCreated(message);
+        }
+    }
+
+    void NetworkClient::handleRoomJoined(const network::RoomJoinedMessage& message) {
+        std::cout << "[NetworkClient] Joined room: '" << message.roomName 
+                  << "' (slot: " << static_cast<int>(message.yourSlot) 
+                  << ", isHost: " << (message.youAreHost ? "yes" : "no") << ")" << std::endl;
+
+        m_currentRoomName = message.roomName;
+        m_isHost = message.youAreHost;
+        m_playerSlot = message.yourSlot;
+
+        if (m_callbacks.onRoomJoined) {
+            m_callbacks.onRoomJoined(message);
+        }
+    }
+
+    void NetworkClient::handleRoomLeft(const network::RoomLeftMessage& message) {
+        std::cout << "[NetworkClient] Left room (clientId: " << message.clientId << ")" << std::endl;
+
+        if (message.clientId == m_clientId) {
+            m_currentRoomName.clear();
+            m_isHost = false;
+            m_playerSlot = 0;
+        }
+
+        if (m_callbacks.onRoomLeft) {
+            m_callbacks.onRoomLeft(message);
+        }
+    }
+
+    void NetworkClient::handleRoomList(const network::RoomListMessage& message) {
+        std::cout << "[NetworkClient] Received room list (" << static_cast<int>(message.roomCount) << " rooms)" << std::endl;
+
+        if (m_callbacks.onRoomList) {
+            m_callbacks.onRoomList(message);
+        }
+    }
+
+    void NetworkClient::handleRoomInfo(const network::RoomInfoMessage& message) {
+        std::cout << "[NetworkClient] Room info update: '" << message.roomName 
+                  << "' (" << static_cast<int>(message.playerCount) << "/" 
+                  << static_cast<int>(message.maxPlayers) << " players)" << std::endl;
+
+        // Update host status if we're in this room
+        if (m_currentRoomName == message.roomName) {
+            m_isHost = (message.hostClientId == m_clientId);
+        }
+
+        if (m_callbacks.onRoomInfo) {
+            m_callbacks.onRoomInfo(message);
+        }
+    }
+
+    void NetworkClient::handleHostChanged(const network::HostChangedMessage& message) {
+        std::cout << "[NetworkClient] Host changed to: " << message.newHostClientId 
+                  << " (reason: " << message.reason << ")" << std::endl;
+
+        m_isHost = (message.newHostClientId == m_clientId);
+
+        if (m_isHost) {
+            std::cout << "[NetworkClient] You are now the host!" << std::endl;
+        }
+
+        if (m_callbacks.onHostChanged) {
+            m_callbacks.onHostChanged(message);
+        }
+    }
+
+    void NetworkClient::handleRoomError(const network::RoomErrorMessage& message) {
+        std::cerr << "[NetworkClient] Room error: " << message.message << std::endl;
+
+        if (m_callbacks.onRoomError) {
+            m_callbacks.onRoomError(message);
+        }
     }
 
     void NetworkClient::handlePlayerSpawn(const network::PlayerSpawnMessage& message) {
         std::cout << "[NetworkClient] Received PLAYER_SPAWN (networkId=" << message.networkId
                   << ", clientId=" << message.clientId << ", slot=" << (int)message.playerSlot << ")" << std::endl;
 
-        // Check if entity already exists
         auto it = m_networkIdToEntity.find(message.networkId);
         if (it != m_networkIdToEntity.end()) {
             std::cerr << "[NetworkClient] Player already exists for networkId " << message.networkId << std::endl;
             return;
         }
 
-        // Determine if this is OUR player
         bool isLocal = (message.clientId == m_clientId);
 
-        // Create entity
         ecs::Entity entity = m_registry.createEntity();
 
-        // Add components
         ecs::PlayerComponent playerComp(message.playerSlot, 3);
         playerComp.isLocal = isLocal;
         m_registry.addComponent(entity, playerComp);
@@ -565,21 +721,17 @@ namespace rtype::client {
         m_registry.addComponent(entity, ecs::HealthComponent(static_cast<int>(message.health), 100));
         m_registry.addComponent(entity, ecs::NetworkComponent(message.networkId, isLocal));
 
-        // Add weapon component (for shooting missiles with Space key)
         ecs::WeaponComponent weapon(ecs::WeaponConstants::DEFAULT_FIRE_RATE, ecs::WeaponConstants::DEFAULT_DAMAGE);
         weapon.projectileSpeed = ecs::WeaponConstants::DEFAULT_PROJECTILE_SPEED;
         m_registry.addComponent(entity, weapon);
 
-        // Add visual component (PlayerShipComponent for rendering)
         ecs::PlayerShipComponent shipComp(ecs::PlayerShipComponent::ShipStyle::Classic);
         shipComp.layer = 10;
         m_registry.addComponent(entity, shipComp);
 
-        // DEBUG: Verify component state
         std::cout << "[NetworkClient] PlayerShipComponent state: isVisible=" << shipComp.isVisible
                   << ", isInvincible=" << shipComp.isInvincible << ", layer=" << shipComp.layer << std::endl;
 
-        // Apply any pending state updates that arrived before spawn
         auto pendingIt = m_pendingStateUpdates.find(message.networkId);
         if (pendingIt != m_pendingStateUpdates.end()) {
             std::cout << "[NetworkClient] Applying pending state update for entity "
@@ -598,7 +750,6 @@ namespace rtype::client {
             m_pendingStateUpdates.erase(pendingIt);
         }
 
-        // Map networkId → entity
         m_networkIdToEntity[message.networkId] = entity;
 
         std::cout << "[NetworkClient] Created player entity " << entity
@@ -609,7 +760,6 @@ namespace rtype::client {
         std::cout << "[NetworkClient] Received PLAYER_HIT (networkId=" << message.networkId
                   << ", newHealth=" << message.newHealth << ")" << std::endl;
 
-        // Find entity
         auto it = m_networkIdToEntity.find(message.networkId);
         if (it == m_networkIdToEntity.end()) {
             std::cerr << "[NetworkClient] Player not found for networkId " << message.networkId << std::endl;
@@ -618,19 +768,15 @@ namespace rtype::client {
 
         ecs::Entity entity = it->second;
 
-        // Update health
         auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(entity);
         if (health) {
             health->currentHealth = static_cast<int>(message.newHealth);
         }
 
-        // Spawn hit effect at impact position
         ecs::Entity hitEffect = m_registry.createEntity();
 
-        // Position at hit location
         m_registry.addComponent(hitEffect, ecs::TransformComponent(message.hitX, message.hitY, 0.0f));
 
-        // Visual effect - red circle with strong glow that fades out
         ecs::SpritesheetComponent sprite;
         sprite.setBullet(ecs::BulletType::Ball, ecs::BulletColor::Red);
         sprite.hasGlow = true;
@@ -639,10 +785,8 @@ namespace rtype::client {
         sprite.frameHeight = 32;
         m_registry.addComponent(hitEffect, sprite);
 
-        // Auto-destroy after 0.3 seconds
         m_registry.addComponent(hitEffect, ecs::LifetimeComponent(0.3f));
 
-        // Float upward slightly
         m_registry.addComponent(hitEffect, ecs::VelocityComponent(0.0f, -50.0f, 0.0f));
 
         std::cout << "[NetworkClient] Player health updated to " << message.newHealth

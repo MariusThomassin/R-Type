@@ -67,7 +67,26 @@ namespace rtype::network {
         // Bidirectional: Player Profile (0x30 - 0x3F)
         // ============================================================
         PLAYER_PROFILE = 0x30,      // Player profile (name, avatar)
-        PROFILE_UPDATE = 0x31       // Profile updated (broadcast to others)
+        PROFILE_UPDATE = 0x31,      // Profile updated (broadcast to others)
+
+        // ============================================================
+        // Room/Lobby Management (0x40 - 0x4F)
+        // ============================================================
+        // Client → Server
+        CREATE_ROOM = 0x40,         // Create a new room
+        JOIN_ROOM = 0x41,           // Join an existing room
+        LEAVE_ROOM = 0x42,          // Leave current room
+        ROOM_LIST_REQUEST = 0x43,   // Request list of available rooms
+        HOST_START_GAME = 0x44,     // Host starts the game
+
+        // Server → Client
+        ROOM_CREATED = 0x45,        // Room creation confirmed
+        ROOM_JOINED = 0x46,         // Successfully joined room
+        ROOM_LEFT = 0x47,           // Left room confirmation
+        ROOM_LIST = 0x48,           // List of available rooms
+        ROOM_INFO = 0x49,           // Current room state update
+        HOST_CHANGED = 0x4A,        // Host has changed (migration)
+        ROOM_ERROR = 0x4B           // Room operation error
     };
 
     /**
@@ -432,6 +451,157 @@ namespace rtype::network {
     };
 
     // ============================================================
+    // Room/Lobby Messages
+    // ============================================================
+
+    /**
+     * @brief Room state enum
+     */
+    enum class RoomState : uint8_t {
+        LOBBY = 0,      // Waiting for players/host to start
+        PLAYING = 1,    // Game in progress
+        FINISHED = 2    // Game ended
+    };
+
+    /**
+     * @brief Room error codes
+     */
+    enum class RoomError : uint8_t {
+        NONE = 0,
+        ROOM_FULL = 1,
+        ROOM_NOT_FOUND = 2,
+        ALREADY_IN_ROOM = 3,
+        NOT_HOST = 4,
+        GAME_ALREADY_STARTED = 5,
+        INVALID_ROOM_NAME = 6
+    };
+
+    /**
+     * @brief CREATE_ROOM: Client requests to create a new room
+     */
+    struct CreateRoomMessage {
+        uint32_t clientId;          // Client creating the room
+        char roomName[32];          // Room name (31 chars + null)
+        uint8_t maxPlayers;         // Max players (2-4, default 4)
+    };
+
+    /**
+     * @brief JOIN_ROOM: Client requests to join a room
+     */
+    struct JoinRoomMessage {
+        uint32_t clientId;          // Client joining
+        char roomName[32];          // Room to join
+    };
+
+    /**
+     * @brief LEAVE_ROOM: Client leaves current room
+     */
+    struct LeaveRoomMessage {
+        uint32_t clientId;          // Client leaving
+    };
+
+    /**
+     * @brief ROOM_LIST_REQUEST: Client requests list of rooms
+     */
+    struct RoomListRequestMessage {
+        uint32_t clientId;          // Requesting client
+    };
+
+    /**
+     * @brief HOST_START_GAME: Host starts the game
+     */
+    struct HostStartGameMessage {
+        uint32_t clientId;          // Must be host
+        uint8_t levelIndex;         // Level to start (0-based)
+    };
+
+    /**
+     * @brief ROOM_CREATED: Server confirms room creation
+     */
+    struct RoomCreatedMessage {
+        char roomName[32];          // Created room name
+        uint32_t hostClientId;      // Host (creator) client ID
+    };
+
+    /**
+     * @brief Player info for room state
+     */
+    struct RoomPlayerInfo {
+        uint32_t clientId;
+        char playerName[32];
+        uint8_t slot;               // Player slot (0-3)
+        bool isReady;
+        bool isHost;
+    };
+
+    /**
+     * @brief ROOM_JOINED: Server confirms room join
+     */
+    struct RoomJoinedMessage {
+        char roomName[32];          // Room name
+        uint32_t hostClientId;      // Current host
+        uint8_t playerCount;        // Current player count
+        uint8_t maxPlayers;         // Max allowed
+        uint8_t yourSlot;           // Assigned slot for joining player
+        bool youAreHost;            // True if this client is the host
+    };
+
+    /**
+     * @brief ROOM_LEFT: Server confirms room leave
+     */
+    struct RoomLeftMessage {
+        uint32_t clientId;          // Client who left
+    };
+
+    /**
+     * @brief Room summary for room list
+     */
+    struct RoomSummary {
+        char roomName[32];
+        uint8_t playerCount;
+        uint8_t maxPlayers;
+        RoomState state;
+    };
+
+    /**
+     * @brief ROOM_LIST: Server sends list of available rooms
+     */
+    struct RoomListMessage {
+        uint8_t roomCount;          // Number of rooms (max 16)
+        RoomSummary rooms[16];      // Room summaries
+    };
+
+    /**
+     * @brief ROOM_INFO: Server broadcasts room state update
+     * 
+     * Sent when players join/leave/ready or host changes.
+     */
+    struct RoomInfoMessage {
+        char roomName[32];
+        uint32_t hostClientId;
+        uint8_t playerCount;
+        uint8_t maxPlayers;
+        RoomState state;
+        RoomPlayerInfo players[4];  // Up to 4 players
+    };
+
+    /**
+     * @brief HOST_CHANGED: Server notifies of host migration
+     */
+    struct HostChangedMessage {
+        uint32_t newHostClientId;   // New host client ID
+        char reason[32];            // "Previous host left", etc.
+    };
+
+    /**
+     * @brief ROOM_ERROR: Server reports room operation error
+     */
+    struct RoomErrorMessage {
+        RoomError error;            // Error code
+        char message[64];           // Human-readable error message
+    };
+
+    // ============================================================
     // Serialization utilities
     // ============================================================
 
@@ -539,6 +709,20 @@ namespace rtype::network {
             // Player Profile
             case MessageType::PLAYER_PROFILE: return "PLAYER_PROFILE";
             case MessageType::PROFILE_UPDATE: return "PROFILE_UPDATE";
+
+            // Room/Lobby Management
+            case MessageType::CREATE_ROOM: return "CREATE_ROOM";
+            case MessageType::JOIN_ROOM: return "JOIN_ROOM";
+            case MessageType::LEAVE_ROOM: return "LEAVE_ROOM";
+            case MessageType::ROOM_LIST_REQUEST: return "ROOM_LIST_REQUEST";
+            case MessageType::HOST_START_GAME: return "HOST_START_GAME";
+            case MessageType::ROOM_CREATED: return "ROOM_CREATED";
+            case MessageType::ROOM_JOINED: return "ROOM_JOINED";
+            case MessageType::ROOM_LEFT: return "ROOM_LEFT";
+            case MessageType::ROOM_LIST: return "ROOM_LIST";
+            case MessageType::ROOM_INFO: return "ROOM_INFO";
+            case MessageType::HOST_CHANGED: return "HOST_CHANGED";
+            case MessageType::ROOM_ERROR: return "ROOM_ERROR";
             
             default: return "UNKNOWN";
         }

@@ -52,7 +52,6 @@ static rtype::ecs::MusicSystem* g_musicSystem = nullptr;
  * @brief Initialize music system (called after MusicSystem is created)
  */
 void initializeMusic() {
-    // MusicSystem handles initialization automatically
     if (g_musicSystem) {
         std::cout << "MusicSystem initialized and ready" << std::endl;
     }
@@ -62,8 +61,7 @@ void initializeMusic() {
  * @brief Update music playback (call every frame)
  */
 void updateMusic() {
-    // MusicSystem::update() is called via SystemManager
-    // This function kept for compatibility
+    // Kept for compatibility - MusicSystem::update() is called via SystemManager
 }
 
 /**
@@ -93,7 +91,6 @@ void setMusicVolume(float volume) {
  * @brief Clean up music resources
  */
 void cleanupMusic() {
-    // MusicSystem handles cleanup in destructor
     std::cout << "Music cleanup handled by MusicSystem" << std::endl;
 }
 
@@ -245,6 +242,9 @@ int main(int argc, char* argv[]) {
     netCallbacks.onLevelComplete = [&scoreManager](const rtype::network::LevelCompleteMessage& msg) {
         scoreManager.setSessionProgress(msg.levelIndex + 1, msg.nextLevelIndex < msg.levelIndex);
     };
+    
+    // Room/Lobby callbacks - will be set up after lobbyWidget is created
+    // (see below after lobbyWidget initialization)
     networkClient.setCallbacks(netCallbacks);
 
     // ==================== Settings Panel Setup ====================
@@ -440,7 +440,10 @@ int main(int argc, char* argv[]) {
         std::cout << "Returning to main menu from multiplayer..." << std::endl;
     };
 
-    multiplayerCallbacks.onJoinServer = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const std::string& ip, int port) {
+    // Pending room name to join after welcome is received
+    std::string pendingRoomToJoin;
+
+    multiplayerCallbacks.onJoinServer = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient, &pendingRoomToJoin](const std::string& ip, int port) {
         std::cout << "[Main] Attempting to connect to " << ip << ":" << port << std::endl;
         
         // Disconnect if already connected to a different server
@@ -448,30 +451,31 @@ int main(int argc, char* argv[]) {
             networkClient.disconnect();
         }
         
+        // Store the room to join after we receive welcome
+        pendingRoomToJoin = "DefaultRoom";
+        lobbyWidget->setRoomName(pendingRoomToJoin);
+        
         // Connect to the specified server
         if (networkClient.connect(ip, static_cast<uint16_t>(port))) {
             std::cout << "[Main] Connected to server " << ip << ":" << port << std::endl;
             
-            // Send player ready message
-            networkClient.sendPlayerReady();
-            
-            // Go to lobby state
+            // Go to lobby state - room join will happen in onWelcome callback
             gameState = GameState::LOBBY;
             showingMultiplayer = false;
             showingLobby = true;
             multiplayerWidget->hide();
             lobbyWidget->show();
-            std::cout << "[Main] Entering lobby..." << std::endl;
+            std::cout << "[Main] Waiting for welcome before joining room..." << std::endl;
         } else {
             std::cerr << "[Main] Failed to connect to " << ip << ":" << port << std::endl;
-            // Show error message in multiplayer widget (if it has that capability)
+            pendingRoomToJoin.clear();
         }
     };
 
     multiplayerCallbacks.onCreateRoom = [&gameState, &showingMultiplayer, &showingLobby, &multiplayerWidget, &lobbyWidget, &networkClient](const rtype::ui::RoomSettings& settings) {
         // First, try to create the room on the server
         if (networkClient.isConnected()) {
-            networkClient.createRoom(settings.name, 4, !settings.password.empty());
+            networkClient.createRoom(settings.name, 4);
         }
         
         gameState = GameState::LOBBY;
@@ -506,15 +510,11 @@ int main(int argc, char* argv[]) {
             return rooms; // Empty list if not connected
         }
         
-        // Use NetworkClient to request room list from server
-        auto roomNames = networkClient.requestRoomList();
+        // Request room list from server (async - will receive via callback)
+        networkClient.requestRoomList();
         
-        // Convert server response to RoomInfo objects
-        // TODO: When server implements proper room management, this will return real data
-        for (const auto& roomName : roomNames) {
-            rooms.push_back({roomName, 1, 4, false}); // Default values for now
-        }
-        
+        // Return empty for now - the UI will be updated via the onRoomList callback
+        // TODO: Cache the last received room list and return it here
         return rooms;
     };
 
@@ -533,16 +533,104 @@ int main(int argc, char* argv[]) {
         std::cout << "Returning to multiplayer menu from lobby..." << std::endl;
     };
 
-    lobbyCallbacks.onStartGame = [&gameState, &showingLobby, &lobbyWidget]() {
+    lobbyCallbacks.onStartGame = [&gameState, &showingLobby, &lobbyWidget, &networkClient]() {
+        // Only host can start the game
+        if (!networkClient.isHost()) {
+            std::cout << "Cannot start game - you are not the host!" << std::endl;
+            return;
+        }
+        
+        // Send host start game message to server
+        networkClient.hostStartGame(0);  // Level 0 for now
+        
         gameState = GameState::PLAYING;
         showingLobby = false;
         lobbyWidget->hide();
-        std::cout << "Starting game from lobby..." << std::endl;
+        std::cout << "Host starting game from lobby..." << std::endl;
     };
 
     lobbyWidget->setCallbacks(lobbyCallbacks);
     uiManager.addWidget(lobbyWidget);
     lobbyWidget->initialize(); // Initialize after adding to UI manager
+
+    // ==================== Room/Lobby Network Callbacks ====================
+    // Now that lobbyWidget is created, set up room callbacks
+    netCallbacks.onRoomJoined = [&lobbyWidget, &networkClient](const rtype::network::RoomJoinedMessage& msg) {
+        std::cout << "[Main] Joined room: " << msg.roomName << " (slot " << (int)msg.yourSlot << ")" << std::endl;
+        lobbyWidget->setRoomName(msg.roomName);
+        
+        // Check if we are the host
+        bool isHost = (msg.hostClientId == networkClient.getClientId());
+        lobbyWidget->setIsHost(isHost);
+    };
+    
+    netCallbacks.onRoomInfo = [&lobbyWidget, &networkClient, &gameState, &showingLobby](const rtype::network::RoomInfoMessage& msg) {
+        std::cout << "[Main] Room info update: " << msg.roomName << " (" << (int)msg.playerCount << "/" << (int)msg.maxPlayers << " players)" << std::endl;
+        
+        // Convert RoomPlayerInfo array to LobbyPlayerInfo vector
+        std::vector<rtype::ui::LobbyPlayerInfo> players;
+        for (int i = 0; i < msg.playerCount && i < 4; ++i) {
+            const auto& rp = msg.players[i];
+            rtype::ui::LobbyPlayerInfo lp;
+            lp.name = rp.playerName;
+            lp.slot = rp.slot;
+            lp.isHost = rp.isHost;
+            lp.isReady = rp.isReady;
+            lp.isLocal = (rp.clientId == networkClient.getClientId());
+            players.push_back(lp);
+        }
+        
+        lobbyWidget->updatePlayersList(players);
+        
+        // Update host status
+        bool isHost = (msg.hostClientId == networkClient.getClientId());
+        lobbyWidget->setIsHost(isHost);
+        
+        // If room state changed to PLAYING, start the game locally
+        if (msg.state == rtype::network::RoomState::PLAYING) {
+            std::cout << "[Main] Game starting!" << std::endl;
+            gameState = GameState::PLAYING;
+            showingLobby = false;
+            lobbyWidget->hide();
+        }
+    };
+    
+    netCallbacks.onHostChanged = [&lobbyWidget, &networkClient](const rtype::network::HostChangedMessage& msg) {
+        std::cout << "[Main] Host changed! Reason: " << msg.reason << std::endl;
+        bool isHost = (msg.newHostClientId == networkClient.getClientId());
+        lobbyWidget->setIsHost(isHost);
+        if (isHost) {
+            std::cout << "[Main] You are now the host!" << std::endl;
+        }
+    };
+    
+    netCallbacks.onRoomCreated = [&lobbyWidget, &networkClient](const rtype::network::RoomCreatedMessage& msg) {
+        std::cout << "[Main] Room created: " << msg.roomName << std::endl;
+        lobbyWidget->setRoomName(msg.roomName);
+        lobbyWidget->setIsHost(true);  // Creator is always host
+    };
+    
+    netCallbacks.onRoomError = [](const rtype::network::RoomErrorMessage& msg) {
+        std::cerr << "[Main] Room error: " << msg.message << std::endl;
+    };
+    
+    // Welcome callback - join pending room after receiving client ID
+    netCallbacks.onWelcome = [&networkClient, &pendingRoomToJoin](uint32_t clientId) {
+        std::cout << "[Main] Welcome received! Client ID: " << clientId << std::endl;
+        
+        // Send player ready message now that we have a valid client ID
+        networkClient.sendPlayerReady();
+        
+        // Join the pending room if one was set
+        if (!pendingRoomToJoin.empty()) {
+            std::cout << "[Main] Joining room: " << pendingRoomToJoin << std::endl;
+            networkClient.joinRoom(pendingRoomToJoin);
+            pendingRoomToJoin.clear();
+        }
+    };
+    
+    // Re-set callbacks with room handlers included
+    networkClient.setCallbacks(netCallbacks);
 
     // Update main menu's onMultiplayer callback to show multiplayer widget
     menuCallbacks.onMultiplayer = [&gameState, &showingMultiplayer, &mainMenuWidget, &multiplayerWidget]() {
