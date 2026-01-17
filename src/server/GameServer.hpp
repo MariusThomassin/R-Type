@@ -131,10 +131,22 @@ namespace rtype::server {
         void handlePlayerCollision(const ecs::CollisionEvent& event);
 
         /**
+         * @brief Handle enemy-projectile collision events
+         * @param event Collision event data
+         */
+        void handleEnemyCollision(const ecs::CollisionEvent& event);
+
+        /**
          * @brief Handle player death (health <= 0)
          * @param playerEntity Player entity that died
          */
         void handlePlayerDeath(ecs::EntityId playerEntity);
+
+        /**
+         * @brief Handle enemy death
+         * @param enemyEntity Enemy entity that died
+         */
+        void handleEnemyDeath(ecs::EntityId enemyEntity);
 
         /**
          * @brief Update pending respawns
@@ -152,6 +164,11 @@ namespace rtype::server {
          * @brief Check game over condition
          */
         void checkGameOver();
+
+        /**
+         * @brief Check if level is complete (all waves done, all enemies dead)
+         */
+        void checkLevelComplete();
 
         /**
          * @brief Handle Force orb spawn/upgrade request
@@ -210,6 +227,26 @@ namespace rtype::server {
          * @brief Update level waves - spawn enemies based on level config
          */
         void updateLevelWaves(float dt);
+
+        /**
+         * @brief Update level powerup spawns based on timing
+         */
+        void updatePowerupSpawns(float dt);
+
+        /**
+         * @brief Spawn a powerup entity
+         */
+        void spawnPowerup(int type, float x, float y);
+
+        /**
+         * @brief Update enemy behavior (shooting, etc.)
+         */
+        void updateEnemies(float dt);
+
+        /**
+         * @brief Spawn an enemy projectile
+         */
+        void spawnEnemyProjectile(float x, float y, float vx, float vy);
 
         /**
          * @brief Spawn an enemy entity based on config
@@ -294,11 +331,11 @@ namespace rtype::server {
         float m_difficultyMultiplier = 1.0f; // Difficulty scaling
         bool m_levelActive = false;          // Is a level currently being played
         
-        // Level file paths
+        // Level file paths (relative to build directory)
         std::vector<std::string> m_levelPaths = {
-            "config/levels/level1.json",
-            "config/levels/level2.json", 
-            "config/levels/level3.json"
+            "../config/levels/level1.json",
+            "../config/levels/level2.json", 
+            "../config/levels/level3.json"
         };
 
         // Level wave state

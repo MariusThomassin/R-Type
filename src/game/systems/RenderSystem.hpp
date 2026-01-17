@@ -10,12 +10,15 @@
 #include "../../engine/ecs/core/Registry.hpp"
 #include "../../engine/ecs/components/TransformComponent.hpp"
 #include "../../engine/ecs/components/SpriteComponent.hpp"
+#include "../../engine/ecs/components/HealthComponent.hpp"
 #include "../../engine/ecs/components/ImageBackgroundComponent.hpp"
 #include "../../engine/ecs/components/ProceduralBackgroundComponent.hpp"
 #include "../components/SpritesheetComponent.hpp"
 #include "../components/PlayerShipComponent.hpp"
 #include "../components/PlayerComponent.hpp"
 #include "../components/ProjectileComponent.hpp"
+#include "../components/EnemyComponent.hpp"
+#include "../components/PowerupComponent.hpp"
 #include "../../engine/ui/UIManager.hpp"
 
 #include <raylib.h>
@@ -164,6 +167,18 @@ namespace rtype::ecs {
                         }
                     }
                 );
+                
+                // Collect EnemyComponent entities
+                m_registry->forEach<TransformComponent, EnemyComponent>(
+                    [this, &entities](EntityId e) {
+                        // Only add if not already added via other components
+                        if (!m_registry->hasComponent<SpritesheetComponent>(e) &&
+                            !m_registry->hasComponent<SpriteComponent>(e) &&
+                            !m_registry->hasComponent<PlayerShipComponent>(e)) {
+                            entities.push_back({e, 50});  // Layer 50 for enemies
+                        }
+                    }
+                );
 
                 m_lastEntityCount = entities.size();
 
@@ -186,6 +201,28 @@ namespace rtype::ecs {
                     EntityId e = item.entity;
                     const auto& transform = m_registry->getComponent<TransformComponent>(e);
 
+                    // Check for invincibility flicker (from HealthComponent)
+                    bool shouldFlicker = false;
+                    if (m_registry->hasComponent<HealthComponent>(e)) {
+                        auto& health = m_registry->getComponent<HealthComponent>(e);
+                        if (health.isInvincible) {
+                            // Update invincibility timer
+                            health.invincibilityTimer -= dt;
+                            if (health.invincibilityTimer <= 0.0f) {
+                                health.isInvincible = false;
+                                health.invincibilityTimer = 0.0f;
+                                // Also sync PlayerShipComponent invincibility
+                                if (m_registry->hasComponent<PlayerShipComponent>(e)) {
+                                    auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
+                                    ship.isInvincible = false;
+                                }
+                            } else {
+                                // Flicker: skip rendering every other 0.1s
+                                shouldFlicker = (static_cast<int>(m_animTime * 10.0f) % 2) == 0;
+                            }
+                        }
+                    }
+
                     if (m_registry->hasComponent<PlayerShipComponent>(e)) {
                         auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
                         if (!ship.isRenderable()) {
@@ -195,6 +232,8 @@ namespace rtype::ecs {
                                           << " has isVisible=false, isInvincible=" << ship.isInvincible << std::endl;
                                 loggedShip = true;
                             }
+                        } else if (shouldFlicker) {
+                            // Skip rendering during flicker (invincibility blink)
                         } else if (ship.isInvincible) {
                             // Log when ship is invincible (flashing)
                             static int invincibleCount = 0;
@@ -224,6 +263,66 @@ namespace rtype::ecs {
                         if (sprite.isRenderable()) {
                             sprite.render(transform, ctx);
                         }
+                    } else if (m_registry->hasComponent<EnemyComponent>(e)) {
+                        // Render enemy using simple raylib drawing (placeholder)
+                        float x = transform.x;
+                        float y = transform.y;
+                        float scale = transform.scaleX;
+                        
+                        // Pulsing glow effect
+                        float pulse = 0.5f + 0.5f * std::sin(m_animTime * 4.0f);
+                        unsigned char alpha = static_cast<unsigned char>(100 * pulse);
+                        
+                        // Glow circle (larger, orange)
+                        DrawCircle(static_cast<int>(x), static_cast<int>(y), 
+                                   24.0f * scale, {255, 100, 50, alpha});
+                        
+                        // Main body (orange-red)
+                        DrawCircle(static_cast<int>(x), static_cast<int>(y), 
+                                   16.0f * scale, {255, 100, 50, 255});
+                        
+                        // Inner highlight (white)
+                        DrawCircle(static_cast<int>(x - 4*scale), static_cast<int>(y - 4*scale), 
+                                   6.0f * scale, {255, 255, 255, 150});
+                    } else if (m_registry->hasComponent<PowerupComponent>(e)) {
+                        // Render powerup with type-based color
+                        const auto& powerup = m_registry->getComponent<PowerupComponent>(e);
+                        if (powerup.isCollected) continue;
+                        
+                        float x = transform.x;
+                        float y = transform.y;
+                        float scale = transform.scaleX;
+                        
+                        // Get color based on powerup type
+                        Color color;
+                        switch (powerup.type) {
+                            case PowerupType::SPREAD_SHOT:    color = {0, 255, 255, 255}; break;  // Cyan
+                            case PowerupType::SPEED_BOOST:    color = {255, 255, 0, 255}; break;  // Yellow
+                            case PowerupType::HEALTH_UP:      color = {0, 255, 0, 255}; break;    // Green
+                            case PowerupType::SHIELD:         color = {0, 150, 255, 255}; break;  // Blue
+                            case PowerupType::WEAPON_UPGRADE: color = {255, 136, 0, 255}; break;  // Orange
+                            case PowerupType::FORCE_ORB:      color = {136, 0, 255, 255}; break;  // Purple
+                            case PowerupType::BOMB:           color = {255, 0, 0, 255}; break;    // Red
+                            default:                          color = {255, 255, 255, 255}; break;
+                        }
+                        
+                        // Bobbing animation
+                        float bob = std::sin(m_animTime * 3.0f + x * 0.1f) * 5.0f;
+                        int drawY = static_cast<int>(y + bob);
+                        
+                        // Pulsing glow
+                        float glowPulse = 0.5f + 0.5f * std::sin(m_animTime * 5.0f);
+                        unsigned char glowAlpha = static_cast<unsigned char>(100 * glowPulse);
+                        
+                        // Outer glow
+                        DrawCircle(static_cast<int>(x), drawY, 20.0f * scale, {color.r, color.g, color.b, glowAlpha});
+                        
+                        // Main body
+                        DrawCircle(static_cast<int>(x), drawY, 12.0f * scale, color);
+                        
+                        // Inner highlight
+                        DrawCircle(static_cast<int>(x - 3*scale), drawY - static_cast<int>(3*scale), 
+                                   4.0f * scale, {255, 255, 255, 200});
                     }
                 }
 
@@ -376,7 +475,7 @@ namespace rtype::ecs {
                     snprintf(scoreText, sizeof(scoreText), "%08d", playerScore);
                     DrawText(scoreText, 20, 40, 28, WHITE);
                     
-                    // Lives display
+                    // Lives display with hearts
                     int playerLives = 0;
                     m_registry->forEach<PlayerComponent>(
                         [this, &playerLives](EntityId e) {
@@ -387,9 +486,29 @@ namespace rtype::ecs {
                         }
                     );
                     DrawText("LIVES", 180, 15, 20, {150, 150, 150, 255});
-                    char livesText[8];
-                    snprintf(livesText, sizeof(livesText), "%d", playerLives);
-                    DrawText(livesText, 180, 40, 28, WHITE);
+                    
+                    // Draw hearts for each life
+                    for (int i = 0; i < 3; i++) {
+                        int heartX = 180 + i * 28;
+                        int heartY = 45;
+                        Color heartColor = (i < playerLives) ? Color{255, 50, 80, 255} : Color{60, 60, 60, 150};
+                        
+                        // Simple heart shape using circles
+                        DrawCircle(heartX - 4, heartY, 8, heartColor);
+                        DrawCircle(heartX + 4, heartY, 8, heartColor);
+                        // Triangle bottom
+                        DrawTriangle(
+                            {static_cast<float>(heartX - 12), static_cast<float>(heartY + 2)},
+                            {static_cast<float>(heartX + 12), static_cast<float>(heartY + 2)},
+                            {static_cast<float>(heartX), static_cast<float>(heartY + 16)},
+                            heartColor
+                        );
+                        
+                        // Highlight on filled hearts
+                        if (i < playerLives) {
+                            DrawCircle(heartX - 6, heartY - 2, 3, {255, 200, 200, 150});
+                        }
+                    }
 
                     DrawText("R-TYPE", m_screenWidth - 90, 15, 20, {100, 100, 255, 255});
                     DrawFPS(m_screenWidth - 80, m_screenHeight - 25);

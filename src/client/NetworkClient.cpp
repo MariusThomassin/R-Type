@@ -17,6 +17,8 @@
 #include "game/components/PlayerShipComponent.hpp"
 #include "game/components/WeaponComponent.hpp"
 #include "game/components/WeaponConstants.hpp"
+#include "game/components/EnemyComponent.hpp"
+#include "game/components/PowerupComponent.hpp"
 
 namespace rtype::client {
 
@@ -161,6 +163,22 @@ namespace rtype::client {
                     break;
                 }
 
+                case network::MessageType::PLAYER_DEATH: {
+                    network::PlayerDeathMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handlePlayerDeath(msg);
+                    }
+                    break;
+                }
+
+                case network::MessageType::PLAYER_RESPAWN: {
+                    network::PlayerRespawnMessage msg;
+                    if (network::deserializeMessage(pending.data, msg)) {
+                        handlePlayerRespawn(msg);
+                    }
+                    break;
+                }
+
                 // Level management messages
                 case network::MessageType::LEVEL_INFO: {
                     network::LevelInfoMessage msg;
@@ -299,6 +317,55 @@ namespace rtype::client {
         }
     }
 
+    void NetworkClient::updateAnimations(float dt) {
+        // Process respawn slide-in animations
+        std::vector<uint32_t> completedAnimations;
+        
+        for (auto& [networkId, anim] : m_respawnAnimations) {
+            anim.elapsed += dt;
+            
+            // Find the entity
+            auto it = m_networkIdToEntity.find(networkId);
+            if (it == m_networkIdToEntity.end()) {
+                completedAnimations.push_back(networkId);
+                continue;
+            }
+            
+            ecs::Entity entity = it->second;
+            auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(entity);
+            
+            if (!transform) {
+                completedAnimations.push_back(networkId);
+                continue;
+            }
+            
+            if (anim.elapsed >= anim.duration) {
+                // Animation complete - snap to final position
+                transform->x = anim.targetX;
+                transform->y = anim.targetY;
+                
+                // Turn off invincibility visual after slide-in (health timer still controls actual invincibility)
+                auto* ship = m_registry.tryGetComponent<ecs::PlayerShipComponent>(entity);
+                if (ship) {
+                    ship->isInvincible = false;  // Stop the component-level flicker
+                }
+                
+                completedAnimations.push_back(networkId);
+            } else {
+                // Ease-out interpolation for smooth slide-in
+                float t = anim.elapsed / anim.duration;
+                float easeOut = 1.0f - (1.0f - t) * (1.0f - t);  // Quadratic ease-out
+                transform->x = anim.startX + (anim.targetX - anim.startX) * easeOut;
+                transform->y = anim.targetY;  // Y is already at target
+            }
+        }
+        
+        // Remove completed animations
+        for (uint32_t networkId : completedAnimations) {
+            m_respawnAnimations.erase(networkId);
+        }
+    }
+
     void NetworkClient::receiveLoop() {
         std::cout << "[NetworkClient] Receive loop started" << std::endl;
 
@@ -434,6 +501,54 @@ namespace rtype::client {
                 collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
                 m_registry.addComponent(entity, collider);
             }
+        } else if (message.entityType == network::EntityType::ENEMY) {
+            // Add enemy component (uses placeholder renderer via RenderSystem)
+            ecs::EnemyComponent enemyComp;
+            enemyComp.type = ecs::EnemyType::Basic;
+            enemyComp.scoreValue = 100;
+            m_registry.addComponent(entity, enemyComp);
+
+            // Add health component
+            m_registry.addComponent(entity, ecs::HealthComponent(1, 1));
+
+            // Add collider for enemies
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+
+            // Add trajectory if present
+            if (message.trajectoryType != 0) {
+                ecs::TrajectoryComponent traj;
+                traj.type = static_cast<ecs::TrajectoryType>(message.trajectoryType);
+                traj.initialized = false;
+                m_registry.addComponent(entity, traj);
+            }
+
+            std::cout << "[NetworkClient] Created ENEMY entity at (" << message.x << ", " << message.y << ")" << std::endl;
+        } else if (message.entityType == network::EntityType::POWERUP) {
+            // Add powerup component
+            ecs::PowerupComponent powerup;
+            powerup.type = static_cast<ecs::PowerupType>(static_cast<int>(message.trajectoryParam1));  // trajectoryParam1 encodes powerup type
+            powerup.isCollected = false;
+            m_registry.addComponent(entity, powerup);
+
+            // Add collider for powerups
+            if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
+                ecs::ColliderComponent collider;
+                collider.width = message.colliderWidth;
+                collider.height = message.colliderHeight;
+                collider.layer = static_cast<ecs::CollisionLayer>(message.collisionLayer);
+                collider.mask = static_cast<ecs::CollisionLayer>(message.collisionMask);
+                m_registry.addComponent(entity, collider);
+            }
+
+            std::cout << "[NetworkClient] Created POWERUP entity type " << static_cast<int>(powerup.type) 
+                      << " at (" << message.x << ", " << message.y << ")" << std::endl;
         }
 
         m_networkIdToEntity[message.networkId] = entity;
@@ -451,6 +566,21 @@ namespace rtype::client {
         }
 
         ecs::Entity entity = it->second;
+
+        // Skip position updates for local player - we control our own position
+        // This prevents the "rollback" effect where server corrections fight with local input
+        if (m_registry.hasComponent<ecs::PlayerComponent>(entity)) {
+            const auto& player = m_registry.getComponent<ecs::PlayerComponent>(entity);
+            if (player.isLocal) {
+                // Only update velocity, not position for local player
+                auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(entity);
+                if (velocity) {
+                    velocity->vx = message.vx;
+                    velocity->vy = message.vy;
+                }
+                return;
+            }
+        }
 
         auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(entity);
         if (transform) {
@@ -710,6 +840,11 @@ namespace rtype::client {
 
         bool isLocal = (message.clientId == m_clientId);
 
+        // Store local player network ID for respawn handling
+        if (isLocal) {
+            m_localPlayerNetworkId = message.networkId;
+        }
+
         ecs::Entity entity = m_registry.createEntity();
 
         ecs::PlayerComponent playerComp(message.playerSlot, 3);
@@ -786,11 +921,140 @@ namespace rtype::client {
         m_registry.addComponent(hitEffect, sprite);
 
         m_registry.addComponent(hitEffect, ecs::LifetimeComponent(0.3f));
-
         m_registry.addComponent(hitEffect, ecs::VelocityComponent(0.0f, -50.0f, 0.0f));
 
         std::cout << "[NetworkClient] Player health updated to " << message.newHealth
                   << " - spawned hit effect" << std::endl;
+    }
+
+    void NetworkClient::handlePlayerDeath(const network::PlayerDeathMessage& message) {
+        std::cout << "[NetworkClient] Received PLAYER_DEATH (networkId=" << message.networkId
+                  << ", remainingLives=" << static_cast<int>(message.remainingLives) << ")" << std::endl;
+
+        auto it = m_networkIdToEntity.find(message.networkId);
+        if (it == m_networkIdToEntity.end()) {
+            std::cerr << "[NetworkClient] Player not found for networkId " << message.networkId << std::endl;
+            return;
+        }
+
+        ecs::Entity entity = it->second;
+
+        // Update player lives
+        auto* player = m_registry.tryGetComponent<ecs::PlayerComponent>(entity);
+        if (player) {
+            player->lives = static_cast<int>(message.remainingLives);
+            std::cout << "[NetworkClient] Updated player lives to " << player->lives << std::endl;
+        }
+
+        // Create death explosion effect at death position
+        ecs::Entity deathEffect = m_registry.createEntity();
+        m_registry.addComponent(deathEffect, ecs::TransformComponent(message.deathX, message.deathY, 0.0f, 2.0f, 2.0f));
+        
+        ecs::SpritesheetComponent sprite;
+        sprite.setBullet(ecs::BulletType::Ball, ecs::BulletColor::Red);
+        sprite.hasGlow = true;
+        sprite.glowIntensity = 1.5f;
+        sprite.frameWidth = 48;
+        sprite.frameHeight = 48;
+        m_registry.addComponent(deathEffect, sprite);
+        
+        m_registry.addComponent(deathEffect, ecs::LifetimeComponent(0.5f));
+
+        // If player has no lives remaining, mark them as dead (will be respawned by server or game over)
+        if (message.remainingLives == 0) {
+            std::cout << "[NetworkClient] Player has no lives remaining - game over for this player" << std::endl;
+        }
+
+        // Hide player by setting visibility to false (not moving off-screen which causes sync issues)
+        auto* ship = m_registry.tryGetComponent<ecs::PlayerShipComponent>(entity);
+        if (ship) {
+            ship->isVisible = false;
+        }
+
+        // Store death position for respawn animation
+        auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(entity);
+        if (transform) {
+            m_deathPositions[message.networkId] = {transform->x, transform->y};
+        }
+    }
+
+    void NetworkClient::handlePlayerRespawn(const network::PlayerRespawnMessage& message) {
+        std::cout << "[NetworkClient] Received PLAYER_RESPAWN (networkId=" << message.networkId
+                  << ", slot=" << static_cast<int>(message.playerSlot) 
+                  << ", pos=" << message.x << "," << message.y << ")" << std::endl;
+
+        auto it = m_networkIdToEntity.find(message.networkId);
+        if (it == m_networkIdToEntity.end()) {
+            // Player might have been destroyed, need to recreate
+            std::cout << "[NetworkClient] Creating new entity for respawned player" << std::endl;
+            
+            ecs::Entity newPlayer = m_registry.createEntity();
+            
+            // Start off-screen left, will slide in
+            m_registry.addComponent(newPlayer, ecs::TransformComponent(-50.0f, message.y, 0.0f));
+            m_registry.addComponent(newPlayer, ecs::VelocityComponent(0.0f, 0.0f, 350.0f));
+            
+            ecs::PlayerComponent playerComp(message.playerSlot, 3);
+            playerComp.isLocal = (message.networkId == m_localPlayerNetworkId);
+            m_registry.addComponent(newPlayer, playerComp);
+            
+            m_registry.addComponent(newPlayer, ecs::HealthComponent(100, 100));
+            m_registry.addComponent(newPlayer, ecs::NetworkComponent(message.networkId, playerComp.isLocal));
+            
+            // Add PlayerShipComponent for rendering
+            ecs::PlayerShipComponent shipComp(ecs::PlayerShipComponent::ShipStyle::Classic);
+            shipComp.layer = 10;
+            shipComp.isVisible = true;
+            shipComp.isInvincible = true;  // Visual invincibility indicator
+            m_registry.addComponent(newPlayer, shipComp);
+            
+            // Add WeaponComponent for shooting
+            ecs::WeaponComponent weapon(ecs::WeaponConstants::DEFAULT_FIRE_RATE, ecs::WeaponConstants::DEFAULT_DAMAGE);
+            weapon.projectileSpeed = ecs::WeaponConstants::DEFAULT_PROJECTILE_SPEED;
+            m_registry.addComponent(newPlayer, weapon);
+            
+            // Add invincibility on respawn
+            auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(newPlayer);
+            if (health) {
+                health->isInvincible = true;
+                health->invincibilityTimer = 3.0f;  // 3 seconds of invincibility
+            }
+            
+            // Store respawn animation state
+            m_respawnAnimations[message.networkId] = {-50.0f, message.x, message.y, 0.0f, 0.5f};
+            
+            m_networkIdToEntity[message.networkId] = newPlayer;
+            return;
+        }
+
+        ecs::Entity entity = it->second;
+
+        // Make player visible again
+        auto* ship = m_registry.tryGetComponent<ecs::PlayerShipComponent>(entity);
+        if (ship) {
+            ship->isVisible = true;
+            ship->isInvincible = true;  // Visual indicator
+        }
+
+        // Start position off-screen left for slide-in animation
+        auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(entity);
+        if (transform) {
+            transform->x = -50.0f;
+            transform->y = message.y;
+        }
+
+        // Reset health and add invincibility
+        auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(entity);
+        if (health) {
+            health->currentHealth = static_cast<int>(message.health);
+            health->isInvincible = true;
+            health->invincibilityTimer = 3.0f;  // 3 seconds of invincibility with flicker
+        }
+
+        // Store respawn animation state (startX, targetX, targetY, elapsed, duration)
+        m_respawnAnimations[message.networkId] = {-50.0f, message.x, message.y, 0.0f, 0.5f};
+
+        std::cout << "[NetworkClient] Player respawned with slide-in animation and invincibility!" << std::endl;
     }
 
     // ============================================================

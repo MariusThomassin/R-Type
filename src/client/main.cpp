@@ -874,6 +874,9 @@ int main(int argc, char* argv[]) {
 
         // Update network (process received messages)
         networkClient.update();
+        
+        // Update respawn animations (slide-in from left)
+        networkClient.updateAnimations(frameTime);
 
         while (accumulator >= FIXED_TIMESTEP) {
             // Update game systems based on game state
