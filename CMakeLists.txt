@@ -108,6 +108,9 @@ add_subdirectory(src/shared)
 add_subdirectory(src/server)
 add_subdirectory(src/client)
 
+# Build Flappy Bird game (standalone game using the engine)
+add_subdirectory(src/flappybird)
+
 #--------------------------------------------------------------
 # Testing
 #--------------------------------------------------------------
