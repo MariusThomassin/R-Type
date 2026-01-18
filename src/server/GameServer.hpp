@@ -348,6 +348,11 @@ namespace rtype::server {
         bool m_waveActive = false;               // Is a wave currently spawning
         size_t m_enemiesAlive = 0;               // Track alive enemies for wave completion
 
+        // Boss state
+        bool m_allWavesComplete = false;         // All regular waves finished
+        bool m_bossSpawned = false;              // Boss has been spawned
+        float m_bossTriggerTimer = 0.0f;         // Timer until boss spawns
+
         // Player scores (clientId → score)
         std::map<uint32_t, uint32_t> m_playerScores;
         uint32_t m_teamScore = 0;

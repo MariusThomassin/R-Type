@@ -28,6 +28,7 @@
 #include "engine/ecs/components/HealthComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include "game/components/PlayerComponent.hpp"
+#include "game/components/PowerupComponent.hpp"
 #include "game/components/EnemyComponent.hpp"
 // Note: SpritesheetComponent removed - not needed on headless server
 #include "game/components/bullets/TrajectoryComponent.hpp"
@@ -40,6 +41,7 @@
 // Powerup components
 #include "game/components/ForceOrbComponent.hpp"
 #include "game/components/PowerupComponent.hpp"
+#include "game/components/BossComponent.hpp"
 
 #include <thread>
 #include <cmath>
@@ -377,6 +379,40 @@ namespace rtype::server {
             return;
         }
 
+        // Check for shield (spare hit protection)
+        auto* activePowerups = m_registry.tryGetComponent<ecs::ActivePowerupsComponent>(playerEntityId);
+        if (activePowerups && activePowerups->hasShield) {
+            // Shield absorbs the hit
+            activePowerups->hasShield = false;
+            activePowerups->shieldTimer = 0.0f;
+            std::cout << "[GameServer] Shield absorbed hit for Player NetworkID=" << network->networkId << std::endl;
+            
+            // Grant brief invincibility after shield breaks
+            health->isInvincible = true;
+            health->invincibilityTimer = 1.0f;
+            
+            // Notify client about shield break and invincibility
+            network::PlayerHitMessage hitMsg;
+            hitMsg.networkId = network->networkId;
+            hitMsg.newHealth = static_cast<float>(health->currentHealth);
+            hitMsg.hitX = transform->x;
+            hitMsg.hitY = transform->y;
+            hitMsg.isInvincible = true;
+            hitMsg.invincibilityTimer = 1.0f;
+            auto buffer = network::serializeMessage(network::MessageType::PLAYER_HIT, hitMsg);
+            m_networkManager->broadcast(buffer);
+            
+            // Destroy projectile
+            auto* projectileNetwork = m_registry.tryGetComponent<ecs::NetworkComponent>(projectileEntityId);
+            if (projectileNetwork) {
+                ecs::Entity projectileEntity(projectileEntityId);
+                m_networkIdManager->remove(projectileEntity);
+                m_networkManager->broadcastEntityDestroy(projectileNetwork->networkId);
+            }
+            m_registry.destroyEntity(projectileEntityId);
+            return;
+        }
+
         std::cout << "[GameServer] Player hit! NetworkID=" << network->networkId
                   << " - losing a life!" << std::endl;
 
@@ -489,6 +525,7 @@ namespace rtype::server {
     void GameServer::handleEnemyDeath(ecs::EntityId enemyEntityId) {
         auto* enemy = m_registry.tryGetComponent<ecs::EnemyComponent>(enemyEntityId);
         auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(enemyEntityId);
+        auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(enemyEntityId);
 
         if (!enemy || !network) {
             return;
@@ -500,11 +537,13 @@ namespace rtype::server {
         // Award score to all players and broadcast to clients
         m_teamScore += enemy->scoreValue;
         
-        // Broadcast score update to all clients
+        // Broadcast score update to all clients (with position for floating text)
         network::ScoreUpdateMessage scoreMsg;
         scoreMsg.clientId = 0;  // 0 = team score
         scoreMsg.newScore = static_cast<int32_t>(m_teamScore);
         scoreMsg.delta = enemy->scoreValue;
+        scoreMsg.scoreX = transform ? transform->x : 0.0f;
+        scoreMsg.scoreY = transform ? transform->y : 0.0f;
         auto scoreBuffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
         m_networkManager->broadcast(scoreBuffer);
 
@@ -534,8 +573,15 @@ namespace rtype::server {
         
         // Check if all enemies are dead
         bool allEnemiesDead = (m_enemiesAlive == 0);
-
-        if (allWavesSpawned && allEnemiesDead) {
+        
+        // If boss section is enabled, must also kill the boss
+        if (m_currentLevelConfig->bossSection.enabled) {
+            // Level is complete only if boss was spawned AND all enemies (including boss) are dead
+            if (allWavesSpawned && m_bossSpawned && allEnemiesDead) {
+                std::cout << "[GameServer] Level complete! Boss defeated!" << std::endl;
+                handleLevelComplete();
+            }
+        } else if (allWavesSpawned && allEnemiesDead) {
             std::cout << "[GameServer] Level complete! All waves finished and all enemies killed." << std::endl;
             handleLevelComplete();
         }
@@ -566,7 +612,7 @@ namespace rtype::server {
     void GameServer::respawnPlayer(uint32_t clientId) {
         std::cout << "[GameServer] Respawning player for client " << clientId << std::endl;
 
-        // Spawn new player entity
+        // Spawn new player entity (or get existing one)
         ecs::Entity newPlayer = m_playerManager->spawnPlayer(clientId);
         if (newPlayer.id == ecs::NULL_ENTITY) {
             std::cout << "[GameServer] Failed to respawn player for client " << clientId << std::endl;
@@ -583,8 +629,27 @@ namespace rtype::server {
             return;
         }
 
+        // Re-add collider if missing (was removed on death)
+        if (!m_registry.hasComponent<ecs::ColliderComponent>(newPlayer)) {
+            ecs::ColliderComponent collider;
+            collider.width = 32.0f;
+            collider.height = 24.0f;
+            collider.layer = ecs::CollisionLayer::Player;
+            collider.mask = static_cast<ecs::CollisionLayer>(
+                static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
+                static_cast<uint32_t>(ecs::CollisionLayer::Enemy)
+            );
+            m_registry.addComponent(newPlayer, collider);
+            std::cout << "[GameServer] Re-added collider to respawned player" << std::endl;
+        }
+
+        // Reset position to spawn point
+        transform->x = 100.0f;
+        transform->y = 360.0f;
+
         // Set invincibility on respawn (3 seconds)
         if (health) {
+            health->currentHealth = health->maxHealth;
             health->isInvincible = true;
             health->invincibilityTimer = 3.0f;
         }
@@ -596,6 +661,8 @@ namespace rtype::server {
         respawnMsg.x = transform->x;
         respawnMsg.y = transform->y;
         respawnMsg.health = 100.0f;
+        respawnMsg.isInvincible = true;
+        respawnMsg.invincibilityTimer = 3.0f;
 
         auto buffer = network::serializeMessage(network::MessageType::PLAYER_RESPAWN, respawnMsg);
         m_networkManager->broadcast(buffer);
@@ -759,6 +826,11 @@ namespace rtype::server {
         m_enemySpawnTimer = 0.0f;
         m_waveActive = false;
         m_enemiesAlive = 0;
+        
+        // Reset boss state
+        m_allWavesComplete = false;
+        m_bossSpawned = false;
+        m_bossTriggerTimer = 0.0f;
 
         std::cout << "[GameServer] Loaded level '" << m_currentLevelConfig->name 
                   << "' with " << m_currentLevelConfig->waves.size() << " waves" << std::endl;
@@ -945,11 +1017,13 @@ namespace rtype::server {
         m_playerScores[clientId] += delta;
         m_teamScore += delta;
 
-        // Broadcast score update
+        // Broadcast score update (no position for non-enemy score updates)
         network::ScoreUpdateMessage scoreMsg;
         scoreMsg.clientId = clientId;
         scoreMsg.newScore = static_cast<int32_t>(m_playerScores[clientId]);
         scoreMsg.delta = delta;
+        scoreMsg.scoreX = 0.0f;  // No position for generic score updates
+        scoreMsg.scoreY = 0.0f;
 
         auto buffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
         m_networkManager->broadcast(buffer);
@@ -962,9 +1036,21 @@ namespace rtype::server {
         
         const auto& waves = m_currentLevelConfig->waves;
         
-        // Check if all waves are complete
+        // Check if all waves are complete - handle boss spawning
         if (m_currentWaveIndex >= waves.size()) {
-            // Level complete - could trigger boss or next level
+            // Check for boss section
+            if (m_allWavesComplete && !m_bossSpawned && m_currentLevelConfig->bossSection.enabled) {
+                m_bossTriggerTimer += dt;
+                if (m_bossTriggerTimer >= m_currentLevelConfig->bossSection.triggerDelay) {
+                    // Spawn the boss using the same spawnEnemy function
+                    const auto& bossConfig = m_currentLevelConfig->bossSection.boss;
+                    spawnEnemy(bossConfig);
+                    m_enemiesAlive++;  // Count boss as an enemy
+                    m_bossSpawned = true;
+                    std::cout << "[GameServer] BOSS SPAWNED! Health: " << bossConfig.health 
+                              << " at (" << bossConfig.x << ", " << bossConfig.y << ")" << std::endl;
+                }
+            }
             return;
         }
         
@@ -1020,7 +1106,8 @@ namespace rtype::server {
                                    static_cast<uint8_t>(nextEnemyCount));
             } else {
                 std::cout << "[GameServer] All waves complete!" << std::endl;
-                // TODO: Spawn boss if enabled
+                m_allWavesComplete = true;
+                m_bossTriggerTimer = 0.0f;
             }
         }
     }
@@ -1114,10 +1201,15 @@ namespace rtype::server {
         enemyComp.scoreValue = config.scoreValue;
         m_registry.addComponent(enemy, enemyComp);
         
-        // Collider
+        // Collider - bosses are 96x96, other enemies 32x32
         ecs::ColliderComponent collider;
-        collider.width = 32.0f;
-        collider.height = 32.0f;
+        if (config.type == ecs::EnemyType::Boss) {
+            collider.width = 96.0f;
+            collider.height = 96.0f;
+        } else {
+            collider.width = 32.0f;
+            collider.height = 32.0f;
+        }
         collider.layer = ecs::CollisionLayer::Enemy;
         collider.mask = static_cast<ecs::CollisionLayer>(
             static_cast<uint32_t>(ecs::CollisionLayer::Player) |
@@ -1134,6 +1226,27 @@ namespace rtype::server {
             m_registry.addComponent(enemy, traj);
         }
         
+        // Add BossComponent for boss enemies with mechanic settings
+        if (config.type == ecs::EnemyType::Boss) {
+            ecs::BossComponent bossComp;
+            bossComp.mechanic = ecs::BossComponent::parseMechanic(config.mechanic);
+            bossComp.arcSpread = config.arcSpread;
+            bossComp.bulletsPerArc = config.bulletsPerArc;
+            bossComp.arcCooldown = config.arcCooldown;
+            bossComp.minionSpawnRate = config.minionSpawnRate;
+            bossComp.maxMinions = config.maxMinions;
+            bossComp.teleportCooldown = config.teleportCooldown;
+            bossComp.baseY = config.y;
+            bossComp.maxHealth = scaledHealth;
+            m_registry.addComponent(enemy, bossComp);
+            
+            std::cout << "[GameServer] Boss mechanic: " << config.mechanic 
+                      << " (arcSpread=" << config.arcSpread 
+                      << ", bullets=" << config.bulletsPerArc 
+                      << ", minionRate=" << config.minionSpawnRate
+                      << ", teleportCD=" << config.teleportCooldown << ")" << std::endl;
+        }
+        
         // Network - Allocate network ID
         uint32_t networkId = m_networkIdManager->allocate(enemy);
         m_registry.addComponent(enemy, ecs::NetworkComponent(networkId, false));
@@ -1142,13 +1255,14 @@ namespace rtype::server {
         network::EntitySpawnMessage spawnMsg{};
         spawnMsg.networkId = networkId;
         spawnMsg.entityType = network::EntityType::ENEMY;
+        spawnMsg.enemyType = static_cast<uint8_t>(config.type);  // Send enemy type to client
         spawnMsg.x = config.x;
         spawnMsg.y = config.y;
         spawnMsg.rotation = 0.0f;
         spawnMsg.vx = config.vx;
         spawnMsg.vy = config.vy;
-        spawnMsg.colliderWidth = 32.0f;
-        spawnMsg.colliderHeight = 32.0f;
+        spawnMsg.colliderWidth = (config.type == ecs::EnemyType::Boss) ? 96.0f : 32.0f;
+        spawnMsg.colliderHeight = (config.type == ecs::EnemyType::Boss) ? 96.0f : 32.0f;
         spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::Enemy);
         spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Player) |
                                  static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot);
@@ -1187,6 +1301,109 @@ namespace rtype::server {
             
             // All enemies can shoot, but at different rates based on type
             enemy->fireTimer += dt;
+            
+            // Check if this is a boss with special mechanics
+            auto* bossComp = m_registry.tryGetComponent<ecs::BossComponent>(eid);
+            if (bossComp) {
+                // Boss movement: oscillate up and down
+                bossComp->moveTimer += dt;
+                auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(eid);
+                if (velocity) {
+                    // Move toward target X position (800), then oscillate vertically
+                    if (transform->x > 900.0f) {
+                        velocity->vx = -60.0f;  // Move left until in position
+                    } else {
+                        velocity->vx = 0.0f;  // Stop horizontal movement
+                    }
+                    // Oscillate vertically using sine wave
+                    float targetY = bossComp->baseY + std::sin(bossComp->moveTimer * bossComp->moveSpeed * 0.02f) * bossComp->oscillateRange;
+                    velocity->vy = (targetY - transform->y) * 2.0f;  // Move toward target Y
+                }
+                
+                // Handle boss mechanics
+                if (bossComp->mechanic == ecs::BossMechanic::ArcShot) {
+                    bossComp->arcTimer += dt;
+                    if (bossComp->arcTimer >= bossComp->arcCooldown) {
+                        bossComp->arcTimer = 0.0f;
+                        
+                        // Fire arc of bullets
+                        float startAngle = 180.0f - bossComp->arcSpread / 2.0f;  // Centered on left direction
+                        float angleStep = bossComp->bulletsPerArc > 1 ? 
+                            bossComp->arcSpread / (bossComp->bulletsPerArc - 1) : 0.0f;
+                        
+                        for (int i = 0; i < bossComp->bulletsPerArc; ++i) {
+                            float angle = startAngle + angleStep * i;
+                            float rad = angle * 3.14159f / 180.0f;
+                            float projVx = std::cos(rad) * 250.0f;
+                            float projVy = std::sin(rad) * 250.0f;
+                            spawnEnemyProjectile(transform->x - 30.0f, transform->y, projVx, projVy);
+                        }
+                        
+                        std::cout << "[GameServer] Boss fired arc shot! " << bossComp->bulletsPerArc << " bullets" << std::endl;
+                    }
+                } else if (bossComp->mechanic == ecs::BossMechanic::MinionSpawner) {
+                    // Spawn minion enemies periodically
+                    bossComp->minionTimer += dt;
+                    if (bossComp->minionTimer >= bossComp->minionSpawnRate && bossComp->currentMinions < bossComp->maxMinions) {
+                        bossComp->minionTimer = 0.0f;
+                        
+                        // Spawn a basic enemy minion near the boss
+                        ecs::EnemySpawnConfig minionConfig;
+                        minionConfig.type = ecs::EnemyType::Basic;
+                        minionConfig.x = transform->x - 50.0f;
+                        minionConfig.y = transform->y + (std::rand() % 100 - 50);  // Random Y offset
+                        minionConfig.vx = -150.0f;
+                        minionConfig.vy = 0.0f;
+                        minionConfig.health = 1;
+                        minionConfig.scoreValue = 50;
+                        spawnEnemy(minionConfig);
+                        bossComp->currentMinions++;
+                        m_enemiesAlive++;
+                        
+                        std::cout << "[GameServer] Boss spawned minion! (" << bossComp->currentMinions << "/" << bossComp->maxMinions << ")" << std::endl;
+                    }
+                    
+                    // Also fire regular shots at player
+                    enemy->fireTimer += dt;
+                    if (enemy->fireTimer >= 1.5f) {
+                        enemy->fireTimer = 0.0f;
+                        spawnEnemyProjectile(transform->x - 30.0f, transform->y, -300.0f, 0.0f);
+                    }
+                } else if (bossComp->mechanic == ecs::BossMechanic::Teleporter) {
+                    // Teleport to random position periodically
+                    bossComp->teleportTimer += dt;
+                    if (bossComp->teleportTimer >= bossComp->teleportCooldown) {
+                        bossComp->teleportTimer = 0.0f;
+                        
+                        // Teleport to new position (right side of screen)
+                        float newX = 700.0f + (std::rand() % 300);  // 700-1000
+                        float newY = 100.0f + (std::rand() % 500);  // 100-600
+                        transform->x = newX;
+                        transform->y = newY;
+                        bossComp->baseY = newY;  // Update oscillation center
+                        
+                        // Fire burst after teleporting
+                        for (int i = 0; i < 8; ++i) {
+                            float angle = i * 45.0f;
+                            float rad = angle * 3.14159f / 180.0f;
+                            float projVx = std::cos(rad) * 200.0f;
+                            float projVy = std::sin(rad) * 200.0f;
+                            spawnEnemyProjectile(transform->x, transform->y, projVx, projVy);
+                        }
+                        
+                        std::cout << "[GameServer] Boss teleported to (" << newX << ", " << newY << ") and fired burst!" << std::endl;
+                    }
+                } else {
+                    // Boss with no special mechanic - just fire rapidly
+                    enemy->fireTimer += dt;
+                    if (enemy->fireTimer >= 0.8f) {
+                        enemy->fireTimer = 0.0f;
+                        spawnEnemyProjectile(transform->x - 30.0f, transform->y, -350.0f, 0.0f);
+                    }
+                }
+                // Skip regular firing for bosses with mechanics
+                continue;
+            }
             
             // Determine fire interval based on enemy type
             float fireInterval = 3.0f;  // Basic enemies shoot every 3 seconds

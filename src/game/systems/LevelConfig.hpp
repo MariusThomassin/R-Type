@@ -23,6 +23,19 @@ namespace rtype::ecs {
         float spawnDelay = 0.0f;        // Per-enemy delay offset for ordered spawning
         bool shootsAtPlayer = false;    // Override shooting behavior
         float fireRate = 1.5f;          // Custom fire rate if shootsAtPlayer
+        
+        // Boss mechanic fields
+        std::string mechanic;           // Boss mechanic type: "arc_shot", "minion_spawner", "teleporter"
+        float arcSpread = 45.0f;        // Arc shot: spread angle in degrees
+        int bulletsPerArc = 5;          // Arc shot: number of bullets per arc
+        float arcCooldown = 2.0f;       // Arc shot: cooldown between arcs
+        
+        // Minion spawner params
+        float minionSpawnRate = 4.0f;   // Time between minion spawns
+        int maxMinions = 4;             // Maximum minions alive
+        
+        // Teleporter params  
+        float teleportCooldown = 5.0f;  // Time between teleports
     };
 
     /**

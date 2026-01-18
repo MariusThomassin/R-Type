@@ -18,7 +18,9 @@
 #include "../components/PlayerComponent.hpp"
 #include "../components/ProjectileComponent.hpp"
 #include "../components/EnemyComponent.hpp"
+#include "../components/EnemySprites.hpp"
 #include "../components/PowerupComponent.hpp"
+#include "../components/FloatingTextComponent.hpp"
 #include "../../engine/ui/UIManager.hpp"
 
 #include <raylib.h>
@@ -265,26 +267,9 @@ namespace rtype::ecs {
                             sprite.render(transform, ctx);
                         }
                     } else if (m_registry->hasComponent<EnemyComponent>(e)) {
-                        // Render enemy using simple raylib drawing (placeholder)
-                        float x = transform.x;
-                        float y = transform.y;
-                        float scale = transform.scaleX;
-                        
-                        // Pulsing glow effect
-                        float pulse = 0.5f + 0.5f * std::sin(m_animTime * 4.0f);
-                        unsigned char alpha = static_cast<unsigned char>(100 * pulse);
-                        
-                        // Glow circle (larger, orange)
-                        DrawCircle(static_cast<int>(x), static_cast<int>(y), 
-                                   24.0f * scale, {255, 100, 50, alpha});
-                        
-                        // Main body (orange-red)
-                        DrawCircle(static_cast<int>(x), static_cast<int>(y), 
-                                   16.0f * scale, {255, 100, 50, 255});
-                        
-                        // Inner highlight (white)
-                        DrawCircle(static_cast<int>(x - 4*scale), static_cast<int>(y - 4*scale), 
-                                   6.0f * scale, {255, 255, 255, 150});
+                        const auto& enemy = m_registry->getComponent<EnemyComponent>(e);
+                        renderEnemySprite(transform.x, transform.y, transform.scaleX, 
+                                         enemy.type, m_animTime);
                     } else if (m_registry->hasComponent<PowerupComponent>(e)) {
                         // Render powerup with type-based color
                         const auto& powerup = m_registry->getComponent<PowerupComponent>(e);
@@ -326,6 +311,9 @@ namespace rtype::ecs {
                                    4.0f * scale, {255, 255, 255, 200});
                     }
                 }
+
+                // Render floating text (score popups)
+                renderFloatingText(dt);
 
                 drawUI();
                 
@@ -443,9 +431,113 @@ namespace rtype::ecs {
             void loadTextures() {
                 std::string path = rtype::resolveAssetPath("assets/sprites/touhou_bullets.png");
                 loadTexture("touhou_bullets", path.c_str());
+                
+                // Load enemy spritesheets
+                loadTexture("r-typesheet1", rtype::resolveAssetPath("assets/sprites/r-typesheet1.gif").c_str());
+                loadTexture("r-typesheet5", rtype::resolveAssetPath("assets/sprites/r-typesheet5.gif").c_str());
+                loadTexture("r-typesheet7", rtype::resolveAssetPath("assets/sprites/r-typesheet7.gif").c_str());
+                loadTexture("r-typesheet8", rtype::resolveAssetPath("assets/sprites/r-typesheet8.gif").c_str());
             }
 
             // ==================== UI ====================
+
+            /**
+             * @brief Render floating text (score popups, etc.)
+             */
+            void renderFloatingText(float dt) {
+                std::vector<EntityId> expiredTexts;
+                
+                m_registry->forEach<FloatingTextComponent>(
+                    [this, dt, &expiredTexts](EntityId e) {
+                        auto& text = m_registry->getComponent<FloatingTextComponent>(e);
+                        
+                        // Update elapsed time
+                        text.elapsed += dt;
+                        
+                        if (text.isExpired()) {
+                            expiredTexts.push_back(e);
+                            return;
+                        }
+                        
+                        // Calculate current values
+                        float y = text.getCurrentY();
+                        float alpha = text.getAlpha();
+                        float scale = text.getScale();
+                        
+                        // Calculate font size with scale
+                        int fontSize = static_cast<int>(text.fontSize * scale);
+                        
+                        // Measure text for centering
+                        int textWidth = MeasureText(text.text.c_str(), fontSize);
+                        int drawX = static_cast<int>(text.startX - textWidth / 2);
+                        int drawY = static_cast<int>(y);
+                        
+                        // Calculate color with alpha
+                        unsigned char a = static_cast<unsigned char>(text.a * alpha);
+                        Color textColor = {text.r, text.g, text.b, a};
+                        
+                        // Draw shadow for better visibility
+                        Color shadowColor = {0, 0, 0, static_cast<unsigned char>(a * 0.5f)};
+                        DrawText(text.text.c_str(), drawX + 2, drawY + 2, fontSize, shadowColor);
+                        
+                        // Draw main text
+                        DrawText(text.text.c_str(), drawX, drawY, fontSize, textColor);
+                    }
+                );
+                
+                // Clean up expired floating texts
+                for (EntityId e : expiredTexts) {
+                    m_registry->destroyEntity(e);
+                }
+            }
+
+            /**
+             * @brief Draw boss health bar if a boss is present
+             */
+            void drawBossHealthBar() {
+                m_registry->forEach<EnemyComponent, HealthComponent>(
+                    [this](EntityId e) {
+                        const auto& enemy = m_registry->getComponent<EnemyComponent>(e);
+                        if (enemy.type == EnemyType::Boss) {
+                            const auto& health = m_registry->getComponent<HealthComponent>(e);
+                            int barWidth = 400;
+                            int barHeight = 24;
+                            int barX = (m_screenWidth - barWidth) / 2;
+                            int barY = 30;
+                            float healthPercent = static_cast<float>(health.currentHealth) / static_cast<float>(health.maxHealth);
+                            
+                            // Outer border with glow effect
+                            DrawRectangle(barX - 4, barY - 4, barWidth + 8, barHeight + 8, {80, 20, 20, 180});
+                            DrawRectangle(barX - 2, barY - 2, barWidth + 4, barHeight + 4, {120, 40, 40, 220});
+                            
+                            // Background
+                            DrawRectangle(barX, barY, barWidth, barHeight, {30, 30, 30, 255});
+                            
+                            // Health fill with gradient effect
+                            int fillWidth = static_cast<int>(barWidth * healthPercent);
+                            Color healthColor = {255, 50, 50, 255};
+                            if (healthPercent < 0.3f) {
+                                healthColor = {255, 100, 50, 255}; // Orange when low
+                            }
+                            DrawRectangle(barX, barY, fillWidth, barHeight, healthColor);
+                            
+                            // Shine effect on health bar
+                            DrawRectangle(barX, barY, fillWidth, barHeight / 3, {255, 150, 150, 80});
+                            
+                            // Boss label
+                            const char* bossLabel = "-- BOSS --";
+                            int labelWidth = MeasureText(bossLabel, 18);
+                            DrawText(bossLabel, barX + barWidth/2 - labelWidth/2, barY + 3, 18, WHITE);
+                            
+                            // Health numbers
+                            char healthText[32];
+                            snprintf(healthText, sizeof(healthText), "%d / %d", health.currentHealth, health.maxHealth);
+                            int healthTextWidth = MeasureText(healthText, 14);
+                            DrawText(healthText, barX + barWidth/2 - healthTextWidth/2, barY + barHeight + 4, 14, {200, 200, 200, 255});
+                        }
+                    }
+                );
+            }
 
             /**
              * @brief Draw the game UI elements
@@ -472,11 +564,16 @@ namespace rtype::ecs {
                     
                     // Lives display with hearts
                     int playerLives = 0;
+                    bool playerHasShield = false;
                     m_registry->forEach<PlayerComponent>(
-                        [this, &playerLives](EntityId e) {
+                        [this, &playerLives, &playerHasShield](EntityId e) {
                             const auto& player = m_registry->getComponent<PlayerComponent>(e);
                             if (player.isLocal) {
                                 playerLives = player.lives;
+                                if (m_registry->hasComponent<ActivePowerupsComponent>(e)) {
+                                    const auto& active = m_registry->getComponent<ActivePowerupsComponent>(e);
+                                    playerHasShield = active.hasShield;
+                                }
                             }
                         }
                     );
@@ -504,6 +601,19 @@ namespace rtype::ecs {
                             DrawCircle(heartX - 6, heartY - 2, 3, {255, 200, 200, 150});
                         }
                     }
+                    
+                    // Shield indicator (if active)
+                    if (playerHasShield) {
+                        int shieldX = 285;
+                        int shieldY = 35;
+                        // Draw shield icon
+                        DrawCircle(shieldX + 15, shieldY + 12, 14, {100, 150, 255, 150});
+                        DrawCircle(shieldX + 15, shieldY + 12, 10, {150, 200, 255, 200});
+                        DrawText("SHIELD", shieldX, 15, 16, {100, 200, 255, 255});
+                    }
+                    
+                    // Boss health bar (if boss exists)
+                    drawBossHealthBar();
 
                     DrawText("R-TYPE", m_screenWidth - 90, 15, 20, {100, 100, 255, 255});
                     DrawFPS(m_screenWidth - 80, m_screenHeight - 25);

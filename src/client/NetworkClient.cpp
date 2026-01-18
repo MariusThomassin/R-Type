@@ -502,14 +502,55 @@ namespace rtype::client {
                 m_registry.addComponent(entity, collider);
             }
         } else if (message.entityType == network::EntityType::ENEMY) {
-            // Add enemy component (uses placeholder renderer via RenderSystem)
+            // Add enemy component with correct type from server
             ecs::EnemyComponent enemyComp;
-            enemyComp.type = ecs::EnemyType::Basic;
+            enemyComp.type = static_cast<ecs::EnemyType>(message.enemyType);
             enemyComp.scoreValue = 100;
             m_registry.addComponent(entity, enemyComp);
 
             // Add health component
             m_registry.addComponent(entity, ecs::HealthComponent(1, 1));
+
+            // Add sprite component based on enemy type
+            ecs::SpritesheetComponent sprite;
+            sprite.textureId = "r-typesheet5";  // Default enemy spritesheet
+            sprite.isVisible = true;
+            sprite.hasGlow = true;
+            sprite.glowIntensity = 0.4f;
+            
+            switch (enemyComp.type) {
+                case ecs::EnemyType::Basic:
+                    sprite.frameX = 0; sprite.frameY = 0;
+                    sprite.frameWidth = 32; sprite.frameHeight = 32;
+                    sprite.tintR = 100; sprite.tintG = 200; sprite.tintB = 255;
+                    break;
+                case ecs::EnemyType::Shooter:
+                    sprite.frameX = 1; sprite.frameY = 0;
+                    sprite.frameWidth = 32; sprite.frameHeight = 32;
+                    sprite.tintR = 255; sprite.tintG = 150; sprite.tintB = 50;
+                    break;
+                case ecs::EnemyType::Chaser:
+                    sprite.frameX = 2; sprite.frameY = 0;
+                    sprite.frameWidth = 32; sprite.frameHeight = 32;
+                    sprite.tintR = 200; sprite.tintG = 100; sprite.tintB = 255;
+                    break;
+                case ecs::EnemyType::Turret:
+                    sprite.frameX = 3; sprite.frameY = 0;
+                    sprite.frameWidth = 32; sprite.frameHeight = 32;
+                    sprite.tintR = 100; sprite.tintG = 255; sprite.tintB = 100;
+                    break;
+                case ecs::EnemyType::Boss:
+                    sprite.textureId = "r-typesheet1";  // Boss uses different sheet
+                    sprite.frameX = 0; sprite.frameY = 0;
+                    sprite.frameWidth = 96; sprite.frameHeight = 96;
+                    sprite.tintR = 255; sprite.tintG = 50; sprite.tintB = 50;
+                    sprite.glowIntensity = 0.6f;
+                    break;
+                default:
+                    break;
+            }
+            sprite.layer = (enemyComp.type == ecs::EnemyType::Boss) ? 8 : 6;
+            m_registry.addComponent(entity, sprite);
 
             // Add collider for enemies
             if (message.colliderWidth > 0.0f && message.colliderHeight > 0.0f) {
@@ -529,7 +570,8 @@ namespace rtype::client {
                 m_registry.addComponent(entity, traj);
             }
 
-            std::cout << "[NetworkClient] Created ENEMY entity at (" << message.x << ", " << message.y << ")" << std::endl;
+            std::cout << "[NetworkClient] Created ENEMY entity type " << static_cast<int>(enemyComp.type) 
+                      << " at (" << message.x << ", " << message.y << ")" << std::endl;
         } else if (message.entityType == network::EntityType::POWERUP) {
             // Add powerup component
             ecs::PowerupComponent powerup;
@@ -893,7 +935,9 @@ namespace rtype::client {
 
     void NetworkClient::handlePlayerHit(const network::PlayerHitMessage& message) {
         std::cout << "[NetworkClient] Received PLAYER_HIT (networkId=" << message.networkId
-                  << ", newHealth=" << message.newHealth << ")" << std::endl;
+                  << ", newHealth=" << message.newHealth 
+                  << ", invincible=" << message.isInvincible
+                  << ", timer=" << message.invincibilityTimer << ")" << std::endl;
 
         auto it = m_networkIdToEntity.find(message.networkId);
         if (it == m_networkIdToEntity.end()) {
@@ -906,6 +950,15 @@ namespace rtype::client {
         auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(entity);
         if (health) {
             health->currentHealth = static_cast<int>(message.newHealth);
+            // Sync invincibility state from server
+            health->isInvincible = message.isInvincible;
+            health->invincibilityTimer = message.invincibilityTimer;
+        }
+        
+        // Also update PlayerShipComponent for visual flicker
+        auto* ship = m_registry.tryGetComponent<ecs::PlayerShipComponent>(entity);
+        if (ship) {
+            ship->isInvincible = message.isInvincible;
         }
 
         ecs::Entity hitEffect = m_registry.createEntity();
@@ -1005,7 +1058,7 @@ namespace rtype::client {
             ecs::PlayerShipComponent shipComp(ecs::PlayerShipComponent::ShipStyle::Classic);
             shipComp.layer = 10;
             shipComp.isVisible = true;
-            shipComp.isInvincible = true;  // Visual invincibility indicator
+            shipComp.isInvincible = message.isInvincible;  // Visual invincibility indicator
             m_registry.addComponent(newPlayer, shipComp);
             
             // Add WeaponComponent for shooting
@@ -1013,11 +1066,11 @@ namespace rtype::client {
             weapon.projectileSpeed = ecs::WeaponConstants::DEFAULT_PROJECTILE_SPEED;
             m_registry.addComponent(newPlayer, weapon);
             
-            // Add invincibility on respawn
+            // Add invincibility on respawn from server values
             auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(newPlayer);
             if (health) {
-                health->isInvincible = true;
-                health->invincibilityTimer = 3.0f;  // 3 seconds of invincibility
+                health->isInvincible = message.isInvincible;
+                health->invincibilityTimer = message.invincibilityTimer;
             }
             
             // Store respawn animation state
@@ -1043,12 +1096,12 @@ namespace rtype::client {
             transform->y = message.y;
         }
 
-        // Reset health and add invincibility
+        // Reset health and add invincibility from server
         auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(entity);
         if (health) {
             health->currentHealth = static_cast<int>(message.health);
-            health->isInvincible = true;
-            health->invincibilityTimer = 3.0f;  // 3 seconds of invincibility with flicker
+            health->isInvincible = message.isInvincible;
+            health->invincibilityTimer = message.invincibilityTimer;
         }
 
         // Store respawn animation state (startX, targetX, targetY, elapsed, duration)

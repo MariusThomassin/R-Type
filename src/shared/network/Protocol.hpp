@@ -194,6 +194,7 @@ namespace rtype::network {
     struct EntitySpawnMessage {
         uint32_t networkId;
         EntityType entityType;
+        uint8_t enemyType;          // For enemies: EnemyType enum value
 
         // Transform
         float x, y;
@@ -264,6 +265,8 @@ namespace rtype::network {
         uint32_t networkId;
         float newHealth;
         float hitX, hitY;       // Impact position (for visual effect)
+        bool isInvincible;      // Whether player is now invincible
+        float invincibilityTimer;  // Duration of invincibility
     };
 
     /**
@@ -283,6 +286,8 @@ namespace rtype::network {
         uint8_t playerSlot;
         float x, y;
         float health;
+        bool isInvincible;      // Whether player is now invincible
+        float invincibilityTimer;  // Duration of invincibility
     };
 
     /**
@@ -316,6 +321,8 @@ namespace rtype::network {
         uint32_t clientId;          // Client whose score changed
         int32_t newScore;           // New total score
         int32_t delta;              // Points added
+        float scoreX;               // X position where score was earned (for floating text)
+        float scoreY;               // Y position where score was earned
     };
 
     // ============================================================

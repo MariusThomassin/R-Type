@@ -7,12 +7,17 @@
   "bossMusic": "assets/sound/music/Sketchbook 2024-10-23.ogg",
   "powerupSpawns": [
     {"type": 2, "x": 1300, "y": 200, "triggerTime": 10.0},
+    {"type": 1, "x": 1300, "y": 550, "triggerTime": 18.0},
     {"type": 0, "x": 1300, "y": 400, "triggerTime": 25.0},
-    {"type": 4, "x": 1300, "y": 300, "triggerTime": 40.0},
-    {"type": 3, "x": 1300, "y": 500, "triggerTime": 55.0}
+    {"type": 4, "x": 1300, "y": 300, "triggerTime": 35.0},
+    {"type": 5, "x": 1300, "y": 450, "triggerTime": 45.0},
+    {"type": 3, "x": 1300, "y": 500, "triggerTime": 55.0},
+    {"type": 2, "x": 1300, "y": 250, "triggerTime": 68.0},
+    {"type": 0, "x": 1300, "y": 350, "triggerTime": 78.0}
   ],
   "bombSpawns": [
-    {"x": 1300, "y": 360, "triggerTime": 70.0}
+    {"x": 1300, "y": 360, "triggerTime": 62.0},
+    {"x": 1300, "y": 180, "triggerTime": 85.0}
   ],
   "waves": [
     {
@@ -110,15 +115,23 @@
       "y": 360,
       "vx": -25,
       "vy": 0,
-      "health": 50,
+      "health": 150,
       "scoreValue": 8000,
       "shootsAtPlayer": true,
-      "fireRate": 0.8
+      "fireRate": 0.8,
+      "mechanic": "minion_spawner",
+      "mechanicParams": {
+        "minionType": "basic",
+        "minionHealth": 1,
+        "spawnCount": 2,
+        "spawnCooldown": 4.0,
+        "minionSpeed": 150
+      }
     },
     "phases": [
-      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 50.0},
-      {"phase": 2, "healthThreshold": 0.6, "pattern": "spiral", "moveSpeed": 70.0},
-      {"phase": 3, "healthThreshold": 0.3, "pattern": "desperate", "moveSpeed": 100.0}
+      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 50.0, "spawnCount": 2, "spawnCooldown": 5.0},
+      {"phase": 2, "healthThreshold": 0.6, "pattern": "spiral", "moveSpeed": 70.0, "spawnCount": 3, "spawnCooldown": 3.5},
+      {"phase": 3, "healthThreshold": 0.3, "pattern": "desperate", "moveSpeed": 100.0, "spawnCount": 4, "spawnCooldown": 2.5}
     ]
   }
 }

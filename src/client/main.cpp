@@ -35,6 +35,7 @@
 #include "LocalServer.hpp"
 #include "ProfileManager.hpp"
 #include "ScoreManager.hpp"
+#include "../game/components/FloatingTextComponent.hpp"
 #include "../shared/PathUtils.hpp"
 
 using namespace rtype::ecs;
@@ -235,9 +236,16 @@ int main(int argc, char* argv[]) {
     
     // Set up network callbacks for score tracking
     rtype::client::NetworkCallbacks netCallbacks;
-    netCallbacks.onScoreUpdate = [&scoreManager, &networkClient](const rtype::network::ScoreUpdateMessage& msg) {
+    netCallbacks.onScoreUpdate = [&scoreManager, &networkClient, &registry](const rtype::network::ScoreUpdateMessage& msg) {
         if (msg.clientId == networkClient.getClientId()) {
             scoreManager.updateSessionScore(msg.newScore);
+        }
+        
+        // Spawn floating text for score popups (if position is provided)
+        if (msg.delta > 0 && (msg.scoreX != 0.0f || msg.scoreY != 0.0f)) {
+            Entity floatText = registry.createEntity();
+            std::string scoreStr = "+" + std::to_string(msg.delta);
+            registry.addComponent(floatText, FloatingTextComponent(scoreStr, msg.scoreX, msg.scoreY, msg.delta));
         }
     };
     netCallbacks.onLevelComplete = [&scoreManager](const rtype::network::LevelCompleteMessage& msg) {
