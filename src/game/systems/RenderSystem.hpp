@@ -28,6 +28,7 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
+#include "../../shared/PathUtils.hpp"
 
 // Game state for conditional rendering
 enum class GameState {
@@ -440,14 +441,8 @@ namespace rtype::ecs {
              * @brief Load essential textures at startup
              */
             void loadTextures() {
-                const char* paths[] = {
-                    "../assets/sprites/touhou_bullets.png",
-                    "assets/sprites/touhou_bullets.png",
-                    "./touhou_bullets.png"
-                };
-                for (const char* p : paths) {
-                    if (loadTexture("touhou_bullets", p)) break;
-                }
+                std::string path = rtype::resolveAssetPath("assets/sprites/touhou_bullets.png");
+                loadTexture("touhou_bullets", path.c_str());
             }
 
             // ==================== UI ====================

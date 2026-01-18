@@ -35,6 +35,7 @@
 #include "LocalServer.hpp"
 #include "ProfileManager.hpp"
 #include "ScoreManager.hpp"
+#include "../shared/PathUtils.hpp"
 
 using namespace rtype::ecs;
 using rtype::ecs::BulletType;
@@ -243,6 +244,30 @@ int main(int argc, char* argv[]) {
         scoreManager.setSessionProgress(msg.levelIndex + 1, msg.nextLevelIndex < msg.levelIndex);
     };
     
+    netCallbacks.onLevelInfo = [&eventBus](const rtype::network::LevelInfoMessage& msg) {
+        std::cout << "[Main] Level info received, loading assets: bg=" << msg.backgroundPath 
+                  << ", music=" << msg.stageMusicPath << std::endl;
+        
+        rtype::ecs::events::LevelAssetsLoaded assetsEvent;
+        
+        // Use PathUtils to resolve paths - works in both build/ and dist/ layouts
+        if (msg.backgroundPath[0] != '\0') {
+            assetsEvent.backgroundPath = rtype::resolveAssetPath(msg.backgroundPath);
+        }
+        if (msg.stageMusicPath[0] != '\0') {
+            assetsEvent.stageMusicPath = rtype::resolveAssetPath(msg.stageMusicPath);
+        }
+        if (msg.bossMusicPath[0] != '\0') {
+            assetsEvent.bossMusicPath = rtype::resolveAssetPath(msg.bossMusicPath);
+        }
+        
+        assetsEvent.hasBackground = (msg.backgroundPath[0] != '\0');
+        assetsEvent.hasStageMusic = (msg.stageMusicPath[0] != '\0');
+        assetsEvent.hasBossMusic = (msg.bossMusicPath[0] != '\0');
+        
+        eventBus.emit(assetsEvent);
+    };
+    
     // Room/Lobby callbacks - will be set up after lobbyWidget is created
     // (see below after lobbyWidget initialization)
     networkClient.setCallbacks(netCallbacks);
@@ -258,7 +283,7 @@ int main(int argc, char* argv[]) {
 
     // ==================== Button Click Sound Setup ====================
     // Set a default click sound for all buttons
-    rtype::ui::ButtonWidget::setDefaultClickSound("assets/sound/mixkit-modern-technology-select-3124.wav");
+    rtype::ui::ButtonWidget::setDefaultClickSound(rtype::resolveAssetPath("assets/sound/mixkit-modern-technology-select-3124.wav"));
     // Set initial volume to match effects volume settings (convert percentage to 0.0-1.0 range)
     rtype::ui::ButtonWidget::setSoundVolume(initialConfig.effectsVolume / 100.0f);
     
@@ -274,7 +299,7 @@ int main(int argc, char* argv[]) {
     musicSystem.setMasterVolume(initialConfig.musicVolume / 100.0f);
     
     // Play default music for menu
-    musicSystem.playTrack("assets/sound/music/Sketchbook 2024-10-13.ogg", 1.0f, true);
+    musicSystem.playTrack(rtype::resolveAssetPath("assets/sound/music/Sketchbook 2024-10-13.ogg"), 1.0f, true);
     std::cout << "MusicSystem initialized with default track" << std::endl;
     
     auto settingsWidget = std::make_shared<rtype::ui::SettingsWidget>(initialConfig);
