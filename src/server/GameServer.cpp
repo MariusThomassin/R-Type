@@ -166,6 +166,7 @@ namespace rtype::server {
             [this](const ecs::CollisionEvent& event) {
                 handlePlayerCollision(event);
                 handleEnemyCollision(event);
+                handlePowerupCollision(event);
             }
         );
 
@@ -281,6 +282,35 @@ namespace rtype::server {
                     if (health.invincibilityTimer <= 0.0f) {
                         health.isInvincible = false;
                         health.invincibilityTimer = 0.0f;
+                    }
+                }
+            }
+        );
+
+        // Update active powerup timers
+        m_registry.forEach<ecs::PlayerComponent, ecs::ActivePowerupsComponent>(
+            [this, dt](ecs::EntityId e) {
+                auto& active = m_registry.getComponent<ecs::ActivePowerupsComponent>(e);
+                
+                // Track what was active before update
+                bool wasSpreadShot = active.hasSpreadShot;
+                bool wasSpeedBoost = active.hasSpeedBoost;
+                
+                // Update timers (decrements and clears flags when expired)
+                active.update(dt);
+                
+                // Revert spread shot
+                if (wasSpreadShot && !active.hasSpreadShot) {
+                    std::cout << "[GameServer] Spread shot expired for player " << e << std::endl;
+                }
+                
+                // Revert speed boost
+                if (wasSpeedBoost && !active.hasSpeedBoost) {
+                    auto* vel = m_registry.tryGetComponent<ecs::VelocityComponent>(e);
+                    if (vel && active.originalMaxSpeed > 0.0f) {
+                        vel->maxSpeed = active.originalMaxSpeed;
+                        std::cout << "[GameServer] Speed boost expired for player " << e 
+                                  << " - restored max speed to " << vel->maxSpeed << std::endl;
                     }
                 }
             }
@@ -522,6 +552,134 @@ namespace rtype::server {
         }
     }
 
+    void GameServer::handlePowerupCollision(const ecs::CollisionEvent& event) {
+        ecs::EntityId playerEntityId = ecs::NULL_ENTITY;
+        ecs::EntityId powerupEntityId = ecs::NULL_ENTITY;
+
+        auto* playerA = m_registry.tryGetComponent<ecs::PlayerComponent>(event.entityA);
+        auto* playerB = m_registry.tryGetComponent<ecs::PlayerComponent>(event.entityB);
+        auto* powerupA = m_registry.tryGetComponent<ecs::PowerupComponent>(event.entityA);
+        auto* powerupB = m_registry.tryGetComponent<ecs::PowerupComponent>(event.entityB);
+
+        // Check for player-powerup collision
+        if (playerA && powerupB) {
+            playerEntityId = event.entityA;
+            powerupEntityId = event.entityB;
+        } else if (playerB && powerupA) {
+            playerEntityId = event.entityB;
+            powerupEntityId = event.entityA;
+        } else {
+            return;  // Not a player-powerup collision
+        }
+
+        auto* powerup = m_registry.tryGetComponent<ecs::PowerupComponent>(powerupEntityId);
+        auto* player = m_registry.tryGetComponent<ecs::PlayerComponent>(playerEntityId);
+        auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(powerupEntityId);
+        auto* playerTransform = m_registry.tryGetComponent<ecs::TransformComponent>(playerEntityId);
+
+        if (!powerup || !player || powerup->isCollected) {
+            return;
+        }
+
+        // Mark as collected to prevent double-collection
+        powerup->isCollected = true;
+
+        std::cout << "[GameServer] Player " << player->playerId << " collected powerup type " 
+                  << static_cast<int>(powerup->type) << std::endl;
+
+        // Ensure player has ActivePowerupsComponent
+        if (!m_registry.hasComponent<ecs::ActivePowerupsComponent>(playerEntityId)) {
+            m_registry.addComponent(ecs::Entity(playerEntityId), ecs::ActivePowerupsComponent());
+        }
+        auto* active = m_registry.tryGetComponent<ecs::ActivePowerupsComponent>(playerEntityId);
+
+        // Apply powerup effect based on type
+        switch (powerup->type) {
+            case ecs::PowerupType::HEALTH_UP:
+                // Grant shield (one spare hit) - if already has shield, bonus points
+                if (active && active->hasShield) {
+                    player->score += 1000;  // Bonus points for extra shield pickup
+                    m_teamScore += 1000;
+                } else if (active) {
+                    active->hasShield = true;
+                    active->shieldTimer = 999.0f;  // Shield lasts until hit
+                }
+                break;
+
+            case ecs::PowerupType::SPREAD_SHOT:
+                if (active) {
+                    active->hasSpreadShot = true;
+                    active->spreadShotTimer = powerup->duration;
+                }
+                break;
+
+            case ecs::PowerupType::SPEED_BOOST:
+                if (active) {
+                    active->hasSpeedBoost = true;
+                    active->speedBoostTimer = powerup->duration;
+                    // Increase player speed
+                    auto* vel = m_registry.tryGetComponent<ecs::VelocityComponent>(playerEntityId);
+                    if (vel) {
+                        if (active->originalMaxSpeed == 0.0f) {
+                            active->originalMaxSpeed = vel->maxSpeed;
+                        }
+                        vel->maxSpeed = active->originalMaxSpeed * 1.5f;
+                    }
+                }
+                break;
+
+            case ecs::PowerupType::SHIELD:
+                if (active) {
+                    active->hasShield = true;
+                    active->shieldTimer = powerup->duration;
+                }
+                break;
+
+            case ecs::PowerupType::WEAPON_UPGRADE:
+                // Upgrade weapon power level (handled elsewhere)
+                player->score += 200;
+                m_teamScore += 200;
+                break;
+
+            case ecs::PowerupType::FORCE_ORB:
+                // Emit Force Orb spawn event
+                m_eventBus.emit(ecs::events::SpawnForceOrb{playerEntityId, 1});
+                break;
+
+            case ecs::PowerupType::BOMB:
+                // Activate bomb
+                if (playerTransform) {
+                    m_eventBus.emit(ecs::events::BombActivated{
+                        playerEntityId, playerTransform->x, playerTransform->y
+                    });
+                }
+                break;
+        }
+
+        // Award base score for pickup
+        player->score += 100;
+        m_teamScore += 100;
+
+        // Broadcast score update with position for floating text
+        network::ScoreUpdateMessage scoreMsg;
+        scoreMsg.clientId = player->networkClientId;
+        scoreMsg.newScore = static_cast<int32_t>(player->score);
+        scoreMsg.delta = 100;
+        scoreMsg.scoreX = playerTransform ? playerTransform->x : 0.0f;
+        scoreMsg.scoreY = playerTransform ? playerTransform->y - 30.0f : 0.0f;  // Above player
+        auto scoreBuffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
+        m_networkManager->broadcast(scoreBuffer);
+
+        // Broadcast entity destroy for the powerup
+        if (network) {
+            m_networkIdManager->remove(ecs::Entity(powerupEntityId));
+            m_networkManager->broadcastEntityDestroy(network->networkId);
+        }
+
+        // Destroy the powerup entity
+        m_registry.destroyEntity(powerupEntityId);
+    }
+
     void GameServer::handleEnemyDeath(ecs::EntityId enemyEntityId) {
         auto* enemy = m_registry.tryGetComponent<ecs::EnemyComponent>(enemyEntityId);
         auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(enemyEntityId);
@@ -637,7 +795,8 @@ namespace rtype::server {
             collider.layer = ecs::CollisionLayer::Player;
             collider.mask = static_cast<ecs::CollisionLayer>(
                 static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
-                static_cast<uint32_t>(ecs::CollisionLayer::Enemy)
+                static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
+                static_cast<uint32_t>(ecs::CollisionLayer::Powerup)
             );
             m_registry.addComponent(newPlayer, collider);
             std::cout << "[GameServer] Re-added collider to respawned player" << std::endl;
