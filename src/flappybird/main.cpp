@@ -123,6 +123,7 @@ int main() {
     std::cout << "  R - Restart (when game over)" << std::endl;
     std::cout << "  ESC - Quit" << std::endl;
     std::cout << "==================================" << std::endl;
+    std::cout << "[DEBUG] Entering game loop..." << std::endl;
     
     while (!WindowShouldClose()) {
         float frameTime = GetFrameTime();
@@ -138,7 +139,9 @@ int main() {
         // Fixed timestep updates
         while (accumulator >= FIXED_TIMESTEP) {
             // Update game logic
+            std::cout << "[DEBUG] Before flappySystem->update" << std::endl;
             flappySystem->update(FIXED_TIMESTEP);
+            std::cout << "[DEBUG] After flappySystem->update" << std::endl;
             
             // Flush deferred entity destructions
             registry.flushDeferred();
@@ -156,7 +159,9 @@ int main() {
         drawClouds(animTime);
         
         // Render game entities (pipes, bird, ground)
+        std::cout << "[DEBUG] Before renderSystem->update" << std::endl;
         renderSystem->update(frameTime);
+        std::cout << "[DEBUG] After renderSystem->update" << std::endl;
         
         // Draw UI (score, game over screen)
         bool isWaiting = (flappySystem->getGamePhase() == flappy::FlappyBirdSystem::GamePhase::Waiting);

@@ -16,8 +16,6 @@
 #include "../components/GroundComponent.hpp"
 
 #include <raylib.h>
-#include <vector>
-#include <algorithm>
 
 namespace flappy {
 
@@ -60,76 +58,47 @@ namespace flappy {
             ctx.animTime = m_animTime;
             ctx.deltaTime = dt;
             
-            // Collect all renderables by entity ID (like R-Type's RenderSystem)
-            struct RenderItem {
-                rtype::ecs::EntityId entity;
-                int layer;
-                enum class Type { Bird, Pipe, Ground } type;
-            };
-            std::vector<RenderItem> renderItems;
-            renderItems.reserve(32);
+            // Render ground first (lowest layer)
+            try {
+                m_registry->forEach<GroundComponent, rtype::ecs::TransformComponent>(
+                    [this, &ctx](rtype::ecs::EntityId entity) {
+                        if (!m_registry->entityExists(entity)) return;
+                        const auto& ground = m_registry->getComponent<GroundComponent>(entity);
+                        const auto& transform = m_registry->getComponent<rtype::ecs::TransformComponent>(entity);
+                        if (ground.isRenderable()) {
+                            ground.render(transform, ctx);
+                        }
+                    }
+                );
+            } catch (...) {}
             
-            // Collect birds
-            m_registry->forEach<BirdComponent, rtype::ecs::TransformComponent>(
-                [this, &renderItems](rtype::ecs::EntityId entity) {
-                    const auto& bird = m_registry->getComponent<BirdComponent>(entity);
-                    if (bird.isRenderable()) {
-                        renderItems.push_back({entity, bird.getRenderLayer(), RenderItem::Type::Bird});
+            // Render pipes (middle layer)
+            try {
+                m_registry->forEach<PipeComponent, rtype::ecs::TransformComponent>(
+                    [this, &ctx](rtype::ecs::EntityId entity) {
+                        if (!m_registry->entityExists(entity)) return;
+                        const auto& pipe = m_registry->getComponent<PipeComponent>(entity);
+                        const auto& transform = m_registry->getComponent<rtype::ecs::TransformComponent>(entity);
+                        if (pipe.isRenderable()) {
+                            pipe.render(transform, ctx);
+                        }
                     }
-                }
-            );
+                );
+            } catch (...) {}
             
-            // Collect pipes
-            m_registry->forEach<PipeComponent, rtype::ecs::TransformComponent>(
-                [this, &renderItems](rtype::ecs::EntityId entity) {
-                    const auto& pipe = m_registry->getComponent<PipeComponent>(entity);
-                    if (pipe.isRenderable()) {
-                        renderItems.push_back({entity, pipe.getRenderLayer(), RenderItem::Type::Pipe});
+            // Render birds (top layer)
+            try {
+                m_registry->forEach<BirdComponent, rtype::ecs::TransformComponent>(
+                    [this, &ctx](rtype::ecs::EntityId entity) {
+                        if (!m_registry->entityExists(entity)) return;
+                        const auto& bird = m_registry->getComponent<BirdComponent>(entity);
+                        const auto& transform = m_registry->getComponent<rtype::ecs::TransformComponent>(entity);
+                        if (bird.isRenderable()) {
+                            bird.render(transform, ctx);
+                        }
                     }
-                }
-            );
-            
-            // Collect ground
-            m_registry->forEach<GroundComponent, rtype::ecs::TransformComponent>(
-                [this, &renderItems](rtype::ecs::EntityId entity) {
-                    const auto& ground = m_registry->getComponent<GroundComponent>(entity);
-                    if (ground.isRenderable()) {
-                        renderItems.push_back({entity, ground.getRenderLayer(), RenderItem::Type::Ground});
-                    }
-                }
-            );
-            
-            // Sort by layer (ascending - lower layers first)
-            std::sort(renderItems.begin(), renderItems.end(),
-                [](const RenderItem& a, const RenderItem& b) {
-                    return a.layer < b.layer;
-                }
-            );
-            
-            // Render all items by looking up components at render time
-            for (const auto& item : renderItems) {
-                if (!m_registry->entityExists(item.entity)) continue;
-                
-                const auto& transform = m_registry->getComponent<rtype::ecs::TransformComponent>(item.entity);
-                
-                switch (item.type) {
-                    case RenderItem::Type::Bird: {
-                        const auto& bird = m_registry->getComponent<BirdComponent>(item.entity);
-                        bird.render(transform, ctx);
-                        break;
-                    }
-                    case RenderItem::Type::Pipe: {
-                        const auto& pipe = m_registry->getComponent<PipeComponent>(item.entity);
-                        pipe.render(transform, ctx);
-                        break;
-                    }
-                    case RenderItem::Type::Ground: {
-                        const auto& ground = m_registry->getComponent<GroundComponent>(item.entity);
-                        ground.render(transform, ctx);
-                        break;
-                    }
-                }
-            }
+                );
+            } catch (...) {}
         }
         
         /**

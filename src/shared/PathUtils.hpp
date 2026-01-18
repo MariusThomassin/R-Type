@@ -9,6 +9,11 @@
 #include <cstring>
 
 #ifdef _WIN32
+// Must include winsock2.h before windows.h to avoid conflicts with ASIO
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
 #include <windows.h>
 #else
 #include <unistd.h>
