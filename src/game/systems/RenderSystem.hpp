@@ -10,12 +10,17 @@
 #include "../../engine/ecs/core/Registry.hpp"
 #include "../../engine/ecs/components/TransformComponent.hpp"
 #include "../../engine/ecs/components/SpriteComponent.hpp"
+#include "../../engine/ecs/components/HealthComponent.hpp"
 #include "../../engine/ecs/components/ImageBackgroundComponent.hpp"
 #include "../../engine/ecs/components/ProceduralBackgroundComponent.hpp"
 #include "../components/SpritesheetComponent.hpp"
 #include "../components/PlayerShipComponent.hpp"
 #include "../components/PlayerComponent.hpp"
 #include "../components/ProjectileComponent.hpp"
+#include "../components/EnemyComponent.hpp"
+#include "../components/EnemySprites.hpp"
+#include "../components/PowerupComponent.hpp"
+#include "../components/FloatingTextComponent.hpp"
 #include "../../engine/ui/UIManager.hpp"
 
 #include <raylib.h>
@@ -25,6 +30,7 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
+#include "../../shared/PathUtils.hpp"
 
 // Game state for conditional rendering
 enum class GameState {
@@ -164,6 +170,31 @@ namespace rtype::ecs {
                         }
                     }
                 );
+                
+                // Collect EnemyComponent entities
+                m_registry->forEach<TransformComponent, EnemyComponent>(
+                    [this, &entities](EntityId e) {
+                        // Only add if not already added via other components
+                        if (!m_registry->hasComponent<SpritesheetComponent>(e) &&
+                            !m_registry->hasComponent<SpriteComponent>(e) &&
+                            !m_registry->hasComponent<PlayerShipComponent>(e)) {
+                            entities.push_back({e, 50});  // Layer 50 for enemies
+                        }
+                    }
+                );
+                
+                // Collect PowerupComponent entities
+                m_registry->forEach<TransformComponent, PowerupComponent>(
+                    [this, &entities](EntityId e) {
+                        // Only add if not already added via other components
+                        if (!m_registry->hasComponent<SpritesheetComponent>(e) &&
+                            !m_registry->hasComponent<SpriteComponent>(e) &&
+                            !m_registry->hasComponent<PlayerShipComponent>(e) &&
+                            !m_registry->hasComponent<EnemyComponent>(e)) {
+                            entities.push_back({e, 45});  // Layer 45 for powerups (slightly behind enemies)
+                        }
+                    }
+                );
 
                 m_lastEntityCount = entities.size();
 
@@ -186,6 +217,28 @@ namespace rtype::ecs {
                     EntityId e = item.entity;
                     const auto& transform = m_registry->getComponent<TransformComponent>(e);
 
+                    // Check for invincibility flicker (from HealthComponent)
+                    bool shouldFlicker = false;
+                    if (m_registry->hasComponent<HealthComponent>(e)) {
+                        auto& health = m_registry->getComponent<HealthComponent>(e);
+                        if (health.isInvincible) {
+                            // Update invincibility timer
+                            health.invincibilityTimer -= dt;
+                            if (health.invincibilityTimer <= 0.0f) {
+                                health.isInvincible = false;
+                                health.invincibilityTimer = 0.0f;
+                                // Also sync PlayerShipComponent invincibility
+                                if (m_registry->hasComponent<PlayerShipComponent>(e)) {
+                                    auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
+                                    ship.isInvincible = false;
+                                }
+                            } else {
+                                // Flicker: skip rendering every other 0.1s
+                                shouldFlicker = (static_cast<int>(m_animTime * 10.0f) % 2) == 0;
+                            }
+                        }
+                    }
+
                     if (m_registry->hasComponent<PlayerShipComponent>(e)) {
                         auto& ship = m_registry->getComponent<PlayerShipComponent>(e);
                         if (!ship.isRenderable()) {
@@ -195,6 +248,8 @@ namespace rtype::ecs {
                                           << " has isVisible=false, isInvincible=" << ship.isInvincible << std::endl;
                                 loggedShip = true;
                             }
+                        } else if (shouldFlicker) {
+                            // Skip rendering during flicker (invincibility blink)
                         } else if (ship.isInvincible) {
                             // Log when ship is invincible (flashing)
                             static int invincibleCount = 0;
@@ -224,8 +279,54 @@ namespace rtype::ecs {
                         if (sprite.isRenderable()) {
                             sprite.render(transform, ctx);
                         }
+                    } else if (m_registry->hasComponent<EnemyComponent>(e)) {
+                        const auto& enemy = m_registry->getComponent<EnemyComponent>(e);
+                        renderEnemySprite(transform.x, transform.y, transform.scaleX, 
+                                         enemy.type, m_animTime);
+                    } else if (m_registry->hasComponent<PowerupComponent>(e)) {
+                        // Render powerup with type-based color
+                        const auto& powerup = m_registry->getComponent<PowerupComponent>(e);
+                        if (powerup.isCollected) continue;
+                        
+                        float x = transform.x;
+                        float y = transform.y;
+                        float scale = transform.scaleX;
+                        
+                        // Get color based on powerup type
+                        Color color;
+                        switch (powerup.type) {
+                            case PowerupType::SPREAD_SHOT:    color = {0, 255, 255, 255}; break;  // Cyan
+                            case PowerupType::SPEED_BOOST:    color = {255, 255, 0, 255}; break;  // Yellow
+                            case PowerupType::HEALTH_UP:      color = {0, 255, 0, 255}; break;    // Green
+                            case PowerupType::SHIELD:         color = {0, 150, 255, 255}; break;  // Blue
+                            case PowerupType::WEAPON_UPGRADE: color = {255, 136, 0, 255}; break;  // Orange
+                            case PowerupType::FORCE_ORB:      color = {136, 0, 255, 255}; break;  // Purple
+                            case PowerupType::BOMB:           color = {255, 0, 0, 255}; break;    // Red
+                            default:                          color = {255, 255, 255, 255}; break;
+                        }
+                        
+                        // Bobbing animation
+                        float bob = std::sin(m_animTime * 3.0f + x * 0.1f) * 5.0f;
+                        int drawY = static_cast<int>(y + bob);
+                        
+                        // Pulsing glow
+                        float glowPulse = 0.5f + 0.5f * std::sin(m_animTime * 5.0f);
+                        unsigned char glowAlpha = static_cast<unsigned char>(100 * glowPulse);
+                        
+                        // Outer glow
+                        DrawCircle(static_cast<int>(x), drawY, 20.0f * scale, {color.r, color.g, color.b, glowAlpha});
+                        
+                        // Main body
+                        DrawCircle(static_cast<int>(x), drawY, 12.0f * scale, color);
+                        
+                        // Inner highlight
+                        DrawCircle(static_cast<int>(x - 3*scale), drawY - static_cast<int>(3*scale), 
+                                   4.0f * scale, {255, 255, 255, 200});
                     }
                 }
+
+                // Render floating text (score popups)
+                renderFloatingText(dt);
 
                 drawUI();
                 
@@ -341,17 +442,115 @@ namespace rtype::ecs {
              * @brief Load essential textures at startup
              */
             void loadTextures() {
-                const char* paths[] = {
-                    "../assets/sprites/touhou_bullets.png",
-                    "assets/sprites/touhou_bullets.png",
-                    "./touhou_bullets.png"
-                };
-                for (const char* p : paths) {
-                    if (loadTexture("touhou_bullets", p)) break;
-                }
+                std::string path = rtype::resolveAssetPath("assets/sprites/touhou_bullets.png");
+                loadTexture("touhou_bullets", path.c_str());
+                
+                // Load enemy spritesheets
+                loadTexture("r-typesheet1", rtype::resolveAssetPath("assets/sprites/r-typesheet1.gif").c_str());
+                loadTexture("r-typesheet5", rtype::resolveAssetPath("assets/sprites/r-typesheet5.gif").c_str());
+                loadTexture("r-typesheet7", rtype::resolveAssetPath("assets/sprites/r-typesheet7.gif").c_str());
+                loadTexture("r-typesheet8", rtype::resolveAssetPath("assets/sprites/r-typesheet8.gif").c_str());
             }
 
             // ==================== UI ====================
+
+            /**
+             * @brief Render floating text (score popups, etc.)
+             */
+            void renderFloatingText(float dt) {
+                std::vector<EntityId> expiredTexts;
+                
+                m_registry->forEach<FloatingTextComponent>(
+                    [this, dt, &expiredTexts](EntityId e) {
+                        auto& text = m_registry->getComponent<FloatingTextComponent>(e);
+                        
+                        // Update elapsed time
+                        text.elapsed += dt;
+                        
+                        if (text.isExpired()) {
+                            expiredTexts.push_back(e);
+                            return;
+                        }
+                        
+                        // Calculate current values
+                        float y = text.getCurrentY();
+                        float alpha = text.getAlpha();
+                        float scale = text.getScale();
+                        
+                        // Calculate font size with scale
+                        int fontSize = static_cast<int>(text.fontSize * scale);
+                        
+                        // Measure text for centering
+                        int textWidth = MeasureText(text.text.c_str(), fontSize);
+                        int drawX = static_cast<int>(text.startX - textWidth / 2);
+                        int drawY = static_cast<int>(y);
+                        
+                        // Calculate color with alpha
+                        unsigned char a = static_cast<unsigned char>(text.a * alpha);
+                        Color textColor = {text.r, text.g, text.b, a};
+                        
+                        // Draw shadow for better visibility
+                        Color shadowColor = {0, 0, 0, static_cast<unsigned char>(a * 0.5f)};
+                        DrawText(text.text.c_str(), drawX + 2, drawY + 2, fontSize, shadowColor);
+                        
+                        // Draw main text
+                        DrawText(text.text.c_str(), drawX, drawY, fontSize, textColor);
+                    }
+                );
+                
+                // Clean up expired floating texts
+                for (EntityId e : expiredTexts) {
+                    m_registry->destroyEntity(e);
+                }
+            }
+
+            /**
+             * @brief Draw boss health bar if a boss is present
+             */
+            void drawBossHealthBar() {
+                m_registry->forEach<EnemyComponent, HealthComponent>(
+                    [this](EntityId e) {
+                        const auto& enemy = m_registry->getComponent<EnemyComponent>(e);
+                        if (enemy.type == EnemyType::Boss) {
+                            const auto& health = m_registry->getComponent<HealthComponent>(e);
+                            int barWidth = 400;
+                            int barHeight = 24;
+                            int barX = (m_screenWidth - barWidth) / 2;
+                            int barY = 30;
+                            float healthPercent = static_cast<float>(health.currentHealth) / static_cast<float>(health.maxHealth);
+                            
+                            // Outer border with glow effect
+                            DrawRectangle(barX - 4, barY - 4, barWidth + 8, barHeight + 8, {80, 20, 20, 180});
+                            DrawRectangle(barX - 2, barY - 2, barWidth + 4, barHeight + 4, {120, 40, 40, 220});
+                            
+                            // Background
+                            DrawRectangle(barX, barY, barWidth, barHeight, {30, 30, 30, 255});
+                            
+                            // Health fill with gradient effect
+                            int fillWidth = static_cast<int>(barWidth * healthPercent);
+                            Color healthColor = {255, 50, 50, 255};
+                            if (healthPercent < 0.3f) {
+                                healthColor = {255, 100, 50, 255}; // Orange when low
+                            }
+                            DrawRectangle(barX, barY, fillWidth, barHeight, healthColor);
+                            
+                            // Shine effect on health bar
+                            DrawRectangle(barX, barY, fillWidth, barHeight / 3, {255, 150, 150, 80});
+                            
+                            // Boss label
+                            const char* bossLabel = "-- BOSS --";
+                            int labelWidth = MeasureText(bossLabel, 18);
+                            DrawText(bossLabel, barX + barWidth/2 - labelWidth/2, barY + 3, 18, WHITE);
+                            
+                            // Health numbers
+                            char healthText[32];
+                            snprintf(healthText, sizeof(healthText), "%d / %d", health.currentHealth, health.maxHealth);
+                            int healthTextWidth = MeasureText(healthText, 14);
+                            DrawText(healthText, barX + barWidth/2 - healthTextWidth/2, barY + barHeight + 4, 14, {200, 200, 200, 255});
+                        }
+                    }
+                );
+            }
 
             /**
              * @brief Draw the game UI elements
@@ -376,20 +575,58 @@ namespace rtype::ecs {
                     snprintf(scoreText, sizeof(scoreText), "%08d", playerScore);
                     DrawText(scoreText, 20, 40, 28, WHITE);
                     
-                    // Lives display
+                    // Lives display with hearts
                     int playerLives = 0;
+                    bool playerHasShield = false;
                     m_registry->forEach<PlayerComponent>(
-                        [this, &playerLives](EntityId e) {
+                        [this, &playerLives, &playerHasShield](EntityId e) {
                             const auto& player = m_registry->getComponent<PlayerComponent>(e);
                             if (player.isLocal) {
                                 playerLives = player.lives;
+                                if (m_registry->hasComponent<ActivePowerupsComponent>(e)) {
+                                    const auto& active = m_registry->getComponent<ActivePowerupsComponent>(e);
+                                    playerHasShield = active.hasShield;
+                                }
                             }
                         }
                     );
                     DrawText("LIVES", 180, 15, 20, {150, 150, 150, 255});
-                    char livesText[8];
-                    snprintf(livesText, sizeof(livesText), "%d", playerLives);
-                    DrawText(livesText, 180, 40, 28, WHITE);
+                    
+                    // Draw hearts for each life
+                    for (int i = 0; i < 3; i++) {
+                        int heartX = 180 + i * 28;
+                        int heartY = 45;
+                        Color heartColor = (i < playerLives) ? Color{255, 50, 80, 255} : Color{60, 60, 60, 150};
+                        
+                        // Simple heart shape using circles
+                        DrawCircle(heartX - 4, heartY, 8, heartColor);
+                        DrawCircle(heartX + 4, heartY, 8, heartColor);
+                        // Triangle bottom
+                        DrawTriangle(
+                            {static_cast<float>(heartX - 12), static_cast<float>(heartY + 2)},
+                            {static_cast<float>(heartX + 12), static_cast<float>(heartY + 2)},
+                            {static_cast<float>(heartX), static_cast<float>(heartY + 16)},
+                            heartColor
+                        );
+                        
+                        // Highlight on filled hearts
+                        if (i < playerLives) {
+                            DrawCircle(heartX - 6, heartY - 2, 3, {255, 200, 200, 150});
+                        }
+                    }
+                    
+                    // Shield indicator (if active)
+                    if (playerHasShield) {
+                        int shieldX = 285;
+                        int shieldY = 35;
+                        // Draw shield icon
+                        DrawCircle(shieldX + 15, shieldY + 12, 14, {100, 150, 255, 150});
+                        DrawCircle(shieldX + 15, shieldY + 12, 10, {150, 200, 255, 200});
+                        DrawText("SHIELD", shieldX, 15, 16, {100, 200, 255, 255});
+                    }
+                    
+                    // Boss health bar (if boss exists)
+                    drawBossHealthBar();
 
                     DrawText("R-TYPE", m_screenWidth - 90, 15, 20, {100, 100, 255, 255});
                     DrawFPS(m_screenWidth - 80, m_screenHeight - 25);

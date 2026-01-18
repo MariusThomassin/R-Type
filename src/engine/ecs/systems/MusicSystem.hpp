@@ -198,6 +198,10 @@ namespace rtype::ecs {
         void handleLevelAssets(const events::LevelAssetsLoaded& e) {
             m_stageMusicPath = e.stageMusicPath;
             m_bossMusicPath = e.bossMusicPath;
+            
+            if (e.hasStageMusic && !e.stageMusicPath.empty()) {
+                playStageMusic();
+            }
         }
         
         void cleanup() {

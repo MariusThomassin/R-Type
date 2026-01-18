@@ -6,15 +6,21 @@
   "stageMusic": "assets/sound/music/Sketchbook 2024-10-26.ogg",
   "bossMusic": "assets/sound/music/Sketchbook 2024-10-30.ogg",
   "powerupSpawns": [
-    {"type": 2, "x": 1300, "y": 150, "triggerTime": 8.0},
+    {"type": 2, "x": 1300, "y": 150, "triggerTime": 6.0},
+    {"type": 1, "x": 1300, "y": 600, "triggerTime": 12.0},
     {"type": 3, "x": 1300, "y": 400, "triggerTime": 18.0},
-    {"type": 0, "x": 1300, "y": 250, "triggerTime": 28.0},
-    {"type": 4, "x": 1300, "y": 500, "triggerTime": 40.0},
-    {"type": 5, "x": 1300, "y": 350, "triggerTime": 55.0}
+    {"type": 0, "x": 1300, "y": 250, "triggerTime": 25.0},
+    {"type": 4, "x": 1300, "y": 500, "triggerTime": 32.0},
+    {"type": 2, "x": 1300, "y": 300, "triggerTime": 40.0},
+    {"type": 5, "x": 1300, "y": 350, "triggerTime": 48.0},
+    {"type": 3, "x": 1300, "y": 200, "triggerTime": 56.0},
+    {"type": 0, "x": 1300, "y": 550, "triggerTime": 65.0},
+    {"type": 2, "x": 1300, "y": 400, "triggerTime": 75.0}
   ],
   "bombSpawns": [
-    {"x": 1300, "y": 200, "triggerTime": 35.0},
-    {"x": 1300, "y": 500, "triggerTime": 65.0}
+    {"x": 1300, "y": 200, "triggerTime": 30.0},
+    {"x": 1300, "y": 500, "triggerTime": 58.0},
+    {"x": 1300, "y": 350, "triggerTime": 82.0}
   ],
   "waves": [
     {
@@ -119,16 +125,25 @@
       "y": 360,
       "vx": -20,
       "vy": 0,
-      "health": 80,
+      "health": 200,
       "scoreValue": 15000,
       "shootsAtPlayer": true,
-      "fireRate": 0.5
+      "fireRate": 0.5,
+      "mechanic": "teleporter",
+      "mechanicParams": {
+        "teleportCooldown": 5.0,
+        "teleportWarning": 0.8,
+        "minTeleportY": 100,
+        "maxTeleportY": 620,
+        "burstAfterTeleport": true,
+        "burstBullets": 8
+      }
     },
     "phases": [
-      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 60.0},
-      {"phase": 2, "healthThreshold": 0.75, "pattern": "spiral", "moveSpeed": 80.0},
-      {"phase": 3, "healthThreshold": 0.5, "pattern": "aggressive", "moveSpeed": 100.0},
-      {"phase": 4, "healthThreshold": 0.25, "pattern": "desperate", "moveSpeed": 130.0}
+      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 60.0, "teleportCooldown": 6.0, "burstBullets": 6},
+      {"phase": 2, "healthThreshold": 0.75, "pattern": "spiral", "moveSpeed": 80.0, "teleportCooldown": 5.0, "burstBullets": 8},
+      {"phase": 3, "healthThreshold": 0.5, "pattern": "aggressive", "moveSpeed": 100.0, "teleportCooldown": 4.0, "burstBullets": 10},
+      {"phase": 4, "healthThreshold": 0.25, "pattern": "desperate", "moveSpeed": 130.0, "teleportCooldown": 3.0, "burstBullets": 12}
     ]
   }
 }

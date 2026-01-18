@@ -78,6 +78,3 @@ elseif(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(server PRIVATE Threads::Threads)
 endif()
-
-# Install rules
-install(TARGETS server RUNTIME DESTINATION bin)

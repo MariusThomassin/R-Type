@@ -18,6 +18,7 @@
 #include "game/components/WeaponComponent.hpp"
 #include "game/components/EnemyComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
+#include "game/components/FloatingTextComponent.hpp"
 #include "engine/ecs/events/definitions/GameEvents.hpp"
 
 #include <random>
@@ -303,10 +304,26 @@ namespace rtype::ecs {
             }
             auto& active = m_registry->getComponent<ActivePowerupsComponent>(playerEntity);
 
+            // Get player position for floating text
+            float playerX = 0.0f, playerY = 0.0f;
+            if (m_registry->hasComponent<TransformComponent>(playerEntity)) {
+                const auto& playerTransform = m_registry->getComponent<TransformComponent>(playerEntity);
+                playerX = playerTransform.x;
+                playerY = playerTransform.y;
+            }
+
             switch (powerup.type) {
                 case PowerupType::HEALTH_UP:
-                    // Restore health (handled by HealthComponent if exists)
-                    player.lives = std::min(player.lives + 1, 5);  // Cap at 5 lives
+                    // Grant shield (one spare hit) - if already has shield, bonus points
+                    if (active.hasShield) {
+                        player.score += 1000;  // Bonus points for extra shield pickup
+                        // Spawn floating text for bonus
+                        Entity floatText = m_registry->createEntity();
+                        m_registry->addComponent(floatText, FloatingTextComponent("+1000", playerX, playerY - 20, 1000));
+                    } else {
+                        active.hasShield = true;
+                        active.shieldTimer = 999.0f;  // Shield lasts until hit, not timed
+                    }
                     break;
 
                 case PowerupType::SPREAD_SHOT:

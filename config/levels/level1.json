@@ -6,12 +6,16 @@
   "stageMusic": "assets/sound/music/Sketchbook 2024-10-13.ogg",
   "bossMusic": "assets/sound/music/Sketchbook 2024-10-16.ogg",
   "powerupSpawns": [
-    {"type": 2, "x": 1300, "y": 300, "triggerTime": 15.0},
+    {"type": 2, "x": 1300, "y": 300, "triggerTime": 12.0},
+    {"type": 1, "x": 1300, "y": 200, "triggerTime": 20.0},
     {"type": 4, "x": 1300, "y": 400, "triggerTime": 30.0},
-    {"type": 0, "x": 1300, "y": 250, "triggerTime": 45.0}
+    {"type": 0, "x": 1300, "y": 250, "triggerTime": 42.0},
+    {"type": 3, "x": 1300, "y": 500, "triggerTime": 52.0},
+    {"type": 2, "x": 1300, "y": 350, "triggerTime": 62.0}
   ],
   "bombSpawns": [
-    {"x": 1300, "y": 360, "triggerTime": 55.0}
+    {"x": 1300, "y": 360, "triggerTime": 55.0},
+    {"x": 1300, "y": 200, "triggerTime": 75.0}
   ],
   "waves": [
     {
@@ -92,15 +96,21 @@
       "y": 360,
       "vx": -30,
       "vy": 0,
-      "health": 30,
+      "health": 100,
       "scoreValue": 5000,
       "shootsAtPlayer": true,
-      "fireRate": 1.0
+      "fireRate": 1.0,
+      "mechanic": "arc_shot",
+      "mechanicParams": {
+        "arcSpread": 45,
+        "bulletsPerArc": 5,
+        "arcCooldown": 2.0
+      }
     },
     "phases": [
-      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 40.0},
-      {"phase": 2, "healthThreshold": 0.66, "pattern": "aggressive", "moveSpeed": 60.0},
-      {"phase": 3, "healthThreshold": 0.33, "pattern": "desperate", "moveSpeed": 90.0}
+      {"phase": 1, "healthThreshold": 1.0, "pattern": "default", "moveSpeed": 40.0, "arcSpread": 30, "bulletsPerArc": 3},
+      {"phase": 2, "healthThreshold": 0.66, "pattern": "aggressive", "moveSpeed": 60.0, "arcSpread": 45, "bulletsPerArc": 5},
+      {"phase": 3, "healthThreshold": 0.33, "pattern": "desperate", "moveSpeed": 90.0, "arcSpread": 60, "bulletsPerArc": 7}
     ]
   }
 }

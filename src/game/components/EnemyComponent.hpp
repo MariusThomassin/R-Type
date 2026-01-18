@@ -31,17 +31,30 @@ namespace rtype::ecs {
         EnemyType type = EnemyType::Basic;
         int difficultyLevel = 1;      // Affects behavior/stats
         int scoreValue = 100;         // Points when destroyed
+        
+        // Shooting behavior
+        bool canShoot = true;         // Whether this enemy can shoot
+        float fireRate = 2.0f;        // Shots per second
+        float fireTimer = 0.0f;       // Current timer
+        float projectileSpeed = 300.0f; // Speed of projectiles
 
         EnemyComponent() = default;
 
         explicit EnemyComponent(EnemyType t)
-            : type(t) {}
+            : type(t) {
+            // Set shooting based on type
+            canShoot = (t == EnemyType::Shooter || t == EnemyType::Turret || t == EnemyType::Boss);
+        }
 
         EnemyComponent(EnemyType t, int difficulty)
-            : type(t), difficultyLevel(difficulty) {}
+            : type(t), difficultyLevel(difficulty) {
+            canShoot = (t == EnemyType::Shooter || t == EnemyType::Turret || t == EnemyType::Boss);
+        }
 
         EnemyComponent(EnemyType t, int difficulty, int score)
-            : type(t), difficultyLevel(difficulty), scoreValue(score) {}
+            : type(t), difficultyLevel(difficulty), scoreValue(score) {
+            canShoot = (t == EnemyType::Shooter || t == EnemyType::Turret || t == EnemyType::Boss);
+        }
 
         std::string getTypeName() const override {
             return "EnemyComponent";

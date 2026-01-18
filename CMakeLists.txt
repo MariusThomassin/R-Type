@@ -17,6 +17,9 @@ include(FetchContent)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
 
+# Prevent raylib from installing its own files
+set(RAYLIB_INSTALL OFF CACHE BOOL "" FORCE)
+
 # Fix CMake policy issues with newer CMake versions
 if(POLICY CMP0077)
     cmake_policy(SET CMP0077 NEW)
@@ -105,6 +108,9 @@ add_subdirectory(src/shared)
 add_subdirectory(src/server)
 add_subdirectory(src/client)
 
+# Build Flappy Bird game (standalone game using the engine)
+add_subdirectory(src/flappybird)
+
 #--------------------------------------------------------------
 # Testing
 #--------------------------------------------------------------
@@ -168,6 +174,73 @@ add_custom_target(run_tests
 )
 
 #--------------------------------------------------------------
+# Installation / Distribution
+#--------------------------------------------------------------
+
+# Set default install prefix to a 'dist' folder in build directory
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/dist" CACHE PATH "Install path prefix" FORCE)
+endif()
+
+# Install binaries
+install(TARGETS server client
+    RUNTIME DESTINATION .
+    COMPONENT Runtime
+)
+
+# Install assets
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
+    DESTINATION assets
+    COMPONENT Assets
+    FILES_MATCHING 
+    PATTERN "*.png"
+    PATTERN "*.gif"
+    PATTERN "*.jpg"
+    PATTERN "*.wav"
+    PATTERN "*.ogg"
+    PATTERN "*.mp3"
+)
+
+# Install config files
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/config/
+    DESTINATION config
+    COMPONENT Config
+    FILES_MATCHING
+    PATTERN "*.json"
+)
+
+# Create a convenience target for distribution
+add_custom_target(dist
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/dist"
+    COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix "${CMAKE_BINARY_DIR}/dist" --component Runtime
+    COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix "${CMAKE_BINARY_DIR}/dist" --component Assets
+    COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix "${CMAKE_BINARY_DIR}/dist" --component Config
+    COMMENT "Creating distribution package in ${CMAKE_BINARY_DIR}/dist/"
+)
+
+# CPack configuration for creating installers/archives
+set(CPACK_PACKAGE_NAME "R-Type")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_VENDOR "R-Type Team")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "R-Type Multiplayer Game")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
+
+# Archive generators (ZIP for Windows, TGZ for Linux/Mac)
+set(CPACK_GENERATOR "ZIP;TGZ")
+set(CPACK_SOURCE_GENERATOR "ZIP;TGZ")
+
+# Explicitly specify which projects/components to install
+# Format: "build_directory;project_name;component;subdirectory"
+set(CPACK_INSTALL_CMAKE_PROJECTS
+    "${CMAKE_BINARY_DIR};RType;Runtime;/"
+    "${CMAKE_BINARY_DIR};RType;Assets;/"
+    "${CMAKE_BINARY_DIR};RType;Config;/"
+)
+
+include(CPack)
+
+#--------------------------------------------------------------
 # Summary
 #--------------------------------------------------------------
 
@@ -178,5 +251,11 @@ message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Source Dir: ${CMAKE_SOURCE_DIR}")
 message(STATUS "Binary Dir: ${CMAKE_BINARY_DIR}")
 message(STATUS "Binary Output: ${CMAKE_BINARY_DIR}")
+message(STATUS "Install Prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "==================================================")
+message(STATUS "")
+message(STATUS "Distribution targets:")
+message(STATUS "  make dist     - Build and create dist/ folder")
+message(STATUS "  make package  - Create distributable archive")
 message(STATUS "==================================================")
 

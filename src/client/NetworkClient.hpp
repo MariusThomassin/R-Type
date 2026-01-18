@@ -97,6 +97,13 @@ namespace rtype::client {
         void update();
 
         /**
+         * @brief Update respawn animations (called from main thread with delta time)
+         *
+         * @param dt Delta time in seconds
+         */
+        void updateAnimations(float dt);
+
+        /**
          * @brief Check if connected to server
          */
         bool isConnected() const { return m_connected && m_welcomeReceived; }
@@ -234,6 +241,16 @@ namespace rtype::client {
         void handlePlayerHit(const network::PlayerHitMessage& message);
 
         /**
+         * @brief Handle PLAYER_DEATH message (main thread)
+         */
+        void handlePlayerDeath(const network::PlayerDeathMessage& message);
+
+        /**
+         * @brief Handle PLAYER_RESPAWN message (main thread)
+         */
+        void handlePlayerRespawn(const network::PlayerRespawnMessage& message);
+
+        /**
          * @brief Handle level and game event messages (main thread)
          * These invoke the registered callbacks
          */
@@ -287,6 +304,22 @@ namespace rtype::client {
 
         // Network ID mapping (networkId → local Entity)
         std::unordered_map<uint32_t, ecs::Entity> m_networkIdToEntity;
+
+        // Death positions for respawn animation
+        std::unordered_map<uint32_t, std::pair<float, float>> m_deathPositions;
+
+        // Respawn slide-in animation state: {startX, targetX, targetY, elapsed, duration}
+        struct RespawnAnimation {
+            float startX;
+            float targetX;
+            float targetY;
+            float elapsed;
+            float duration;
+        };
+        std::unordered_map<uint32_t, RespawnAnimation> m_respawnAnimations;
+
+        // Local player's network ID (for identifying which player is ours)
+        uint32_t m_localPlayerNetworkId = 0;
 
         // Pending state updates for entities that haven't spawned yet (networkId → EntityState)
         std::unordered_map<uint32_t, network::EntityStateMessage> m_pendingStateUpdates;

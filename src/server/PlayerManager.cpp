@@ -14,8 +14,11 @@
 #include "game/components/WeaponConstants.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include "game/components/bullets/TrajectoryComponent.hpp"
+#include "game/components/PowerupComponent.hpp"
 #include <iostream>
 #include <algorithm>
+#include <cmath>
+#include <vector>
 
 namespace rtype::server {
 
@@ -77,7 +80,8 @@ namespace rtype::server {
         collider.layer = ecs::CollisionLayer::Player;
         collider.mask = static_cast<ecs::CollisionLayer>(
             static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
-            static_cast<uint32_t>(ecs::CollisionLayer::Enemy)
+            static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
+            static_cast<uint32_t>(ecs::CollisionLayer::Powerup)
         );
         m_registry.addComponent(player, collider);
 
@@ -274,66 +278,89 @@ namespace rtype::server {
     void PlayerManager::spawnPlayerProjectile(ecs::Entity player, uint32_t clientId,
                                               const ecs::TransformComponent& transform,
                                               const ecs::WeaponComponent& weapon) {
-        // Create projectile entity
-        ecs::Entity projectile = m_registry.createEntity();
+        // Check if player has spread shot active
+        bool hasSpreadShot = false;
+        auto* activePowerups = m_registry.tryGetComponent<ecs::ActivePowerupsComponent>(player);
+        if (activePowerups && activePowerups->hasSpreadShot) {
+            hasSpreadShot = true;
+        }
 
-        // Position: spawn in front of player ship
-        float offsetX = 40.0f;  // Spawn ahead of ship
-        float projectileX = transform.x + offsetX;
-        float projectileY = transform.y;
+        // Define projectile angles (spread shot fires at multiple angles)
+        std::vector<float> angles;
+        if (hasSpreadShot) {
+            angles = {0.0f, 15.0f, -15.0f};  // 3 shots: straight, up, down
+            std::cout << "[PlayerManager] Firing SPREAD SHOT (3 projectiles)!" << std::endl;
+        } else {
+            angles = {0.0f};  // Single shot
+        }
 
-        m_registry.addComponent(projectile, ecs::TransformComponent(projectileX, projectileY, 0.0f));
-
-        // Velocity: player bullets travel to the right
         float projectileSpeed = weapon.projectileSpeed;
-        m_registry.addComponent(projectile, ecs::VelocityComponent(projectileSpeed, 0.0f, projectileSpeed * 1.5f));
+        float offsetX = 40.0f;  // Spawn ahead of ship
 
-        // Projectile component (isPlayer = true)
-        m_registry.addComponent(projectile, ecs::ProjectileComponent(player, weapon.damage, true));
+        for (float angle : angles) {
+            // Create projectile entity
+            ecs::Entity projectile = m_registry.createEntity();
 
-        // Collider for collision detection
-        ecs::ColliderComponent collider;
-        collider.width = 16.0f;
-        collider.height = 16.0f;
-        collider.layer = ecs::CollisionLayer::PlayerShot;
-        collider.mask = static_cast<ecs::CollisionLayer>(
-            static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
-            static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
-            static_cast<uint32_t>(ecs::CollisionLayer::Wall)
-        );
-        m_registry.addComponent(projectile, collider);
+            // Position: spawn in front of player ship
+            float projectileX = transform.x + offsetX;
+            float projectileY = transform.y;
 
-        // Lifetime (3 seconds)
-        m_registry.addComponent(projectile, ecs::LifetimeComponent(3.0f));
+            m_registry.addComponent(projectile, ecs::TransformComponent(projectileX, projectileY, 0.0f));
 
-        // Network component - allocate network ID
-        uint32_t networkId = m_networkIdManager.allocate(projectile);
-        m_registry.addComponent(projectile, ecs::NetworkComponent(networkId, false));
+            // Calculate velocity based on angle (convert degrees to radians)
+            float radians = angle * 3.14159f / 180.0f;
+            float vx = projectileSpeed * std::cos(radians);
+            float vy = projectileSpeed * std::sin(radians);
 
-        // Broadcast ENTITY_SPAWN to all clients
-        network::EntitySpawnMessage spawnMsg{};
-        spawnMsg.networkId = networkId;
-        spawnMsg.entityType = network::EntityType::PROJECTILE;
-        spawnMsg.x = projectileX;
-        spawnMsg.y = projectileY;
-        spawnMsg.rotation = 0.0f;
-        spawnMsg.vx = projectileSpeed;
-        spawnMsg.vy = 0.0f;
-        spawnMsg.trajectoryType = static_cast<uint8_t>(ecs::TrajectoryType::Linear);
-        spawnMsg.trajectoryParam1 = 0.0f;
-        spawnMsg.trajectoryParam2 = 0.0f;
-        spawnMsg.spinSpeed = 0.0f;
-        spawnMsg.maxLifetime = 3.0f;
-        spawnMsg.colliderWidth = 16.0f;
-        spawnMsg.colliderHeight = 16.0f;
-        spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot);
-        spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
-                                 static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
-                                 static_cast<uint32_t>(ecs::CollisionLayer::Wall);
+            m_registry.addComponent(projectile, ecs::VelocityComponent(vx, vy, projectileSpeed * 1.5f));
 
-        m_networkManager.broadcastEntitySpawn(spawnMsg);
+            // Projectile component (isPlayer = true)
+            m_registry.addComponent(projectile, ecs::ProjectileComponent(player, weapon.damage, true));
 
-        std::cout << "[PlayerManager] Player " << clientId << " fired projectile [networkId=" << networkId << "]" << std::endl;
+            // Collider for collision detection
+            ecs::ColliderComponent collider;
+            collider.width = 16.0f;
+            collider.height = 16.0f;
+            collider.layer = ecs::CollisionLayer::PlayerShot;
+            collider.mask = static_cast<ecs::CollisionLayer>(
+                static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
+                static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
+                static_cast<uint32_t>(ecs::CollisionLayer::Wall)
+            );
+            m_registry.addComponent(projectile, collider);
+
+            // Lifetime (3 seconds)
+            m_registry.addComponent(projectile, ecs::LifetimeComponent(3.0f));
+
+            // Network component - allocate network ID
+            uint32_t networkId = m_networkIdManager.allocate(projectile);
+            m_registry.addComponent(projectile, ecs::NetworkComponent(networkId, false));
+
+            // Broadcast ENTITY_SPAWN to all clients
+            network::EntitySpawnMessage spawnMsg{};
+            spawnMsg.networkId = networkId;
+            spawnMsg.entityType = network::EntityType::PROJECTILE;
+            spawnMsg.x = projectileX;
+            spawnMsg.y = projectileY;
+            spawnMsg.rotation = angle;  // Store angle for rotation on client
+            spawnMsg.vx = vx;
+            spawnMsg.vy = vy;
+            spawnMsg.trajectoryType = static_cast<uint8_t>(ecs::TrajectoryType::Linear);
+            spawnMsg.trajectoryParam1 = 0.0f;
+            spawnMsg.trajectoryParam2 = 0.0f;
+            spawnMsg.spinSpeed = 0.0f;
+            spawnMsg.maxLifetime = 3.0f;
+            spawnMsg.colliderWidth = 16.0f;
+            spawnMsg.colliderHeight = 16.0f;
+            spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot);
+            spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
+                                     static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
+                                     static_cast<uint32_t>(ecs::CollisionLayer::Wall);
+
+            m_networkManager.broadcastEntitySpawn(spawnMsg);
+        }
+
+        std::cout << "[PlayerManager] Player " << clientId << " fired " << angles.size() << " projectile(s)" << std::endl;
     }
 
 } // namespace rtype::server

@@ -5,9 +5,19 @@
 ** Event-driven input via EventBus
 */
 
+// Windows: Must include winsock2.h before windows.h (required by ASIO)
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <windows.h>
+#endif
+
 #include <raylib.h>
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include "../engine/ecs/ECS.hpp"
 #include "../engine/ecs/core/EventBus.hpp"
@@ -35,6 +45,8 @@
 #include "LocalServer.hpp"
 #include "ProfileManager.hpp"
 #include "ScoreManager.hpp"
+#include "../game/components/FloatingTextComponent.hpp"
+#include "../shared/PathUtils.hpp"
 
 using namespace rtype::ecs;
 using rtype::ecs::BulletType;
@@ -157,6 +169,22 @@ void clampPlayerToScreen(Registry& registry) {
 }
 
 int main(int argc, char* argv[]) {
+    // ==================== File Logging for Debugging ====================
+    std::ofstream logFile("rtype_client.log", std::ios::out | std::ios::trunc);
+    std::streambuf* coutBuf = std::cout.rdbuf();
+    std::streambuf* cerrBuf = std::cerr.rdbuf();
+    if (logFile.is_open()) {
+        std::cout.rdbuf(logFile.rdbuf());
+        std::cerr.rdbuf(logFile.rdbuf());
+    }
+    std::cout << "[Log] R-Type Client starting..." << std::endl;
+    std::cout << "[Log] argc = " << argc << std::endl;
+    for (int i = 0; i < argc; i++) {
+        std::cout << "[Log] argv[" << i << "] = " << argv[i] << std::endl;
+    }
+    std::cout.flush();
+
+    try {
     // ==================== Parse Command-Line Arguments ====================
     std::string serverIp = "127.0.0.1";  // Default: localhost
     int serverPort = 4242;                // Default: 4242
@@ -183,24 +211,45 @@ int main(int argc, char* argv[]) {
     // ==================== Audio Initialization ====================
     InitAudioDevice();  // Explicitly initialize audio device
     std::cout << "Audio device initialized. Ready: " << (IsAudioDeviceReady() ? "YES" : "NO") << std::endl;
+    std::cout.flush();
 
     // ==================== Event Bus ====================
+    std::cout << "[Log] Creating EventBus..." << std::endl; std::cout.flush();
     rtype::ecs::EventBus eventBus;
+    std::cout << "[Log] EventBus created" << std::endl; std::cout.flush();
 
     // ==================== Settings Manager ====================
+    std::cout << "[Log] Creating SettingsManager..." << std::endl; std::cout.flush();
     rtype::SettingsManager settingsManager;
+    std::cout << "[Log] SettingsManager created" << std::endl; std::cout.flush();
     // Try to load settings from file, otherwise use defaults
-    if (!settingsManager.load("config/settings.json")) {
+    std::cout << "[Log] Loading settings file..." << std::endl; std::cout.flush();
+    bool settingsLoaded = false;
+    try {
+        settingsLoaded = settingsManager.load("config/settings.json");
+        std::cout << "[Log] Settings load returned: " << (settingsLoaded ? "true" : "false") << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[Log] Settings load exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[Log] Settings load unknown exception" << std::endl;
+    }
+    std::cout.flush();
+    if (!settingsLoaded) {
         std::cout << "[Main] No settings file found, using defaults" << std::endl;
     } else {
         std::cout << "[Main] Settings loaded from config/settings.json" << std::endl;
     }
+    std::cout.flush();
 
     // ==================== Input Manager ====================
+    std::cout << "[Log] Creating InputManager..." << std::endl; std::cout.flush();
     rtype::ecs::events::InputManager inputManager(eventBus, &settingsManager);
+    std::cout << "[Log] InputManager created" << std::endl; std::cout.flush();
 
     // ==================== UI Manager ====================
+    std::cout << "[Log] Creating UIManager..." << std::endl; std::cout.flush();
     rtype::ui::UIManager uiManager(eventBus);
+    std::cout << "[Log] UIManager created" << std::endl; std::cout.flush();
 
     // UIManager automatically subscribes to events via its constructor // Optional for testing focus/text
 
@@ -213,14 +262,20 @@ int main(int argc, char* argv[]) {
     bool showingMultiplayer = false;
     
     // ==================== ECS Setup ====================
+    std::cout << "[Log] Creating Registry..." << std::endl; std::cout.flush();
     Registry registry;
+    std::cout << "[Log] Registry created" << std::endl; std::cout.flush();
+    std::cout << "[Log] Creating SystemManager..." << std::endl; std::cout.flush();
     SystemManager systems(&registry);
+    std::cout << "[Log] SystemManager created" << std::endl; std::cout.flush();
     bool shouldExit = false;
 
     // ==================== Network Setup ====================
     // NetworkClient is created but NOT connected at startup
     // Connection happens through the multiplayer menu when user selects a server
+    std::cout << "[Log] Creating NetworkClient..." << std::endl; std::cout.flush();
     rtype::client::NetworkClient networkClient(registry);
+    std::cout << "[Log] NetworkClient created" << std::endl; std::cout.flush();
 
     // ==================== Local Server (for Solo Mode) ====================
     // LocalServer runs a full GameServer in a background thread
@@ -234,13 +289,44 @@ int main(int argc, char* argv[]) {
     
     // Set up network callbacks for score tracking
     rtype::client::NetworkCallbacks netCallbacks;
-    netCallbacks.onScoreUpdate = [&scoreManager, &networkClient](const rtype::network::ScoreUpdateMessage& msg) {
+    netCallbacks.onScoreUpdate = [&scoreManager, &networkClient, &registry](const rtype::network::ScoreUpdateMessage& msg) {
         if (msg.clientId == networkClient.getClientId()) {
             scoreManager.updateSessionScore(msg.newScore);
+        }
+        
+        // Spawn floating text for score popups (if position is provided)
+        if (msg.delta > 0 && (msg.scoreX != 0.0f || msg.scoreY != 0.0f)) {
+            Entity floatText = registry.createEntity();
+            std::string scoreStr = "+" + std::to_string(msg.delta);
+            registry.addComponent(floatText, FloatingTextComponent(scoreStr, msg.scoreX, msg.scoreY, msg.delta));
         }
     };
     netCallbacks.onLevelComplete = [&scoreManager](const rtype::network::LevelCompleteMessage& msg) {
         scoreManager.setSessionProgress(msg.levelIndex + 1, msg.nextLevelIndex < msg.levelIndex);
+    };
+    
+    netCallbacks.onLevelInfo = [&eventBus](const rtype::network::LevelInfoMessage& msg) {
+        std::cout << "[Main] Level info received, loading assets: bg=" << msg.backgroundPath 
+                  << ", music=" << msg.stageMusicPath << std::endl;
+        
+        rtype::ecs::events::LevelAssetsLoaded assetsEvent;
+        
+        // Use PathUtils to resolve paths - works in both build/ and dist/ layouts
+        if (msg.backgroundPath[0] != '\0') {
+            assetsEvent.backgroundPath = rtype::resolveAssetPath(msg.backgroundPath);
+        }
+        if (msg.stageMusicPath[0] != '\0') {
+            assetsEvent.stageMusicPath = rtype::resolveAssetPath(msg.stageMusicPath);
+        }
+        if (msg.bossMusicPath[0] != '\0') {
+            assetsEvent.bossMusicPath = rtype::resolveAssetPath(msg.bossMusicPath);
+        }
+        
+        assetsEvent.hasBackground = (msg.backgroundPath[0] != '\0');
+        assetsEvent.hasStageMusic = (msg.stageMusicPath[0] != '\0');
+        assetsEvent.hasBossMusic = (msg.bossMusicPath[0] != '\0');
+        
+        eventBus.emit(assetsEvent);
     };
     
     // Room/Lobby callbacks - will be set up after lobbyWidget is created
@@ -258,7 +344,7 @@ int main(int argc, char* argv[]) {
 
     // ==================== Button Click Sound Setup ====================
     // Set a default click sound for all buttons
-    rtype::ui::ButtonWidget::setDefaultClickSound("assets/sound/mixkit-modern-technology-select-3124.wav");
+    rtype::ui::ButtonWidget::setDefaultClickSound(rtype::resolveAssetPath("assets/sound/mixkit-modern-technology-select-3124.wav"));
     // Set initial volume to match effects volume settings (convert percentage to 0.0-1.0 range)
     rtype::ui::ButtonWidget::setSoundVolume(initialConfig.effectsVolume / 100.0f);
     
@@ -274,7 +360,7 @@ int main(int argc, char* argv[]) {
     musicSystem.setMasterVolume(initialConfig.musicVolume / 100.0f);
     
     // Play default music for menu
-    musicSystem.playTrack("assets/sound/music/Sketchbook 2024-10-13.ogg", 1.0f, true);
+    musicSystem.playTrack(rtype::resolveAssetPath("assets/sound/music/Sketchbook 2024-10-13.ogg"), 1.0f, true);
     std::cout << "MusicSystem initialized with default track" << std::endl;
     
     auto settingsWidget = std::make_shared<rtype::ui::SettingsWidget>(initialConfig);
@@ -874,6 +960,9 @@ int main(int argc, char* argv[]) {
 
         // Update network (process received messages)
         networkClient.update();
+        
+        // Update respawn animations (slide-in from left)
+        networkClient.updateAnimations(frameTime);
 
         while (accumulator >= FIXED_TIMESTEP) {
             // Update game systems based on game state
@@ -929,6 +1018,31 @@ int main(int argc, char* argv[]) {
     cleanupMusic();      // Clean up music resources
     CloseAudioDevice();  // Clean up audio device
     CloseWindow();
+
+    std::cout << "[Log] R-Type Client exiting normally" << std::endl;
+    std::cout.flush();
+    } catch (const std::exception& e) {
+        std::cerr << "[CRASH] Exception: " << e.what() << std::endl;
+        std::cerr.flush();
+        // Restore streams before exit
+        std::cout.rdbuf(coutBuf);
+        std::cerr.rdbuf(cerrBuf);
+        logFile.close();
+        return 1;
+    } catch (...) {
+        std::cerr << "[CRASH] Unknown exception occurred" << std::endl;
+        std::cerr.flush();
+        // Restore streams before exit
+        std::cout.rdbuf(coutBuf);
+        std::cerr.rdbuf(cerrBuf);
+        logFile.close();
+        return 1;
+    }
+
+    // Restore original stream buffers
+    std::cout.rdbuf(coutBuf);
+    std::cerr.rdbuf(cerrBuf);
+    logFile.close();
 
     return 0;
 }

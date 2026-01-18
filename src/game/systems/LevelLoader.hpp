@@ -246,6 +246,21 @@ namespace rtype::ecs {
             config.shootsAtPlayer = j.value("shootsAtPlayer", false);
             config.fireRate = j.value("fireRate", 1.5f);
             
+            // Boss mechanic fields
+            config.mechanic = j.value("mechanic", "");
+            if (j.contains("mechanicParams") && j["mechanicParams"].is_object()) {
+                const auto& params = j["mechanicParams"];
+                // Arc shot params
+                config.arcSpread = params.value("arcSpread", 45.0f);
+                config.bulletsPerArc = params.value("bulletsPerArc", 5);
+                config.arcCooldown = params.value("arcCooldown", 2.0f);
+                // Minion spawner params
+                config.minionSpawnRate = params.value("spawnCooldown", 4.0f);
+                config.maxMinions = params.value("spawnCount", 4);
+                // Teleporter params
+                config.teleportCooldown = params.value("teleportCooldown", 5.0f);
+            }
+            
             return config;
         }
 

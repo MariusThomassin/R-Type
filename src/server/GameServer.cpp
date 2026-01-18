@@ -28,6 +28,7 @@
 #include "engine/ecs/components/HealthComponent.hpp"
 #include "game/components/ProjectileComponent.hpp"
 #include "game/components/PlayerComponent.hpp"
+#include "game/components/PowerupComponent.hpp"
 #include "game/components/EnemyComponent.hpp"
 // Note: SpritesheetComponent removed - not needed on headless server
 #include "game/components/bullets/TrajectoryComponent.hpp"
@@ -40,6 +41,7 @@
 // Powerup components
 #include "game/components/ForceOrbComponent.hpp"
 #include "game/components/PowerupComponent.hpp"
+#include "game/components/BossComponent.hpp"
 
 #include <thread>
 #include <cmath>
@@ -159,10 +161,12 @@ namespace rtype::server {
             }
         });
 
-        // Subscribe to collision events for player-projectile damage
+        // Subscribe to collision events for damage handling
         m_collisionSubId = m_eventBus.subscribe<ecs::CollisionEvent>(
             [this](const ecs::CollisionEvent& event) {
                 handlePlayerCollision(event);
+                handleEnemyCollision(event);
+                handlePowerupCollision(event);
             }
         );
 
@@ -269,12 +273,57 @@ namespace rtype::server {
         // Update player manager (clamp positions, etc.)
         m_playerManager->update(dt);
 
+        // Update player invincibility timers
+        m_registry.forEach<ecs::PlayerComponent, ecs::HealthComponent>(
+            [this, dt](ecs::EntityId e) {
+                auto& health = m_registry.getComponent<ecs::HealthComponent>(e);
+                if (health.isInvincible && health.invincibilityTimer > 0.0f) {
+                    health.invincibilityTimer -= dt;
+                    if (health.invincibilityTimer <= 0.0f) {
+                        health.isInvincible = false;
+                        health.invincibilityTimer = 0.0f;
+                    }
+                }
+            }
+        );
+
+        // Update active powerup timers
+        m_registry.forEach<ecs::PlayerComponent, ecs::ActivePowerupsComponent>(
+            [this, dt](ecs::EntityId e) {
+                auto& active = m_registry.getComponent<ecs::ActivePowerupsComponent>(e);
+                
+                // Track what was active before update
+                bool wasSpreadShot = active.hasSpreadShot;
+                bool wasSpeedBoost = active.hasSpeedBoost;
+                
+                // Update timers (decrements and clears flags when expired)
+                active.update(dt);
+                
+                // Revert spread shot
+                if (wasSpreadShot && !active.hasSpreadShot) {
+                    std::cout << "[GameServer] Spread shot expired for player " << e << std::endl;
+                }
+                
+                // Revert speed boost
+                if (wasSpeedBoost && !active.hasSpeedBoost) {
+                    auto* vel = m_registry.tryGetComponent<ecs::VelocityComponent>(e);
+                    if (vel && active.originalMaxSpeed > 0.0f) {
+                        vel->maxSpeed = active.originalMaxSpeed;
+                        std::cout << "[GameServer] Speed boost expired for player " << e 
+                                  << " - restored max speed to " << vel->maxSpeed << std::endl;
+                    }
+                }
+            }
+        );
+
         // Update pending respawns
         updateRespawns(dt);
 
         // Update level waves (spawn enemies based on level config)
         if (m_gameStarted.load() && m_levelActive) {
             updateLevelWaves(dt);
+            updatePowerupSpawns(dt);
+            updateEnemies(dt);
         }
 
         // Update all systems (SystemManager handles phase ordering)
@@ -310,7 +359,12 @@ namespace rtype::server {
         std::cout << "[GameServer] Status Report:" << std::endl;
         std::cout << "  - Tick: " << m_tickCount << std::endl;
         std::cout << "  - Game Time: " << m_gameTime << "s" << std::endl;
+        std::cout << "  - Level Timer: " << m_levelTimer << "s" << std::endl;
         std::cout << "  - Active Entities: " << getEntityCount() << std::endl;
+        if (m_currentLevelConfig) {
+            std::cout << "  - Powerup spawns: " << m_currentLevelConfig->powerupSpawns.size() 
+                      << ", Bomb spawns: " << m_currentLevelConfig->bombSpawns.size() << std::endl;
+        }
         std::cout << "  - FPS: ~60 (fixed timestep)" << std::endl;
     }
 
@@ -342,36 +396,67 @@ namespace rtype::server {
             return;
         }
 
-        int damage = projectile->damage;
-        health->currentHealth -= damage;
-        if (health->currentHealth < 0) {
-            health->currentHealth = 0;
+        // Check invincibility
+        if (health->isInvincible) {
+            // Destroy projectile but don't damage player
+            auto* projectileNetwork = m_registry.tryGetComponent<ecs::NetworkComponent>(projectileEntityId);
+            if (projectileNetwork) {
+                ecs::Entity projectileEntity(projectileEntityId);
+                m_networkIdManager->remove(projectileEntity);
+                m_networkManager->broadcastEntityDestroy(projectileNetwork->networkId);
+            }
+            m_registry.destroyEntity(projectileEntityId);
+            return;
+        }
+
+        // Check for shield (spare hit protection)
+        auto* activePowerups = m_registry.tryGetComponent<ecs::ActivePowerupsComponent>(playerEntityId);
+        if (activePowerups && activePowerups->hasShield) {
+            // Shield absorbs the hit
+            activePowerups->hasShield = false;
+            activePowerups->shieldTimer = 0.0f;
+            std::cout << "[GameServer] Shield absorbed hit for Player NetworkID=" << network->networkId << std::endl;
+            
+            // Grant brief invincibility after shield breaks
+            health->isInvincible = true;
+            health->invincibilityTimer = 1.0f;
+            
+            // Notify client about shield break and invincibility
+            network::PlayerHitMessage hitMsg;
+            hitMsg.networkId = network->networkId;
+            hitMsg.newHealth = static_cast<float>(health->currentHealth);
+            hitMsg.hitX = transform->x;
+            hitMsg.hitY = transform->y;
+            hitMsg.isInvincible = true;
+            hitMsg.invincibilityTimer = 1.0f;
+            auto buffer = network::serializeMessage(network::MessageType::PLAYER_HIT, hitMsg);
+            m_networkManager->broadcast(buffer);
+            
+            // Destroy projectile
+            auto* projectileNetwork = m_registry.tryGetComponent<ecs::NetworkComponent>(projectileEntityId);
+            if (projectileNetwork) {
+                ecs::Entity projectileEntity(projectileEntityId);
+                m_networkIdManager->remove(projectileEntity);
+                m_networkManager->broadcastEntityDestroy(projectileNetwork->networkId);
+            }
+            m_registry.destroyEntity(projectileEntityId);
+            return;
         }
 
         std::cout << "[GameServer] Player hit! NetworkID=" << network->networkId
-                  << " Health: " << health->currentHealth << "/" << health->maxHealth << std::endl;
+                  << " - losing a life!" << std::endl;
 
-        network::PlayerHitMessage hitMsg;
-        hitMsg.networkId = network->networkId;
-        hitMsg.newHealth = static_cast<float>(health->currentHealth);
-        hitMsg.hitX = transform->x;
-        hitMsg.hitY = transform->y;
-
-        auto buffer = network::serializeMessage(network::MessageType::PLAYER_HIT, hitMsg);
-        m_networkManager->broadcast(buffer);
-
+        // Destroy projectile
         auto* projectileNetwork = m_registry.tryGetComponent<ecs::NetworkComponent>(projectileEntityId);
         if (projectileNetwork) {
             ecs::Entity projectileEntity(projectileEntityId);
             m_networkIdManager->remove(projectileEntity);
             m_networkManager->broadcastEntityDestroy(projectileNetwork->networkId);
         }
-
         m_registry.destroyEntity(projectileEntityId);
 
-        if (health->currentHealth <= 0) {
-            handlePlayerDeath(playerEntityId);
-        }
+        // One hit = one death (lose one life)
+        handlePlayerDeath(playerEntityId);
     }
 
     void GameServer::handlePlayerDeath(ecs::EntityId playerEntityId) {
@@ -413,6 +498,253 @@ namespace rtype::server {
         }
     }
 
+    void GameServer::handleEnemyCollision(const ecs::CollisionEvent& event) {
+        ecs::EntityId enemyEntityId = ecs::NULL_ENTITY;
+        ecs::EntityId projectileEntityId = ecs::NULL_ENTITY;
+
+        auto* enemyA = m_registry.tryGetComponent<ecs::EnemyComponent>(event.entityA);
+        auto* enemyB = m_registry.tryGetComponent<ecs::EnemyComponent>(event.entityB);
+        auto* projectileA = m_registry.tryGetComponent<ecs::ProjectileComponent>(event.entityA);
+        auto* projectileB = m_registry.tryGetComponent<ecs::ProjectileComponent>(event.entityB);
+
+        // Check for enemy-projectile collision
+        if (enemyA && projectileB && projectileB->isPlayerProjectile) {
+            enemyEntityId = event.entityA;
+            projectileEntityId = event.entityB;
+        } else if (enemyB && projectileA && projectileA->isPlayerProjectile) {
+            enemyEntityId = event.entityB;
+            projectileEntityId = event.entityA;
+        } else {
+            return;  // Not an enemy-player projectile collision
+        }
+
+        auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(enemyEntityId);
+        auto* enemy = m_registry.tryGetComponent<ecs::EnemyComponent>(enemyEntityId);
+        auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(enemyEntityId);
+        auto* projectile = m_registry.tryGetComponent<ecs::ProjectileComponent>(projectileEntityId);
+
+        if (!health || !enemy || !network || !projectile) {
+            return;
+        }
+
+        // Apply damage
+        int damage = projectile->damage;
+        health->currentHealth -= damage;
+        if (health->currentHealth < 0) {
+            health->currentHealth = 0;
+        }
+
+        std::cout << "[GameServer] Enemy hit! NetworkID=" << network->networkId
+                  << " Health: " << health->currentHealth << "/" << health->maxHealth << std::endl;
+
+        // Destroy the projectile
+        auto* projectileNetwork = m_registry.tryGetComponent<ecs::NetworkComponent>(projectileEntityId);
+        if (projectileNetwork) {
+            ecs::Entity projectileEntity(projectileEntityId);
+            m_networkIdManager->remove(projectileEntity);
+            m_networkManager->broadcastEntityDestroy(projectileNetwork->networkId);
+        }
+        m_registry.destroyEntity(projectileEntityId);
+
+        // Check if enemy is dead
+        if (health->currentHealth <= 0) {
+            handleEnemyDeath(enemyEntityId);
+        }
+    }
+
+    void GameServer::handlePowerupCollision(const ecs::CollisionEvent& event) {
+        ecs::EntityId playerEntityId = ecs::NULL_ENTITY;
+        ecs::EntityId powerupEntityId = ecs::NULL_ENTITY;
+
+        auto* playerA = m_registry.tryGetComponent<ecs::PlayerComponent>(event.entityA);
+        auto* playerB = m_registry.tryGetComponent<ecs::PlayerComponent>(event.entityB);
+        auto* powerupA = m_registry.tryGetComponent<ecs::PowerupComponent>(event.entityA);
+        auto* powerupB = m_registry.tryGetComponent<ecs::PowerupComponent>(event.entityB);
+
+        // Check for player-powerup collision
+        if (playerA && powerupB) {
+            playerEntityId = event.entityA;
+            powerupEntityId = event.entityB;
+        } else if (playerB && powerupA) {
+            playerEntityId = event.entityB;
+            powerupEntityId = event.entityA;
+        } else {
+            return;  // Not a player-powerup collision
+        }
+
+        auto* powerup = m_registry.tryGetComponent<ecs::PowerupComponent>(powerupEntityId);
+        auto* player = m_registry.tryGetComponent<ecs::PlayerComponent>(playerEntityId);
+        auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(powerupEntityId);
+        auto* playerTransform = m_registry.tryGetComponent<ecs::TransformComponent>(playerEntityId);
+
+        if (!powerup || !player || powerup->isCollected) {
+            return;
+        }
+
+        // Mark as collected to prevent double-collection
+        powerup->isCollected = true;
+
+        std::cout << "[GameServer] Player " << player->playerId << " collected powerup type " 
+                  << static_cast<int>(powerup->type) << std::endl;
+
+        // Ensure player has ActivePowerupsComponent
+        if (!m_registry.hasComponent<ecs::ActivePowerupsComponent>(playerEntityId)) {
+            m_registry.addComponent(ecs::Entity(playerEntityId), ecs::ActivePowerupsComponent());
+        }
+        auto* active = m_registry.tryGetComponent<ecs::ActivePowerupsComponent>(playerEntityId);
+
+        // Apply powerup effect based on type
+        switch (powerup->type) {
+            case ecs::PowerupType::HEALTH_UP:
+                // Grant shield (one spare hit) - if already has shield, bonus points
+                if (active && active->hasShield) {
+                    player->score += 1000;  // Bonus points for extra shield pickup
+                    m_teamScore += 1000;
+                } else if (active) {
+                    active->hasShield = true;
+                    active->shieldTimer = 999.0f;  // Shield lasts until hit
+                }
+                break;
+
+            case ecs::PowerupType::SPREAD_SHOT:
+                if (active) {
+                    active->hasSpreadShot = true;
+                    active->spreadShotTimer = powerup->duration;
+                }
+                break;
+
+            case ecs::PowerupType::SPEED_BOOST:
+                if (active) {
+                    active->hasSpeedBoost = true;
+                    active->speedBoostTimer = powerup->duration;
+                    // Increase player speed
+                    auto* vel = m_registry.tryGetComponent<ecs::VelocityComponent>(playerEntityId);
+                    if (vel) {
+                        if (active->originalMaxSpeed == 0.0f) {
+                            active->originalMaxSpeed = vel->maxSpeed;
+                        }
+                        vel->maxSpeed = active->originalMaxSpeed * 1.5f;
+                    }
+                }
+                break;
+
+            case ecs::PowerupType::SHIELD:
+                if (active) {
+                    active->hasShield = true;
+                    active->shieldTimer = powerup->duration;
+                }
+                break;
+
+            case ecs::PowerupType::WEAPON_UPGRADE:
+                // Upgrade weapon power level (handled elsewhere)
+                player->score += 200;
+                m_teamScore += 200;
+                break;
+
+            case ecs::PowerupType::FORCE_ORB:
+                // Emit Force Orb spawn event
+                m_eventBus.emit(ecs::events::SpawnForceOrb{playerEntityId, 1});
+                break;
+
+            case ecs::PowerupType::BOMB:
+                // Activate bomb
+                if (playerTransform) {
+                    m_eventBus.emit(ecs::events::BombActivated{
+                        playerEntityId, playerTransform->x, playerTransform->y
+                    });
+                }
+                break;
+        }
+
+        // Award base score for pickup
+        player->score += 100;
+        m_teamScore += 100;
+
+        // Broadcast score update with position for floating text
+        network::ScoreUpdateMessage scoreMsg;
+        scoreMsg.clientId = player->networkClientId;
+        scoreMsg.newScore = static_cast<int32_t>(player->score);
+        scoreMsg.delta = 100;
+        scoreMsg.scoreX = playerTransform ? playerTransform->x : 0.0f;
+        scoreMsg.scoreY = playerTransform ? playerTransform->y - 30.0f : 0.0f;  // Above player
+        auto scoreBuffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
+        m_networkManager->broadcast(scoreBuffer);
+
+        // Broadcast entity destroy for the powerup
+        if (network) {
+            m_networkIdManager->remove(ecs::Entity(powerupEntityId));
+            m_networkManager->broadcastEntityDestroy(network->networkId);
+        }
+
+        // Destroy the powerup entity
+        m_registry.destroyEntity(powerupEntityId);
+    }
+
+    void GameServer::handleEnemyDeath(ecs::EntityId enemyEntityId) {
+        auto* enemy = m_registry.tryGetComponent<ecs::EnemyComponent>(enemyEntityId);
+        auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(enemyEntityId);
+        auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(enemyEntityId);
+
+        if (!enemy || !network) {
+            return;
+        }
+
+        std::cout << "[GameServer] Enemy killed! NetworkID=" << network->networkId 
+                  << " Score: " << enemy->scoreValue << std::endl;
+
+        // Award score to all players and broadcast to clients
+        m_teamScore += enemy->scoreValue;
+        
+        // Broadcast score update to all clients (with position for floating text)
+        network::ScoreUpdateMessage scoreMsg;
+        scoreMsg.clientId = 0;  // 0 = team score
+        scoreMsg.newScore = static_cast<int32_t>(m_teamScore);
+        scoreMsg.delta = enemy->scoreValue;
+        scoreMsg.scoreX = transform ? transform->x : 0.0f;
+        scoreMsg.scoreY = transform ? transform->y : 0.0f;
+        auto scoreBuffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
+        m_networkManager->broadcast(scoreBuffer);
+
+        // Decrement enemy count
+        if (m_enemiesAlive > 0) {
+            m_enemiesAlive--;
+        }
+
+        // Broadcast entity destroy
+        m_networkIdManager->remove(ecs::Entity(enemyEntityId));
+        m_networkManager->broadcastEntityDestroy(network->networkId);
+
+        // Destroy the enemy entity
+        m_registry.destroyEntity(enemyEntityId);
+
+        // Check if level is complete
+        checkLevelComplete();
+    }
+
+    void GameServer::checkLevelComplete() {
+        if (!m_levelActive || !m_currentLevelConfig) {
+            return;
+        }
+
+        // Check if all waves are done
+        bool allWavesSpawned = (m_currentWaveIndex >= m_currentLevelConfig->waves.size());
+        
+        // Check if all enemies are dead
+        bool allEnemiesDead = (m_enemiesAlive == 0);
+        
+        // If boss section is enabled, must also kill the boss
+        if (m_currentLevelConfig->bossSection.enabled) {
+            // Level is complete only if boss was spawned AND all enemies (including boss) are dead
+            if (allWavesSpawned && m_bossSpawned && allEnemiesDead) {
+                std::cout << "[GameServer] Level complete! Boss defeated!" << std::endl;
+                handleLevelComplete();
+            }
+        } else if (allWavesSpawned && allEnemiesDead) {
+            std::cout << "[GameServer] Level complete! All waves finished and all enemies killed." << std::endl;
+            handleLevelComplete();
+        }
+    }
+
     void GameServer::updateRespawns(float dt) {
         if (m_pendingRespawns.empty()) {
             return;
@@ -438,7 +770,7 @@ namespace rtype::server {
     void GameServer::respawnPlayer(uint32_t clientId) {
         std::cout << "[GameServer] Respawning player for client " << clientId << std::endl;
 
-        // Spawn new player entity
+        // Spawn new player entity (or get existing one)
         ecs::Entity newPlayer = m_playerManager->spawnPlayer(clientId);
         if (newPlayer.id == ecs::NULL_ENTITY) {
             std::cout << "[GameServer] Failed to respawn player for client " << clientId << std::endl;
@@ -449,9 +781,36 @@ namespace rtype::server {
         auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(newPlayer);
         auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(newPlayer);
         auto* playerComp = m_registry.tryGetComponent<ecs::PlayerComponent>(newPlayer);
+        auto* health = m_registry.tryGetComponent<ecs::HealthComponent>(newPlayer);
 
         if (!network || !transform || !playerComp) {
             return;
+        }
+
+        // Re-add collider if missing (was removed on death)
+        if (!m_registry.hasComponent<ecs::ColliderComponent>(newPlayer)) {
+            ecs::ColliderComponent collider;
+            collider.width = 32.0f;
+            collider.height = 24.0f;
+            collider.layer = ecs::CollisionLayer::Player;
+            collider.mask = static_cast<ecs::CollisionLayer>(
+                static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot) |
+                static_cast<uint32_t>(ecs::CollisionLayer::Enemy) |
+                static_cast<uint32_t>(ecs::CollisionLayer::Powerup)
+            );
+            m_registry.addComponent(newPlayer, collider);
+            std::cout << "[GameServer] Re-added collider to respawned player" << std::endl;
+        }
+
+        // Reset position to spawn point
+        transform->x = 100.0f;
+        transform->y = 360.0f;
+
+        // Set invincibility on respawn (3 seconds)
+        if (health) {
+            health->currentHealth = health->maxHealth;
+            health->isInvincible = true;
+            health->invincibilityTimer = 3.0f;
         }
 
         // Broadcast PLAYER_RESPAWN message
@@ -461,11 +820,13 @@ namespace rtype::server {
         respawnMsg.x = transform->x;
         respawnMsg.y = transform->y;
         respawnMsg.health = 100.0f;
+        respawnMsg.isInvincible = true;
+        respawnMsg.invincibilityTimer = 3.0f;
 
         auto buffer = network::serializeMessage(network::MessageType::PLAYER_RESPAWN, respawnMsg);
         m_networkManager->broadcast(buffer);
 
-        std::cout << "[GameServer] Player respawned at (" << transform->x << ", " << transform->y << ")" << std::endl;
+        std::cout << "[GameServer] Player respawned at (" << transform->x << ", " << transform->y << ") with 3s invincibility" << std::endl;
     }
 
     void GameServer::checkGameOver() {
@@ -624,9 +985,22 @@ namespace rtype::server {
         m_enemySpawnTimer = 0.0f;
         m_waveActive = false;
         m_enemiesAlive = 0;
+        
+        // Reset boss state
+        m_allWavesComplete = false;
+        m_bossSpawned = false;
+        m_bossTriggerTimer = 0.0f;
 
         std::cout << "[GameServer] Loaded level '" << m_currentLevelConfig->name 
                   << "' with " << m_currentLevelConfig->waves.size() << " waves" << std::endl;
+
+        // Reset powerup spawn flags for this level
+        for (auto& spawn : m_currentLevelConfig->powerupSpawns) {
+            spawn.spawned = false;
+        }
+        for (auto& spawn : m_currentLevelConfig->bombSpawns) {
+            spawn.spawned = false;
+        }
 
         // Broadcast level info to clients
         broadcastLevelInfo();
@@ -802,11 +1176,13 @@ namespace rtype::server {
         m_playerScores[clientId] += delta;
         m_teamScore += delta;
 
-        // Broadcast score update
+        // Broadcast score update (no position for non-enemy score updates)
         network::ScoreUpdateMessage scoreMsg;
         scoreMsg.clientId = clientId;
         scoreMsg.newScore = static_cast<int32_t>(m_playerScores[clientId]);
         scoreMsg.delta = delta;
+        scoreMsg.scoreX = 0.0f;  // No position for generic score updates
+        scoreMsg.scoreY = 0.0f;
 
         auto buffer = network::serializeMessage(network::MessageType::SCORE_UPDATE, scoreMsg);
         m_networkManager->broadcast(buffer);
@@ -819,9 +1195,21 @@ namespace rtype::server {
         
         const auto& waves = m_currentLevelConfig->waves;
         
-        // Check if all waves are complete
+        // Check if all waves are complete - handle boss spawning
         if (m_currentWaveIndex >= waves.size()) {
-            // Level complete - could trigger boss or next level
+            // Check for boss section
+            if (m_allWavesComplete && !m_bossSpawned && m_currentLevelConfig->bossSection.enabled) {
+                m_bossTriggerTimer += dt;
+                if (m_bossTriggerTimer >= m_currentLevelConfig->bossSection.triggerDelay) {
+                    // Spawn the boss using the same spawnEnemy function
+                    const auto& bossConfig = m_currentLevelConfig->bossSection.boss;
+                    spawnEnemy(bossConfig);
+                    m_enemiesAlive++;  // Count boss as an enemy
+                    m_bossSpawned = true;
+                    std::cout << "[GameServer] BOSS SPAWNED! Health: " << bossConfig.health 
+                              << " at (" << bossConfig.x << ", " << bossConfig.y << ")" << std::endl;
+                }
+            }
             return;
         }
         
@@ -877,9 +1265,80 @@ namespace rtype::server {
                                    static_cast<uint8_t>(nextEnemyCount));
             } else {
                 std::cout << "[GameServer] All waves complete!" << std::endl;
-                // TODO: Spawn boss if enabled
+                m_allWavesComplete = true;
+                m_bossTriggerTimer = 0.0f;
             }
         }
+    }
+
+    void GameServer::updatePowerupSpawns(float dt) {
+        if (!m_currentLevelConfig) return;
+        
+        // Check powerup spawns based on level timer
+        for (auto& spawn : m_currentLevelConfig->powerupSpawns) {
+            if (!spawn.spawned && m_levelTimer >= spawn.triggerTime) {
+                spawnPowerup(spawn.type, spawn.x, spawn.y);
+                spawn.spawned = true;
+                std::cout << "[GameServer] Spawned powerup type " << spawn.type 
+                          << " at (" << spawn.x << ", " << spawn.y << ")" << std::endl;
+            }
+        }
+        
+        // Check bomb spawns
+        for (auto& spawn : m_currentLevelConfig->bombSpawns) {
+            if (!spawn.spawned && m_levelTimer >= spawn.triggerTime) {
+                spawnPowerup(6, spawn.x, spawn.y);  // PowerupType::BOMB = 6
+                spawn.spawned = true;
+                std::cout << "[GameServer] Spawned bomb powerup at (" << spawn.x << ", " << spawn.y << ")" << std::endl;
+            }
+        }
+    }
+
+    void GameServer::spawnPowerup(int type, float x, float y) {
+        ecs::Entity powerup = m_registry.createEntity();
+        
+        // Transform - powerups drift left slowly
+        m_registry.addComponent(powerup, ecs::TransformComponent(x, y));
+        m_registry.addComponent(powerup, ecs::VelocityComponent(-50.0f, 30.0f, 100.0f));
+        
+        // Powerup component
+        ecs::PowerupComponent powerupComp;
+        powerupComp.type = static_cast<ecs::PowerupType>(type);
+        powerupComp.isCollected = false;
+        m_registry.addComponent(powerup, powerupComp);
+        
+        // Collider for pickup detection
+        ecs::ColliderComponent collider;
+        collider.width = 24.0f;
+        collider.height = 24.0f;
+        collider.layer = ecs::CollisionLayer::Powerup;
+        collider.mask = ecs::CollisionLayer::Player;
+        collider.isTrigger = true;
+        m_registry.addComponent(powerup, collider);
+        
+        // Lifetime - despawn after 20 seconds
+        m_registry.addComponent(powerup, ecs::LifetimeComponent(20.0f));
+        
+        // Network ID
+        uint32_t networkId = m_networkIdManager->allocate(powerup);
+        m_registry.addComponent(powerup, ecs::NetworkComponent(networkId, false));
+        
+        // Broadcast spawn to clients
+        network::EntitySpawnMessage spawnMsg{};
+        spawnMsg.networkId = networkId;
+        spawnMsg.entityType = network::EntityType::POWERUP;
+        spawnMsg.x = x;
+        spawnMsg.y = y;
+        spawnMsg.rotation = 0.0f;
+        spawnMsg.vx = -50.0f;
+        spawnMsg.vy = 30.0f;
+        spawnMsg.colliderWidth = 24.0f;
+        spawnMsg.colliderHeight = 24.0f;
+        spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::Powerup);
+        spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Player);
+        spawnMsg.trajectoryParam1 = static_cast<float>(type);  // Encode powerup type in trajectoryParam1
+        
+        m_networkManager->broadcastEntitySpawn(spawnMsg);
     }
 
     void GameServer::spawnEnemy(const ecs::EnemySpawnConfig& config) {
@@ -901,10 +1360,15 @@ namespace rtype::server {
         enemyComp.scoreValue = config.scoreValue;
         m_registry.addComponent(enemy, enemyComp);
         
-        // Collider
+        // Collider - bosses are 96x96, other enemies 32x32
         ecs::ColliderComponent collider;
-        collider.width = 32.0f;
-        collider.height = 32.0f;
+        if (config.type == ecs::EnemyType::Boss) {
+            collider.width = 96.0f;
+            collider.height = 96.0f;
+        } else {
+            collider.width = 32.0f;
+            collider.height = 32.0f;
+        }
         collider.layer = ecs::CollisionLayer::Enemy;
         collider.mask = static_cast<ecs::CollisionLayer>(
             static_cast<uint32_t>(ecs::CollisionLayer::Player) |
@@ -921,6 +1385,27 @@ namespace rtype::server {
             m_registry.addComponent(enemy, traj);
         }
         
+        // Add BossComponent for boss enemies with mechanic settings
+        if (config.type == ecs::EnemyType::Boss) {
+            ecs::BossComponent bossComp;
+            bossComp.mechanic = ecs::BossComponent::parseMechanic(config.mechanic);
+            bossComp.arcSpread = config.arcSpread;
+            bossComp.bulletsPerArc = config.bulletsPerArc;
+            bossComp.arcCooldown = config.arcCooldown;
+            bossComp.minionSpawnRate = config.minionSpawnRate;
+            bossComp.maxMinions = config.maxMinions;
+            bossComp.teleportCooldown = config.teleportCooldown;
+            bossComp.baseY = config.y;
+            bossComp.maxHealth = scaledHealth;
+            m_registry.addComponent(enemy, bossComp);
+            
+            std::cout << "[GameServer] Boss mechanic: " << config.mechanic 
+                      << " (arcSpread=" << config.arcSpread 
+                      << ", bullets=" << config.bulletsPerArc 
+                      << ", minionRate=" << config.minionSpawnRate
+                      << ", teleportCD=" << config.teleportCooldown << ")" << std::endl;
+        }
+        
         // Network - Allocate network ID
         uint32_t networkId = m_networkIdManager->allocate(enemy);
         m_registry.addComponent(enemy, ecs::NetworkComponent(networkId, false));
@@ -929,13 +1414,14 @@ namespace rtype::server {
         network::EntitySpawnMessage spawnMsg{};
         spawnMsg.networkId = networkId;
         spawnMsg.entityType = network::EntityType::ENEMY;
+        spawnMsg.enemyType = static_cast<uint8_t>(config.type);  // Send enemy type to client
         spawnMsg.x = config.x;
         spawnMsg.y = config.y;
         spawnMsg.rotation = 0.0f;
         spawnMsg.vx = config.vx;
         spawnMsg.vy = config.vy;
-        spawnMsg.colliderWidth = 32.0f;
-        spawnMsg.colliderHeight = 32.0f;
+        spawnMsg.colliderWidth = (config.type == ecs::EnemyType::Boss) ? 96.0f : 32.0f;
+        spawnMsg.colliderHeight = (config.type == ecs::EnemyType::Boss) ? 96.0f : 32.0f;
         spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::Enemy);
         spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Player) |
                                  static_cast<uint32_t>(ecs::CollisionLayer::PlayerShot);
@@ -951,6 +1437,224 @@ namespace rtype::server {
         
         std::cout << "[GameServer] Spawned enemy type " << static_cast<int>(config.type) 
                   << " at (" << config.x << ", " << config.y << ") [networkId=" << networkId << "]" << std::endl;
+    }
+
+    void GameServer::updateEnemies(float dt) {
+        // Update all enemies with EnemyComponent
+        auto enemyEntities = m_registry.getEntitiesWith<ecs::EnemyComponent>();
+        
+        // Collect enemies to destroy (can't destroy during iteration)
+        std::vector<ecs::EntityId> enemiesToDestroy;
+        
+        for (ecs::EntityId eid : enemyEntities) {
+            auto* enemy = m_registry.tryGetComponent<ecs::EnemyComponent>(eid);
+            auto* transform = m_registry.tryGetComponent<ecs::TransformComponent>(eid);
+            
+            if (!enemy || !transform) continue;
+            
+            // Remove enemies that go off-screen (left side) - check first
+            if (transform->x < -50.0f) {
+                enemiesToDestroy.push_back(eid);
+                continue;
+            }
+            
+            // All enemies can shoot, but at different rates based on type
+            enemy->fireTimer += dt;
+            
+            // Check if this is a boss with special mechanics
+            auto* bossComp = m_registry.tryGetComponent<ecs::BossComponent>(eid);
+            if (bossComp) {
+                // Boss movement: oscillate up and down
+                bossComp->moveTimer += dt;
+                auto* velocity = m_registry.tryGetComponent<ecs::VelocityComponent>(eid);
+                if (velocity) {
+                    // Move toward target X position (800), then oscillate vertically
+                    if (transform->x > 900.0f) {
+                        velocity->vx = -60.0f;  // Move left until in position
+                    } else {
+                        velocity->vx = 0.0f;  // Stop horizontal movement
+                    }
+                    // Oscillate vertically using sine wave
+                    float targetY = bossComp->baseY + std::sin(bossComp->moveTimer * bossComp->moveSpeed * 0.02f) * bossComp->oscillateRange;
+                    velocity->vy = (targetY - transform->y) * 2.0f;  // Move toward target Y
+                }
+                
+                // Handle boss mechanics
+                if (bossComp->mechanic == ecs::BossMechanic::ArcShot) {
+                    bossComp->arcTimer += dt;
+                    if (bossComp->arcTimer >= bossComp->arcCooldown) {
+                        bossComp->arcTimer = 0.0f;
+                        
+                        // Fire arc of bullets
+                        float startAngle = 180.0f - bossComp->arcSpread / 2.0f;  // Centered on left direction
+                        float angleStep = bossComp->bulletsPerArc > 1 ? 
+                            bossComp->arcSpread / (bossComp->bulletsPerArc - 1) : 0.0f;
+                        
+                        for (int i = 0; i < bossComp->bulletsPerArc; ++i) {
+                            float angle = startAngle + angleStep * i;
+                            float rad = angle * 3.14159f / 180.0f;
+                            float projVx = std::cos(rad) * 250.0f;
+                            float projVy = std::sin(rad) * 250.0f;
+                            spawnEnemyProjectile(transform->x - 30.0f, transform->y, projVx, projVy);
+                        }
+                        
+                        std::cout << "[GameServer] Boss fired arc shot! " << bossComp->bulletsPerArc << " bullets" << std::endl;
+                    }
+                } else if (bossComp->mechanic == ecs::BossMechanic::MinionSpawner) {
+                    // Spawn minion enemies periodically
+                    bossComp->minionTimer += dt;
+                    if (bossComp->minionTimer >= bossComp->minionSpawnRate && bossComp->currentMinions < bossComp->maxMinions) {
+                        bossComp->minionTimer = 0.0f;
+                        
+                        // Spawn a basic enemy minion near the boss
+                        ecs::EnemySpawnConfig minionConfig;
+                        minionConfig.type = ecs::EnemyType::Basic;
+                        minionConfig.x = transform->x - 50.0f;
+                        minionConfig.y = transform->y + (std::rand() % 100 - 50);  // Random Y offset
+                        minionConfig.vx = -150.0f;
+                        minionConfig.vy = 0.0f;
+                        minionConfig.health = 1;
+                        minionConfig.scoreValue = 50;
+                        spawnEnemy(minionConfig);
+                        bossComp->currentMinions++;
+                        m_enemiesAlive++;
+                        
+                        std::cout << "[GameServer] Boss spawned minion! (" << bossComp->currentMinions << "/" << bossComp->maxMinions << ")" << std::endl;
+                    }
+                    
+                    // Also fire regular shots at player
+                    enemy->fireTimer += dt;
+                    if (enemy->fireTimer >= 1.5f) {
+                        enemy->fireTimer = 0.0f;
+                        spawnEnemyProjectile(transform->x - 30.0f, transform->y, -300.0f, 0.0f);
+                    }
+                } else if (bossComp->mechanic == ecs::BossMechanic::Teleporter) {
+                    // Teleport to random position periodically
+                    bossComp->teleportTimer += dt;
+                    if (bossComp->teleportTimer >= bossComp->teleportCooldown) {
+                        bossComp->teleportTimer = 0.0f;
+                        
+                        // Teleport to new position (right side of screen)
+                        float newX = 700.0f + (std::rand() % 300);  // 700-1000
+                        float newY = 100.0f + (std::rand() % 500);  // 100-600
+                        transform->x = newX;
+                        transform->y = newY;
+                        bossComp->baseY = newY;  // Update oscillation center
+                        
+                        // Fire burst after teleporting
+                        for (int i = 0; i < 8; ++i) {
+                            float angle = i * 45.0f;
+                            float rad = angle * 3.14159f / 180.0f;
+                            float projVx = std::cos(rad) * 200.0f;
+                            float projVy = std::sin(rad) * 200.0f;
+                            spawnEnemyProjectile(transform->x, transform->y, projVx, projVy);
+                        }
+                        
+                        std::cout << "[GameServer] Boss teleported to (" << newX << ", " << newY << ") and fired burst!" << std::endl;
+                    }
+                } else {
+                    // Boss with no special mechanic - just fire rapidly
+                    enemy->fireTimer += dt;
+                    if (enemy->fireTimer >= 0.8f) {
+                        enemy->fireTimer = 0.0f;
+                        spawnEnemyProjectile(transform->x - 30.0f, transform->y, -350.0f, 0.0f);
+                    }
+                }
+                // Skip regular firing for bosses with mechanics
+                continue;
+            }
+            
+            // Determine fire interval based on enemy type
+            float fireInterval = 3.0f;  // Basic enemies shoot every 3 seconds
+            if (enemy->type == ecs::EnemyType::Shooter || enemy->type == ecs::EnemyType::Turret) {
+                fireInterval = 1.5f;  // Shooter/Turret enemies shoot faster
+            } else if (enemy->type == ecs::EnemyType::Boss) {
+                fireInterval = 0.8f;  // Boss shoots fastest
+            }
+            
+            if (enemy->fireTimer >= fireInterval) {
+                enemy->fireTimer = 0.0f;
+                
+                // Spawn projectile moving left (toward players)
+                float projX = transform->x - 20.0f;
+                float projY = transform->y;
+                float projVx = -enemy->projectileSpeed;
+                float projVy = 0.0f;
+                
+                spawnEnemyProjectile(projX, projY, projVx, projVy);
+            }
+        }
+        
+        // Now destroy collected enemies safely
+        for (ecs::EntityId eid : enemiesToDestroy) {
+            auto* network = m_registry.tryGetComponent<ecs::NetworkComponent>(eid);
+            if (network) {
+                m_networkIdManager->remove(ecs::Entity(eid));
+                m_networkManager->broadcastEntityDestroy(network->networkId);
+            }
+            m_registry.destroyEntity(eid);
+            if (m_enemiesAlive > 0) {
+                m_enemiesAlive--;
+            }
+        }
+        
+        // Check level completion after destroying enemies
+        if (!enemiesToDestroy.empty()) {
+            checkLevelComplete();
+        }
+    }
+
+    void GameServer::spawnEnemyProjectile(float x, float y, float vx, float vy) {
+        ecs::Entity projectile = m_registry.createEntity();
+        
+        // Transform
+        m_registry.addComponent(projectile, ecs::TransformComponent(x, y));
+        
+        // Velocity
+        m_registry.addComponent(projectile, ecs::VelocityComponent(vx, vy, 500.0f));
+        
+        // Projectile component (enemy projectile)
+        m_registry.addComponent(projectile, ecs::ProjectileComponent(ecs::NULL_ENTITY, 10, false));
+        
+        // Collider
+        ecs::ColliderComponent collider;
+        collider.width = 16.0f;
+        collider.height = 16.0f;
+        collider.layer = ecs::CollisionLayer::EnemyShot;
+        collider.mask = static_cast<ecs::CollisionLayer>(
+            static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+            static_cast<uint32_t>(ecs::CollisionLayer::Wall)
+        );
+        m_registry.addComponent(projectile, collider);
+        
+        // Lifetime (auto-destroy after 5 seconds)
+        m_registry.addComponent(projectile, ecs::LifetimeComponent(5.0f));
+        
+        // Network - Allocate network ID
+        uint32_t networkId = m_networkIdManager->allocate(projectile);
+        m_registry.addComponent(projectile, ecs::NetworkComponent(networkId, false));
+        
+        // Broadcast spawn to clients
+        network::EntitySpawnMessage spawnMsg{};
+        spawnMsg.networkId = networkId;
+        spawnMsg.entityType = network::EntityType::PROJECTILE;
+        spawnMsg.x = x;
+        spawnMsg.y = y;
+        spawnMsg.rotation = 0.0f;
+        spawnMsg.vx = vx;
+        spawnMsg.vy = vy;
+        spawnMsg.trajectoryType = 0;  // Linear
+        spawnMsg.trajectoryParam1 = 0.0f;
+        spawnMsg.trajectoryParam2 = 0.0f;
+        spawnMsg.spinSpeed = 0.0f;
+        spawnMsg.maxLifetime = 5.0f;
+        spawnMsg.colliderWidth = 16.0f;
+        spawnMsg.colliderHeight = 16.0f;
+        spawnMsg.collisionLayer = static_cast<uint32_t>(ecs::CollisionLayer::EnemyShot);
+        spawnMsg.collisionMask = static_cast<uint32_t>(ecs::CollisionLayer::Player) |
+                                 static_cast<uint32_t>(ecs::CollisionLayer::Wall);
+        
+        m_networkManager->broadcastEntitySpawn(spawnMsg);
     }
 
 } // namespace rtype::server

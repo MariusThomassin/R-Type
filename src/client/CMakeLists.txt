@@ -54,6 +54,3 @@ elseif(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(client PRIVATE Threads::Threads)
 endif()
-
-# Install rules
-install(TARGETS client RUNTIME DESTINATION bin)
