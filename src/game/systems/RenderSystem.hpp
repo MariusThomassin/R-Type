@@ -182,6 +182,19 @@ namespace rtype::ecs {
                         }
                     }
                 );
+                
+                // Collect PowerupComponent entities
+                m_registry->forEach<TransformComponent, PowerupComponent>(
+                    [this, &entities](EntityId e) {
+                        // Only add if not already added via other components
+                        if (!m_registry->hasComponent<SpritesheetComponent>(e) &&
+                            !m_registry->hasComponent<SpriteComponent>(e) &&
+                            !m_registry->hasComponent<PlayerShipComponent>(e) &&
+                            !m_registry->hasComponent<EnemyComponent>(e)) {
+                            entities.push_back({e, 45});  // Layer 45 for powerups (slightly behind enemies)
+                        }
+                    }
+                );
 
                 m_lastEntityCount = entities.size();
 

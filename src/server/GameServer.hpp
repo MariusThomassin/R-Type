@@ -137,6 +137,12 @@ namespace rtype::server {
         void handleEnemyCollision(const ecs::CollisionEvent& event);
 
         /**
+         * @brief Handle player-powerup collision events
+         * @param event Collision event data
+         */
+        void handlePowerupCollision(const ecs::CollisionEvent& event);
+
+        /**
          * @brief Handle player death (health <= 0)
          * @param playerEntity Player entity that died
          */
