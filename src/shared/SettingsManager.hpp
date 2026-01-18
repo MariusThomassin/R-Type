@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <fstream>
 #include <sstream>
+#include <iostream>
 
 namespace rtype {
 
@@ -76,18 +77,33 @@ namespace rtype {
          * @return true if loaded successfully
          */
         bool load(const std::string& path) {
+            std::cout << "[SettingsManager] load() called with path: " << path << std::endl;
+            std::cout.flush();
             m_filePath = path;
 
+            std::cout << "[SettingsManager] Opening file..." << std::endl;
+            std::cout.flush();
             std::ifstream file(path);
             if (!file.is_open()) {
+                std::cout << "[SettingsManager] File not found, using defaults" << std::endl;
+                std::cout.flush();
                 return false;  // Use defaults
             }
 
+            std::cout << "[SettingsManager] File opened, reading content..." << std::endl;
+            std::cout.flush();
             std::string content((std::istreambuf_iterator<char>(file)),
                                  std::istreambuf_iterator<char>());
+            std::cout << "[SettingsManager] Content read, size: " << content.size() << std::endl;
+            std::cout.flush();
             file.close();
 
-            return parseJson(content);
+            std::cout << "[SettingsManager] Parsing JSON..." << std::endl;
+            std::cout.flush();
+            bool result = parseJson(content);
+            std::cout << "[SettingsManager] Parse complete, result: " << (result ? "true" : "false") << std::endl;
+            std::cout.flush();
+            return result;
         }
 
         /**

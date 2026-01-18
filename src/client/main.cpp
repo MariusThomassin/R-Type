@@ -17,6 +17,7 @@
 #include <raylib.h>
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include "../engine/ecs/ECS.hpp"
 #include "../engine/ecs/core/EventBus.hpp"
@@ -168,6 +169,22 @@ void clampPlayerToScreen(Registry& registry) {
 }
 
 int main(int argc, char* argv[]) {
+    // ==================== File Logging for Debugging ====================
+    std::ofstream logFile("rtype_client.log", std::ios::out | std::ios::trunc);
+    std::streambuf* coutBuf = std::cout.rdbuf();
+    std::streambuf* cerrBuf = std::cerr.rdbuf();
+    if (logFile.is_open()) {
+        std::cout.rdbuf(logFile.rdbuf());
+        std::cerr.rdbuf(logFile.rdbuf());
+    }
+    std::cout << "[Log] R-Type Client starting..." << std::endl;
+    std::cout << "[Log] argc = " << argc << std::endl;
+    for (int i = 0; i < argc; i++) {
+        std::cout << "[Log] argv[" << i << "] = " << argv[i] << std::endl;
+    }
+    std::cout.flush();
+
+    try {
     // ==================== Parse Command-Line Arguments ====================
     std::string serverIp = "127.0.0.1";  // Default: localhost
     int serverPort = 4242;                // Default: 4242
@@ -194,24 +211,45 @@ int main(int argc, char* argv[]) {
     // ==================== Audio Initialization ====================
     InitAudioDevice();  // Explicitly initialize audio device
     std::cout << "Audio device initialized. Ready: " << (IsAudioDeviceReady() ? "YES" : "NO") << std::endl;
+    std::cout.flush();
 
     // ==================== Event Bus ====================
+    std::cout << "[Log] Creating EventBus..." << std::endl; std::cout.flush();
     rtype::ecs::EventBus eventBus;
+    std::cout << "[Log] EventBus created" << std::endl; std::cout.flush();
 
     // ==================== Settings Manager ====================
+    std::cout << "[Log] Creating SettingsManager..." << std::endl; std::cout.flush();
     rtype::SettingsManager settingsManager;
+    std::cout << "[Log] SettingsManager created" << std::endl; std::cout.flush();
     // Try to load settings from file, otherwise use defaults
-    if (!settingsManager.load("config/settings.json")) {
+    std::cout << "[Log] Loading settings file..." << std::endl; std::cout.flush();
+    bool settingsLoaded = false;
+    try {
+        settingsLoaded = settingsManager.load("config/settings.json");
+        std::cout << "[Log] Settings load returned: " << (settingsLoaded ? "true" : "false") << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[Log] Settings load exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[Log] Settings load unknown exception" << std::endl;
+    }
+    std::cout.flush();
+    if (!settingsLoaded) {
         std::cout << "[Main] No settings file found, using defaults" << std::endl;
     } else {
         std::cout << "[Main] Settings loaded from config/settings.json" << std::endl;
     }
+    std::cout.flush();
 
     // ==================== Input Manager ====================
+    std::cout << "[Log] Creating InputManager..." << std::endl; std::cout.flush();
     rtype::ecs::events::InputManager inputManager(eventBus, &settingsManager);
+    std::cout << "[Log] InputManager created" << std::endl; std::cout.flush();
 
     // ==================== UI Manager ====================
+    std::cout << "[Log] Creating UIManager..." << std::endl; std::cout.flush();
     rtype::ui::UIManager uiManager(eventBus);
+    std::cout << "[Log] UIManager created" << std::endl; std::cout.flush();
 
     // UIManager automatically subscribes to events via its constructor // Optional for testing focus/text
 
@@ -224,14 +262,20 @@ int main(int argc, char* argv[]) {
     bool showingMultiplayer = false;
     
     // ==================== ECS Setup ====================
+    std::cout << "[Log] Creating Registry..." << std::endl; std::cout.flush();
     Registry registry;
+    std::cout << "[Log] Registry created" << std::endl; std::cout.flush();
+    std::cout << "[Log] Creating SystemManager..." << std::endl; std::cout.flush();
     SystemManager systems(&registry);
+    std::cout << "[Log] SystemManager created" << std::endl; std::cout.flush();
     bool shouldExit = false;
 
     // ==================== Network Setup ====================
     // NetworkClient is created but NOT connected at startup
     // Connection happens through the multiplayer menu when user selects a server
+    std::cout << "[Log] Creating NetworkClient..." << std::endl; std::cout.flush();
     rtype::client::NetworkClient networkClient(registry);
+    std::cout << "[Log] NetworkClient created" << std::endl; std::cout.flush();
 
     // ==================== Local Server (for Solo Mode) ====================
     // LocalServer runs a full GameServer in a background thread
@@ -974,6 +1018,31 @@ int main(int argc, char* argv[]) {
     cleanupMusic();      // Clean up music resources
     CloseAudioDevice();  // Clean up audio device
     CloseWindow();
+
+    std::cout << "[Log] R-Type Client exiting normally" << std::endl;
+    std::cout.flush();
+    } catch (const std::exception& e) {
+        std::cerr << "[CRASH] Exception: " << e.what() << std::endl;
+        std::cerr.flush();
+        // Restore streams before exit
+        std::cout.rdbuf(coutBuf);
+        std::cerr.rdbuf(cerrBuf);
+        logFile.close();
+        return 1;
+    } catch (...) {
+        std::cerr << "[CRASH] Unknown exception occurred" << std::endl;
+        std::cerr.flush();
+        // Restore streams before exit
+        std::cout.rdbuf(coutBuf);
+        std::cerr.rdbuf(cerrBuf);
+        logFile.close();
+        return 1;
+    }
+
+    // Restore original stream buffers
+    std::cout.rdbuf(coutBuf);
+    std::cerr.rdbuf(cerrBuf);
+    logFile.close();
 
     return 0;
 }
